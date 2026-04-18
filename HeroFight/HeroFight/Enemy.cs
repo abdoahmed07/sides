@@ -1,13 +1,13 @@
-﻿namespace OBP200_RolePlayingGame;
+﻿namespace HeroFight;
 
 // Enemy inherits from Character.
-// Has extra properties for rewards the player gets after combat.
+// Rewards the player with XP and gold after being defeated.
 public class Enemy : Character
 {
     public int XpReward { get; set; }
     public int GoldReward { get; set; }
 
-    // The enemy deals damage based on its Attack stat, without bonus.
+    // Enemies deal damage equal to their base Attack stat.
     public override int DealDamage()
     {
         return Attack;

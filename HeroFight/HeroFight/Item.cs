@@ -1,4 +1,4 @@
-﻿namespace OBP200_RolePlayingGame;
+﻿namespace HeroFight;
 
 // Represents an item in the player's inventory.
 public class Item

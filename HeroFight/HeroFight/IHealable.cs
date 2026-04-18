@@ -1,7 +1,7 @@
-﻿namespace OBP200_RolePlayingGame;
+﻿namespace HeroFight;
 
 // Interface for characters that can be healed.
-// Player implements this - Enemy does not since enemies don't heal.
+// Player implements this - enemies do not.
 public interface IHealable
 {
     void Heal(int amount);
