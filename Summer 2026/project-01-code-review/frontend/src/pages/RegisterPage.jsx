@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../App";
 
@@ -9,6 +9,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get("redirect") || "/";
 
   function handleChange(e) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -22,7 +24,7 @@ export default function RegisterPage() {
     try {
       const { token, user } = await api.register(form);
       login(token, user);
-      navigate("/");
+      navigate(redirect);
     } catch (err) {
       setError(err.message);
     } finally {

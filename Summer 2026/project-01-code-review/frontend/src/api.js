@@ -1,7 +1,9 @@
 // Thin API wrapper — all fetch calls go through here
 // I centralize this so I can easily change the base URL or add error handling in one place
 
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+// In dev, use relative paths — Vite proxy forwards /api → localhost:3000
+// In production, set VITE_API_URL to the deployed backend URL
+const BASE = import.meta.env.VITE_API_URL || "";
 
 async function request(path, options = {}, token = null) {
   const headers = {

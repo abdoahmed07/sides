@@ -10,7 +10,8 @@ import { useAuth } from "../App";
 import CommentSidebar from "../components/CommentSidebar";
 import CommentForm from "../components/CommentForm";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+// Empty string = connect to same origin, Vite proxy handles it in dev
+const API_URL = import.meta.env.VITE_API_URL || "";
 
 export default function ReviewPage() {
   const { shareId } = useParams();
@@ -230,7 +231,10 @@ export default function ReviewPage() {
                   )}
                   {isSelected && !token && (
                     <div className="ml-16 my-2 mr-4 text-sm text-gray-500">
-                      <a href="/login" className="text-blue-400 hover:underline">Sign in</a> to leave a comment
+                      <a
+                        href={`/login?redirect=/review/${shareId}`}
+                        className="text-blue-400 hover:underline"
+                      >Sign in</a> to leave a comment
                     </div>
                   )}
                 </div>

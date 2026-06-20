@@ -4,8 +4,8 @@
   "description": "Backend for the real-time collaborative code review tool",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "start": "node --env-file=.env src/index.js",
+    "dev": "nodemon --env-file=.env src/index.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
