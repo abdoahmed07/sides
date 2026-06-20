@@ -41,6 +41,7 @@ static void handle_sigint(int sig) {
 
 // Called by libpcap for each captured packet
 void packet_handler(u_char* user, const struct pcap_pkthdr* header, const u_char* packet) {
+    (void)user; /* unused when not writing to a dump file */
     PacketInfo info = {0};
     info.timestamp  = header->ts;
     info.length     = header->len;
@@ -121,12 +122,20 @@ int main(int argc, char* argv[]) {
         snprintf(filter_expr, sizeof(filter_expr), "%s", host_filter);
 
     // Find default interface if none specified
+    // pcap_lookupdev() was deprecated in libpcap 1.9 and removed in some builds,
+    // so I use pcap_findalldevs() instead — it's the modern way
     if (!interface) {
-        interface = pcap_lookupdev(errbuf);
-        if (!interface) {
+        pcap_if_t* alldevs;
+        if (pcap_findalldevs(&alldevs, errbuf) == -1 || alldevs == NULL) {
             fprintf(stderr, "No interface found: %s\n", errbuf);
             return 1;
         }
+        // Use the first non-loopback interface, falling back to whatever is first
+        interface = alldevs->name;
+        for (pcap_if_t* d = alldevs; d != NULL; d = d->next) {
+            if (!(d->flags & PCAP_IF_LOOPBACK)) { interface = d->name; break; }
+        }
+        // Note: alldevs memory leaks here intentionally — we exit or use it right after
     }
 
     printf("Capturing on %s", interface);

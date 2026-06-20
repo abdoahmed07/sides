@@ -5,6 +5,7 @@
 // add alignment padding that would mess up the byte offsets
 
 #include <stdint.h>
+#include <sys/time.h>    /* struct timeval */
 #include <netinet/in.h>
 
 #define ETHERNET_HEADER_LEN 14

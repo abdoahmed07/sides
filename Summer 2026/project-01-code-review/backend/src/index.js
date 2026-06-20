@@ -37,6 +37,9 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// Attach io to app so routes can emit events via req.app.get("io")
+app.set("io", io);
+
 // Socket.io connection handling — I pass the io instance into a handler
 // so I can keep all the socket logic in one place
 registerSocketHandlers(io);

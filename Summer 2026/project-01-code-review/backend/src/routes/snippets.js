@@ -2,7 +2,7 @@
 // A snippet is a piece of code with a unique shareable URL
 
 const express = require("express");
-const { nanoid } = require("nanoid"); // generates short unique IDs like "V1StGXR8_Z5jdHi6"
+const { randomBytes } = require("crypto"); // built-in Node module — no extra dependency needed
 const db = require("../db");
 const { requireAuth, optionalAuth } = require("../middleware/auth");
 
@@ -21,12 +21,12 @@ router.post("/", requireAuth, async (req, res) => {
   }
 
   try {
-    // nanoid gives me a random 8-char URL-safe string
-    // The chance of collision is astronomically low but I handle it just in case
+    // randomBytes(6) → base64url → 8 chars (6 bytes = 48 bits = 8 base64 chars)
+    // The chance of collision is astronomically low but I check anyway
     let shareId;
     let attempts = 0;
     while (true) {
-      shareId = nanoid(8);
+      shareId = randomBytes(6).toString("base64url");
       const existing = await db.query("SELECT id FROM snippets WHERE share_id = $1", [shareId]);
       if (existing.rows.length === 0) break;
       if (++attempts > 5) throw new Error("Could not generate unique share ID");

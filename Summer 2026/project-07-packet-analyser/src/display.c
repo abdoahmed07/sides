@@ -20,22 +20,20 @@
 #define COLOR_BOLD    "\x1b[1m"
 
 // Get a string description of TCP flags like "SYN", "ACK", "SYN-ACK", "FIN", "RST"
+// I store each flag name as a null-terminated string (4 bytes) to avoid strncpy truncation
 static void tcp_flags_str(uint8_t flags, char* out, int outlen) {
-    char parts[6][4] = {0};
-    int n = 0;
-    if (flags & 0x02) strncpy(parts[n++], "SYN", 3);
-    if (flags & 0x10) strncpy(parts[n++], "ACK", 3);
-    if (flags & 0x01) strncpy(parts[n++], "FIN", 3);
-    if (flags & 0x04) strncpy(parts[n++], "RST", 3);
-    if (flags & 0x08) strncpy(parts[n++], "PSH", 3);
-    if (flags & 0x20) strncpy(parts[n++], "URG", 3);
-
+    const char* names[] = {"SYN", "ACK", "FIN", "RST", "PSH", "URG"};
+    uint8_t     bits[]  = {0x02,  0x10,  0x01,  0x04,  0x08,  0x20};
     out[0] = '\0';
-    for (int i = 0; i < n; i++) {
-        if (i > 0) strncat(out, "-", outlen - strlen(out) - 1);
-        strncat(out, parts[i], outlen - strlen(out) - 1);
+    int wrote = 0;
+    for (int i = 0; i < 6; i++) {
+        if (flags & bits[i]) {
+            if (wrote) strncat(out, "-",       outlen - (int)strlen(out) - 1);
+            strncat(out,  names[i], outlen - (int)strlen(out) - 1);
+            wrote = 1;
+        }
     }
-    if (n == 0) strncpy(out, "none", outlen);
+    if (!wrote) strncat(out, "none", outlen - 1);
 }
 
 void print_header(void) {
@@ -47,11 +45,11 @@ void print_header(void) {
 }
 
 void print_packet(const PacketInfo* info) {
-    // Format timestamp as HH:MM:SS.usec
+    // Format timestamp as HH:MM:SS.ms — buffer needs 13 chars + null
     char time_str[16];
     struct tm* t = localtime(&info->timestamp.tv_sec);
-    snprintf(time_str, sizeof(time_str), "%02d:%02d:%02d.%03ld",
-             t->tm_hour, t->tm_min, t->tm_sec, info->timestamp.tv_usec / 1000);
+    snprintf(time_str, sizeof(time_str), "%02d:%02d:%02d.%03d",
+             t->tm_hour, t->tm_min, t->tm_sec, (int)(info->timestamp.tv_usec / 1000));
 
     const char* color = COLOR_GREY;
     char proto[8]     = "???";
@@ -74,9 +72,9 @@ void print_packet(const PacketInfo* info) {
         snprintf(src, sizeof(src), "%s:%d", info->src_ip, info->src_port);
         snprintf(dst, sizeof(dst), "%s:%d", info->dst_ip, info->dst_port);
         if (info->dns_is_response && info->dns_answer[0])
-            snprintf(extra, sizeof(extra), "%s -> %s", info->dns_query, info->dns_answer);
+            snprintf(extra, sizeof(extra), "%.28s->%.28s", info->dns_query, info->dns_answer);
         else
-            snprintf(extra, sizeof(extra), "query: %s", info->dns_query);
+            snprintf(extra, sizeof(extra), "q:%.58s", info->dns_query);
     } else if (info->is_tcp) {
         color = COLOR_BLUE;
         snprintf(proto, sizeof(proto), "TCP");

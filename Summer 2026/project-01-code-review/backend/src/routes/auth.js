@@ -3,7 +3,7 @@
 // No refresh tokens for now, the JWT expires in 7 days which is fine for a portfolio app
 
 const express = require("express");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs"); // pure-JS bcrypt — same API as bcrypt but no native build step
 const jwt = require("jsonwebtoken");
 const db = require("../db");
 
