@@ -1,0 +1,62 @@
+// Example Lox program that exercises all the main features of the language
+// I wrote this to test my interpreter after implementing each chapter
+
+// Variables and arithmetic
+var a = 10;
+var b = 20;
+print a + b;  // 30
+
+// Functions and recursion
+fun fibonacci(n) {
+    if (n <= 1) return n;
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+print fibonacci(10);  // 55
+
+// Closures — this is the really cool part
+// makeCounter returns a function that closes over its local variable `count`
+fun makeCounter() {
+    var count = 0;
+    fun increment() {
+        count = count + 1;
+        return count;
+    }
+    return increment;
+}
+
+var counter = makeCounter();
+print counter();  // 1
+print counter();  // 2
+print counter();  // 3
+
+// Classes with inheritance
+class Animal {
+    init(name) {
+        this.name = name;
+    }
+
+    speak() {
+        print this.name + " makes a sound.";
+    }
+}
+
+class Dog < Animal {
+    speak() {
+        print this.name + " barks.";
+    }
+
+    fetch() {
+        super.speak();  // call Animal's speak
+        print this.name + " fetches the ball!";
+    }
+}
+
+var d = Dog("Rex");
+d.speak();   // Rex barks.
+d.fetch();   // Rex makes a sound. \n Rex fetches the ball!
+
+// String interpolation (my custom extension — not in the book)
+var greeting = "Hello";
+var name = "world";
+print f"{greeting}, {name}!";  // Hello, world!

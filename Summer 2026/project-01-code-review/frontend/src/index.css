@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* highlight.js theme — using github-dark, looks clean and professional */
+@import "highlight.js/styles/github-dark.css";
+
+/* Make the code block fill its container and not overflow */
+pre code.hljs {
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}
+
+/* Line highlight when a line is selected */
+.line-highlighted {
+  background-color: rgba(59, 130, 246, 0.15);
+  border-left: 2px solid #3b82f6;
+}
+
+/* Smooth transitions for interactive elements */
+* {
+  transition-property: background-color, border-color, color, opacity;
+  transition-duration: 150ms;
+}

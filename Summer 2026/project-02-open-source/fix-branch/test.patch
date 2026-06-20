@@ -1,0 +1,29 @@
+diff --git a/test/socket.io.ts b/test/socket.io.ts
+index abc1234..def5678 100644
+--- a/test/socket.io.ts
++++ b/test/socket.io.ts
+@@ -XXX,0 +XXX,30 @@
++  // Test I added for the disconnect-before-ack bug fix
++  it("should call ack callback with error when socket disconnects before ack", (done) => {
++    const io = new Server(0);
++    const port = (io.httpServer.address() as AddressInfo).port;
++
++    io.on("connection", (socket) => {
++      socket.on("test", (_data, callback) => {
++        // Disconnect before calling the ack
++        socket.disconnect(true);
++        // The ack should NOT be called normally here
++        // (the _onclose handler should call it with an error instead)
++      });
++    });
++
++    const client = ioc(`http://localhost:${port}`);
++
++    client.emit("test", { hello: "world" }, (err: Error | null) => {
++      // The callback should be called with an error, not null
++      expect(err).to.be.an.instanceof(Error);
++      expect(err.message).to.equal("socket disconnected");
++      io.close();
++      done();
++    });
++  });

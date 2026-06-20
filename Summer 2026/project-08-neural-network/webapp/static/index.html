@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digit Classifier — Neural Net from Scratch</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #111;
+      color: #f0f0f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    p.subtitle { color: #888; font-size: 0.9rem; margin-bottom: 2rem; }
+
+    .container {
+      display: flex;
+      gap: 3rem;
+      align-items: flex-start;
+    }
+
+    .canvas-area { display: flex; flex-direction: column; gap: 1rem; }
+    canvas {
+      border: 2px solid #444;
+      border-radius: 8px;
+      cursor: crosshair;
+      background: #000;
+    }
+    .buttons { display: flex; gap: 0.75rem; }
+    button {
+      padding: 0.6rem 1.4rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    #classify-btn { background: #3b82f6; color: white; }
+    #classify-btn:hover { background: #2563eb; }
+    #clear-btn { background: #374151; color: white; }
+    #clear-btn:hover { background: #4b5563; }
+
+    .result-area { min-width: 240px; }
+    .prediction {
+      font-size: 5rem;
+      font-weight: 700;
+      text-align: center;
+      color: #60a5fa;
+      margin-bottom: 0.5rem;
+    }
+    .confidence {
+      text-align: center;
+      color: #aaa;
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+    .probabilities { list-style: none; }
+    .probabilities li {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.4rem;
+      font-size: 0.85rem;
+    }
+    .bar-track {
+      flex: 1;
+      height: 8px;
+      background: #222;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      background: #3b82f6;
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+    .digit-label { width: 16px; color: #888; }
+    .bar-pct { width: 40px; text-align: right; color: #aaa; }
+    .hint { color: #555; font-size: 0.8rem; margin-top: 1rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>Digit Classifier</h1>
+  <p class="subtitle">Neural network trained from scratch on MNIST — no PyTorch, no TensorFlow</p>
+
+  <div class="container">
+    <div class="canvas-area">
+      <!-- Drawing canvas — 280px = 28 pixels at 10x zoom -->
+      <canvas id="canvas" width="280" height="280"></canvas>
+      <div class="buttons">
+        <button id="classify-btn">Classify →</button>
+        <button id="clear-btn">Clear</button>
+      </div>
+      <p class="hint">Draw a digit (0–9) with your mouse or finger</p>
+    </div>
+
+    <div class="result-area">
+      <div class="prediction" id="prediction">?</div>
+      <div class="confidence" id="confidence">Draw a digit and click Classify</div>
+      <ul class="probabilities" id="probabilities">
+        <!-- Filled in by JS after classification -->
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const canvas  = document.getElementById("canvas");
+    const ctx     = canvas.getContext("2d");
+    let isDrawing = false;
+
+    // Drawing setup — thick white strokes on black (matches MNIST format)
+    ctx.strokeStyle = "white";
+    ctx.lineWidth   = 18;
+    ctx.lineCap     = "round";
+    ctx.lineJoin    = "round";
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches ? e.touches[0] : e;
+      return {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top,
+      };
+    }
+
+    canvas.addEventListener("mousedown",  (e) => { isDrawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); });
+    canvas.addEventListener("mousemove",  (e) => { if (!isDrawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+    canvas.addEventListener("mouseup",    ()  => { isDrawing = false; });
+    canvas.addEventListener("mouseleave", ()  => { isDrawing = false; });
+    canvas.addEventListener("touchstart", (e) => { e.preventDefault(); isDrawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); }, { passive: false });
+    canvas.addEventListener("touchmove",  (e) => { e.preventDefault(); if (!isDrawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }, { passive: false });
+    canvas.addEventListener("touchend",   ()  => { isDrawing = false; });
+
+    document.getElementById("clear-btn").addEventListener("click", () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      document.getElementById("prediction").textContent = "?";
+      document.getElementById("confidence").textContent = "Draw a digit and click Classify";
+      document.getElementById("probabilities").innerHTML = "";
+    });
+
+    document.getElementById("classify-btn").addEventListener("click", async () => {
+      const imageData = canvas.toDataURL("image/png");
+
+      try {
+        const response = await fetch("/predict", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ image: imageData }),
+        });
+
+        const result = await response.json();
+        if (result.error) {
+          document.getElementById("confidence").textContent = "Error: " + result.error;
+          return;
+        }
+
+        document.getElementById("prediction").textContent = result.digit;
+        document.getElementById("confidence").textContent =
+          `${result.confidence}% confidence`;
+
+        // Render probability bars for each digit
+        const ul = document.getElementById("probabilities");
+        ul.innerHTML = result.probabilities
+          .map((pct, digit) => `
+            <li>
+              <span class="digit-label">${digit}</span>
+              <div class="bar-track">
+                <div class="bar-fill" style="width: ${pct}%"></div>
+              </div>
+              <span class="bar-pct">${pct}%</span>
+            </li>
+          `).join("");
+      } catch (err) {
+        console.error(err);
+        document.getElementById("confidence").textContent = "Network error";
+      }
+    });
+  </script>
+</body>
+</html>

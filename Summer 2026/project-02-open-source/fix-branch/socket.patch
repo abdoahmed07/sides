@@ -1,0 +1,21 @@
+diff --git a/lib/socket.ts b/lib/socket.ts
+index abc1234..def5678 100644
+--- a/lib/socket.ts
++++ b/lib/socket.ts
+@@ -XXX,6 +XXX,18 @@ export class Socket<
+   private _onclose(reason: DisconnectReason, description?: CloseDescription) {
+     if (!this.connected) return this;
+
++    // Call any pending acknowledgement callbacks with an error so callers
++    // know the delivery failed rather than hanging indefinitely.
++    // I discovered this bug while using the library — ack callbacks were being
++    // silently dropped when a client disconnected mid-request.
++    for (const id in this._acks) {
++      const ack = this._acks[id];
++      process.nextTick(ack, new Error("socket disconnected"));
++      delete this._acks[id];
++    }
++
+     debug("closing socket - reason %s", reason);
+     this.emit("disconnecting", reason, description);
+     // ... rest of existing _onclose logic
