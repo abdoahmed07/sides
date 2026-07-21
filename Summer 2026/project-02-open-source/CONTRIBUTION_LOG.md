@@ -15,7 +15,7 @@
 ## What the bug was
 
 When a client calls `socket.emit("event", data, callback)` and then disconnects before the
-server processes the acknowledgement, the callback was never called — it just silently hung.
+server processes the acknowledgement, the callback was never called. It just silently hung.
 
 This matters because callers using the callback pattern to confirm delivery had no way to
 know the delivery failed. The fix is to call pending acknowledgement callbacks with an error
@@ -29,7 +29,7 @@ when the socket disconnects, so callers can handle the failure case.
 # 1. Fork the repo on GitHub (click Fork)
 
 # 2. Clone my fork
-git clone https://github.com/moez-abuharaz/socket.io.git
+git clone https://github.com/abdoahmed07/socket.io.git
 cd socket.io
 
 # 3. Read the contribution guide first

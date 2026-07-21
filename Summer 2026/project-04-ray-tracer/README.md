@@ -1,97 +1,53 @@
 # Ray Tracer (C++)
 
-A physically-based ray tracer implemented from scratch in C++, following the
-[Ray Tracing in One Weekend](https://raytracing.github.io) series (Books 1, 2, and 3).
-No graphics libraries — just math, vectors, and pixels written to a PPM file.
+A physically-based ray tracer built from scratch in C++, following the [Ray Tracing in One Weekend](https://raytracing.github.io) book. No graphics libraries — just math, vectors, and pixels written to a PPM file.
 
-## Renders
+## Render
 
-**Book 1 Final Scene** — hundreds of random spheres with diffuse, metal, and glass materials,
-depth of field:
+![Final render](output.png)
 
-*(render image here — see `renders/book1_final.ppm`)*
-
-**Book 2 Cornell Box** — classic computer graphics test scene with area lights and global
-illumination:
-
-*(render image here — see `renders/book2_cornell_box.ppm`)*
+Hundreds of randomly placed spheres with three material types (matte, metal, and glass), rendered with depth of field and multi-sample anti-aliasing.
 
 ## Building
 
 ```bash
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build . --config Release
+cmake -B build && cmake --build build
 
-# Render the final scene (takes a few minutes at high sample count)
-./raytracer > ../renders/output.ppm
+# Render the scene (takes a few minutes)
+./build/raytracer > output.ppm
 
-# Convert to PNG (requires ImageMagick)
-convert ../renders/output.ppm ../renders/output.png
+# Open the result
+open output.ppm
 ```
+
+## How it works
+
+For every pixel on the screen, the renderer shoots multiple rays from the camera into the scene. When a ray hits a sphere it bounces off according to that sphere's material, and the process repeats until the ray either escapes to the sky (giving it a color) or bounces too many times. The final pixel color is the average of all those ray samples.
+
+This is called **path tracing**, the same technique used in production renderers like Pixar's RenderMan and Blender's Cycles.
+
+## Materials
+
+**Lambertian (matte):** light scatters randomly in all directions. All the colourful spheres use this. Implemented by picking a random point on a unit sphere attached to the hit point and bouncing the ray toward it.
+
+**Metal:** light reflects at the same angle it arrived, like a mirror. Implemented with the reflection formula `v - 2*dot(v,n)*n`. A `fuzz` parameter adds random scatter for a brushed metal look.
+
+**Dielectric (glass):** light bends as it passes through the surface (refraction) following Snell's law. Uses Schlick's approximation to blend between reflection and refraction depending on viewing angle, which is why glass looks more reflective at shallow angles.
 
 ## Features
 
-### Book 1 — Foundations
-- Vec3 class with dot product, cross product, reflection, refraction
-- Ray-sphere intersection via quadratic formula
-- Lambertian (matte) materials with proper diffuse scatter distribution
-- Metal materials with configurable fuzz for brushed effects
-- Dielectric (glass) with Snell's law refraction and Schlick's Fresnel approximation
-- Multi-sample anti-aliasing (configurable samples per pixel)
-- Depth of field / defocus blur via thin lens approximation
-
-### Book 2 — Advanced
-- Motion blur (moving spheres with time-averaged sampling)
-- Bounding Volume Hierarchy (BVH) — dramatically speeds up large scenes by partitioning space
-- Checker and Perlin noise textures
-- Rectangle lights (area lighting)
-- Cornell Box scene
-- Volumes / participating media (smoke, fog)
-
-### Book 3 — Monte Carlo
-- Probability density functions for importance sampling
-- Cosine-weighted hemisphere sampling for Lambertian surfaces
-- Light importance sampling for faster convergence
-
-### Custom Feature — OBJ File Loader
-I added support for loading `.obj` mesh files. The loader parses vertex positions and face
-definitions, triangulates each face, and inserts the triangles as hittable objects.
-This lets me render arbitrary geometry exported from Blender.
-
-```bash
-./raytracer --obj ../models/bunny.obj > ../renders/bunny.ppm
-```
+- `Vec3` class used for positions, directions, and colors (everything is just 3 numbers)
+- Ray-sphere intersection via the quadratic formula
+- Multi-sample anti-aliasing: multiple rays per pixel, averaged for smooth edges
+- Depth of field via thin lens approximation with a configurable aperture
+- Randomly generated scene with hundreds of spheres
 
 ## What I learned
 
-**The rendering equation.** Each recursive call in `ray_color()` is computing one term of
-the rendering equation: how much light arrives at a point from a given direction. The
-recursion terminates at light sources (the background gradient acts as an environment light).
+**The rendering equation.** Each recursive bounce in `ray_color()` computes one term of the rendering equation: how much light arrives at a point from a given direction. Writing it recursively made the physics click.
 
-**BVH is the most important optimization.** Before BVH, rendering a scene with 1,000 objects
-required testing every ray against all 1,000. After BVH, it's O(log n). The Book 2 final scene
-went from ~20 minutes to ~3 minutes to render.
+**Math on paper first.** Every time I tried to code before understanding the derivation (Snell's law refraction, Schlick's approximation) I got it wrong. Writing it out by hand first made the code straightforward.
 
-**Importance sampling matters more than I expected.** In Book 3, switching from uniform
-hemisphere sampling to cosine-weighted sampling halved the noise at the same sample count.
-This is the same principle behind MCMC methods in machine learning — smarter sampling means
-faster convergence.
+**Why C++:** Ray tracing is compute-intensive. The final scene takes several minutes in optimised C++. Python would be 10–100x slower, which would make iteration painful.
 
-**Math on paper first.** Every time I tried to code before understanding the derivation (the
-Snell's law refraction, the Schlick approximation, the BVH bounding box construction), I got
-it wrong. Writing it out by hand first made the code straightforward.
-
-## Technical decisions
-
-**Why C++:** The book uses C++ and I already know it. More importantly, ray tracing is
-compute-intensive — the final scene with 500 samples per pixel takes several minutes even in
-optimized C++. Python would be 10-100x slower, which would make iteration painful.
-
-**Why PPM output:** PPM is the simplest possible image format — plain text with pixel values.
-No library needed, I can write it myself. Once I have the PPM, I convert to PNG with
-ImageMagick.
-
-**Why recursive ray_color instead of iterative:** The book explains this — it's cleaner for
-understanding the rendering equation. A iterative path tracer would be more cache-friendly
-but much harder to reason about.
+**Why PPM output:** PPM is the simplest possible image format. Plain text RGB values, no library needed. Once rendered, open it directly in Preview on macOS.

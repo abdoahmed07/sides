@@ -78,12 +78,12 @@ understood why you'd want it. The interpreter uses it to add `interpret`, `print
 got it.
 
 **Closures are surprisingly subtle.** The Java version stores the closing Environment in the
-function object, which is conceptually clean but wastes memory. The C VM uses "upvalues" — a
+function object, which is conceptually clean but wastes memory. The C VM uses "upvalues": a
 smarter scheme where captured variables live on the stack until the closure outlives the
 scope, then get moved to the heap. Reading the upvalue chapter three times was worth it.
 
 **The garbage collector was the hardest part.** A mark-sweep GC in C requires very careful
-bookkeeping — you can't let the GC run at a moment when the compiler has a reference to an
+bookkeeping. You can't let the GC run at a moment when the compiler has a reference to an
 object that isn't reachable from the roots yet. The book calls these "GC hazard" moments and
 I hit every one of them.
 

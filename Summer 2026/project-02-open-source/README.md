@@ -16,7 +16,7 @@ from the user side to actually understand where the bug was.
 
 **Reading a real codebase is very different from reading tutorials.**
 The socket.io codebase is TypeScript, has multiple layers of abstraction, and uses patterns I
-hadn't seen before. I spent more time reading than writing — that's the right ratio.
+hadn't seen before. I spent more time reading than writing. That's the right ratio.
 
 **The contribution guide is not optional.**
 I almost submitted without reading CONTRIBUTING.md. Reading it first saved me a rejected PR

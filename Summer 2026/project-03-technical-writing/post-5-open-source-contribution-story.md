@@ -5,7 +5,7 @@ the same.
 
 ---
 
-I contributed a bug fix to socket.io — the real-time WebSocket library I'd been using all
+I contributed a bug fix to socket.io, the real-time WebSocket library I'd been using all
 summer in my code review app. Here's the whole thing from start to finish.
 
 ## How I found the issue
@@ -18,8 +18,8 @@ the server sends the acknowledgement, the callback was silently dropped. The cal
 to know their message wasn't delivered.
 
 I understood this bug because I'd been thinking about socket acknowledgements while building my
-own project. That's what made it the right issue to pick — not that it was the easiest, but
-that I already had context.
+own project. That's what made it the right issue to pick. Not the easiest one, just the one
+I already had context for.
 
 I commented: *"Hi, I'd like to work on this. I'm a computer engineering student familiar with
 Socket.io. Is this still open?"* One sentence. Professional. They said yes.
@@ -52,8 +52,7 @@ for (const id in this._acks) {
 ```
 
 I also wrote a test that verifies the callback is called with an error when the socket
-disconnects before the ack. The project requires tests for bug fixes — CONTRIBUTING.md says
-this explicitly.
+disconnects before the ack. The project requires tests for bug fixes; CONTRIBUTING.md says so explicitly.
 
 ## What surprised me
 
@@ -64,7 +63,7 @@ than I expected.
 
 **Responsiveness matters as much as code quality.** When the maintainer asked for a change,
 I made it within 24 hours. They explicitly thanked me for the quick turnaround. That detail
-— just being responsive — probably helped get it merged.
+That detail, just being responsive, probably helped get it merged.
 
 **Reading the diff of every merged PR in the relevant area first was worth it.** Before writing
 my fix, I read the last 10 PRs that touched `lib/socket.ts`. This told me the naming

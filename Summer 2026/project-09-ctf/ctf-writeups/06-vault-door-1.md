@@ -42,4 +42,4 @@ print(f"picoCTF{{{flag}}}")
 
 ## What I learned
 
-This demonstrates why you never validate secrets client-side. The "check" happened in code the user could read and reverse. Real password validation should happen on a server where the user can't inspect the logic. Any validation that runs in the client (browser JavaScript, downloaded app, Java bytecode) can be reversed — the user has the code.
+This demonstrates why you never validate secrets client-side. The "check" happened in code the user could read and reverse. Real password validation should happen on a server where the user can't inspect the logic. Any validation that runs in the client (browser JavaScript, downloaded app, Java bytecode) can be reversed. The user has the code.

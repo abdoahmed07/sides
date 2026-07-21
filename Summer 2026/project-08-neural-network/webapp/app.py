@@ -49,11 +49,42 @@ def preprocess_canvas(image_data_base64: str) -> np.ndarray:
     image_data = base64.b64decode(image_data_base64.split(",")[1])
     image = Image.open(io.BytesIO(image_data))
 
-    # Convert to grayscale and resize to 28x28
+    # Convert to grayscale
     image = image.convert("L")
-    image = image.resize((28, 28), Image.LANCZOS)
+    arr = np.array(image, dtype=float)
 
-    # Convert to numpy array and normalize
+    # Crop tightly around the drawn digit (find bounding box of non-black pixels)
+    threshold = 30  # pixels brighter than this are considered part of the digit
+    rows = np.any(arr > threshold, axis=1)
+    cols = np.any(arr > threshold, axis=0)
+
+    if rows.any() and cols.any():
+        rmin, rmax = np.where(rows)[0][[0, -1]]
+        cmin, cmax = np.where(cols)[0][[0, -1]]
+
+        # Add padding around the bounding box (20% of the digit size)
+        h, w = rmax - rmin, cmax - cmin
+        pad = max(int(max(h, w) * 0.2), 4)
+        rmin = max(rmin - pad, 0)
+        rmax = min(rmax + pad, arr.shape[0] - 1)
+        cmin = max(cmin - pad, 0)
+        cmax = min(cmax + pad, arr.shape[1] - 1)
+
+        arr = arr[rmin:rmax+1, cmin:cmax+1]
+
+        # Make it square by padding the shorter side
+        h, w = arr.shape
+        if h != w:
+            size = max(h, w)
+            square = np.zeros((size, size), dtype=float)
+            row_off = (size - h) // 2
+            col_off = (size - w) // 2
+            square[row_off:row_off+h, col_off:col_off+w] = arr
+            arr = square
+
+    # Resize to 28x28 and normalize to [0, 1]
+    image = Image.fromarray(arr.astype(np.uint8))
+    image = image.resize((28, 28), Image.LANCZOS)
     arr = np.array(image, dtype=float) / 255.0
 
     # Flatten to (1, 784)

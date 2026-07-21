@@ -1,18 +1,18 @@
 # Real-time Code Review Tool
 
-A collaborative web app for inline code commenting with live updates. Paste or upload code, share the link, and leave comments on specific lines — comments appear instantly for everyone viewing the same snippet.
+A collaborative web app for inline code commenting with live updates. Paste or upload code, share the link, and leave comments on specific lines. Comments appear instantly for everyone viewing the same snippet.
 
 **Live demo:** [codereview-rho.vercel.app](https://codereview-rho.vercel.app) | **Backend:** [sides-production.up.railway.app](https://sides-production.up.railway.app)
 
 ## What it does
 
-- Paste code or drag-and-drop a file — it gets stored with a unique shareable URL
+- Paste code or drag-and-drop a file, stored with a unique shareable URL
 - Syntax highlighting via highlight.js for 18+ languages
 - Click any line to leave an inline comment
-- Comments appear live for all viewers (no refresh needed) — powered by Socket.io
+- Comments appear live for all viewers with no refresh needed (Socket.io)
 - Threaded replies in a collapsible sidebar
 - Real-time "X people viewing" presence indicator
-- JWT authentication — comments are attributed to your account
+- JWT authentication so comments are attributed to your account
 - Sign-in redirects back to the snippet you were viewing
 
 ## Tech stack
@@ -74,21 +74,21 @@ npx vercel env add VITE_API_URL production
 npx vercel --prod
 ```
 
-After deploying both, update `FRONTEND_URL` in Railway to your Vercel URL — Railway redeploys automatically.
+After deploying both, update `FRONTEND_URL` in Railway to your Vercel URL. Railway redeploys automatically.
 
 ## Technical decisions I made
 
 **Why Socket.io over SSE (Server-Sent Events):**
-I needed bidirectional communication for the presence feature — the server needs to know when users join/leave rooms. SSE is one-directional. Socket.io also handles reconnection automatically which matters for a real-time app.
+I needed bidirectional communication for the presence feature. The server needs to know when users join/leave rooms, so SSE (which is one-directional) doesn't cut it. Socket.io also handles reconnection automatically, which matters for a real-time app.
 
 **Why JWT in memory instead of localStorage:**
-Storing JWTs in localStorage makes XSS attacks more dangerous — any malicious script can read it. In React state the token dies on refresh, but for this kind of app that's an acceptable trade-off. In production I'd use httpOnly cookies.
+Storing JWTs in localStorage makes XSS attacks more dangerous, since any malicious script can read it. In React state the token dies on refresh, but for this kind of app that's an acceptable trade-off. In production I'd use httpOnly cookies.
 
 **Why `crypto.randomBytes` for share IDs:**
 I originally used nanoid but it's ESM-only in v4+ which breaks CommonJS require. Node's built-in `crypto.randomBytes(6).toString('base64url')` gives the same 8-char URL-safe random ID with no dependency needed.
 
 **Why bcryptjs instead of bcrypt:**
-`bcrypt` requires native compilation (node-gyp) which breaks across platforms and in CI. `bcryptjs` is pure JavaScript with the same API — slightly slower but completely portable.
+`bcrypt` requires native compilation (node-gyp) which breaks across platforms and in CI. `bcryptjs` is pure JavaScript with the same API, slightly slower but completely portable.
 
 **Why Railway + Vercel instead of one platform:**
 Vercel's CDN is faster for static assets. Railway handles long-lived WebSocket connections better than serverless functions, which have timeouts that would kill Socket.io connections.

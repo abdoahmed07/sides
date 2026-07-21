@@ -7,9 +7,8 @@ import java.util.List;
 // The Visitor pattern lets us add new operations (interpret, print, resolve) without
 // modifying these classes — all the logic stays in the visitor
 
-// I generated the boilerplate for these with a script (see tools/GenerateAst.java)
-// but it's important to understand the structure: each Expr subclass holds exactly
-// the data needed for that expression type
+// I generated the boilerplate for these with a script (see tools/GenerateAst.java).
+// Each Expr subclass holds exactly the data needed for that expression type.
 
 public abstract class Expr {
 

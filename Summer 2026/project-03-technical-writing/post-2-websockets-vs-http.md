@@ -10,11 +10,11 @@ I built: live comment updates in a code review tool.
 In a normal HTTP request, the client asks and the server answers. One request, one response,
 connection closed. That's the model.
 
-If I want to show new comments as they're posted — without the user refreshing — I have a few
+If I want to show new comments as they're posted (without the user refreshing), I have a few
 options with plain HTTP:
 
 **Polling:** the frontend asks the server every 2 seconds, "any new comments?" The server
-either says "yes, here they are" or "no, nothing new." This works but it's wasteful — most of
+either says "yes, here they are" or "no, nothing new." This works but it's wasteful. Most of
 those requests will get back an empty response. At 100 users on the same snippet, that's 3,000
 requests per minute for data that doesn't exist yet.
 
@@ -60,7 +60,7 @@ When a user opens a snippet page, the client sends a `join_snippet` event. When 
 close the tab, the client sends `leave_snippet` (or the socket just disconnects).
 
 I couldn't have done this cleanly with HTTP. With polling, I'd have no reliable way to know
-when a user left — they'd just stop making requests, and I'd have to expire their "presence"
+when a user left. They'd just stop making requests, and I'd have to expire their "presence"
 after some timeout.
 
 ## When to use which
@@ -71,5 +71,5 @@ Use WebSockets for: anything where the server needs to push data to clients with
 asking, or where you need the client to send and receive at any time. Chat, live cursors,
 notifications, collaborative editing, real-time dashboards.
 
-I'm currently working on the authentication layer for the same app — JWT tokens. I'll write
+I'm currently working on the authentication layer for the same app (JWT tokens). I'll write
 about that in two weeks.

@@ -37,6 +37,12 @@ class Layer:
         self._cache_X = None
         self._cache_Z = None
 
+        # Adam optimizer state — first and second moment estimates for W and b
+        self.m_W = np.zeros_like(self.W)
+        self.v_W = np.zeros_like(self.W)
+        self.m_b = np.zeros_like(self.b)
+        self.v_b = np.zeros_like(self.b)
+
     def forward(self, X: np.ndarray) -> np.ndarray:
         """
         Forward pass: Z = X @ W + b, A = activation(Z)

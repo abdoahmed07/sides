@@ -1,6 +1,6 @@
 # JWT authentication explained by someone who was confused by it
 
-I'm going to explain JWTs the way I wish someone had explained them to me — without assuming
+I'm going to explain JWTs the way I wish someone had explained them to me, without assuming
 you already know what "stateless authentication" means or why it matters.
 
 ---
@@ -31,9 +31,9 @@ It's three base64-encoded parts separated by dots:
 
 **Part 1 — Header:** `{"alg": "HS256", "typ": "JWT"}` — tells you the signing algorithm used.
 
-**Part 2 — Payload:** `{"id": 42, "email": "moez@example.com", "name": "Moez", "iat": 1703000000, "exp": 1703604800}` — the actual data. `iat` is "issued at", `exp` is when it expires.
+**Part 2 — Payload:** `{"id": 42, "email": "moez@example.com", "name": "Moez", "iat": 1703000000, "exp": 1703604800}`. The actual data. `iat` is "issued at", `exp` is when it expires.
 
-**Part 3 — Signature:** the first two parts hashed with a secret key. This is what makes the token tamper-proof.
+**Part 3 — Signature:** the first two parts hashed with a secret key. This is what makes it tamper-proof.
 
 ## How the signature works
 
@@ -47,7 +47,7 @@ When the backend receives a JWT on a later request, it recomputes that hash from
 and payload, and checks if it matches the signature. If someone changed the payload (e.g.,
 changed their user ID to someone else's), the signature won't match and the token is rejected.
 
-The secret key — `JWT_SECRET` in my `.env` file — never leaves the server. Without it, you
+The secret key (`JWT_SECRET` in my `.env` file) never leaves the server. Without it, you
 can't forge a valid signature.
 
 In code, this is what happens:
@@ -71,8 +71,8 @@ try/catch and return a 401 if it fails.
 ## Why I don't store the token in localStorage
 
 I store the JWT in React component state instead of `localStorage`. Here's why: `localStorage`
-is readable by any JavaScript running on the page. If my app has an XSS vulnerability — any
-place where untrusted input gets rendered as HTML — an attacker could inject a script that reads
+is readable by any JavaScript running on the page. If my app has an XSS vulnerability (any
+place where untrusted input gets rendered as HTML), an attacker could inject a script that reads
 the token from `localStorage` and sends it to their server. Game over.
 
 State in a React component isn't accessible from outside the React tree, so it's safer. The
@@ -83,4 +83,4 @@ completely inaccessible to JavaScript.
 ## What I'm working on next
 
 I deployed the app to Railway and Vercel this week. I'll write about what broke in production
-next time — and there was a lot that broke.
+next time. There was a lot that broke.

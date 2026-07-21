@@ -1,7 +1,7 @@
 # netwatch — Network Packet Analyser
 
 A terminal tool written in C that captures and decodes live network traffic using libpcap.
-No magic underneath — all header parsing is done by hand.
+No magic underneath. All header parsing is done by hand.
 
 ```
 12:34:56.123 TCP    192.168.1.5:52001    -> 142.250.80.46:443   SYN          74

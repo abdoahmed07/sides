@@ -34,4 +34,4 @@ If I couldn't brute-force (e.g., for a longer substitution cipher), I'd use freq
 
 ## What I learned
 
-A cipher's security comes from the number of possible keys (the keyspace). Caesar cipher has a keyspace of 25 — trivially small. AES-256 has a keyspace of 2^256 — infeasible to brute-force even with all the computers on Earth. Encoding (base64, hex) is not encryption — it has a keyspace of 1.
+A cipher's security comes from the number of possible keys (the keyspace). Caesar cipher has a keyspace of 25: trivially small. AES-256 has a keyspace of 2^256, infeasible to brute-force even with all the computers on Earth. Encoding (base64, hex) is not encryption. It has a keyspace of 1.

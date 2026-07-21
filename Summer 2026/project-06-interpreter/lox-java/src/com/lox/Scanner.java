@@ -136,13 +136,101 @@ public class Scanner {
     }
 
     // Scan an identifier or keyword
+    // Special case: f"..." is an f-string (string interpolation)
     private void identifier() {
         while (isAlphaNumeric(peek())) advance();
 
         String text = source.substring(start, current);
-        // If it's a known keyword, use that token type; otherwise it's a user identifier
+
+        // f"..." — string interpolation extension (not in the original Lox spec)
+        if (text.equals("f") && peek() == '"') {
+            advance(); // consume the opening "
+            fstring();
+            return;
+        }
+
         TokenType type = keywords.getOrDefault(text, TokenType.IDENTIFIER);
         addToken(type);
+    }
+
+    // Scan an f-string like f"{greeting}, {name}!"
+    // Strategy: split the string into literal and expression segments,
+    // then emit them as a chain of string concatenations using the + operator.
+    // e.g. f"{a}, {b}!" becomes: ( (a) + ", " + (b) + "!" )
+    private void fstring() {
+        // Collect segments: String for literal text, List<Token> for expressions
+        List<Object> segments = new ArrayList<>();
+        StringBuilder literal = new StringBuilder();
+
+        while (!isAtEnd() && peek() != '"') {
+            if (peek() == '{') {
+                // Save any accumulated literal text first
+                if (literal.length() > 0) {
+                    segments.add(literal.toString());
+                    literal.setLength(0);
+                }
+                advance(); // consume '{'
+
+                // Collect the raw expression source, tracking nested braces
+                int depth = 1;
+                int exprStart = current;
+                while (!isAtEnd() && depth > 0) {
+                    char ch = advance();
+                    if (ch == '{') depth++;
+                    else if (ch == '}') depth--;
+                }
+                // current is now past the closing '}'
+                String exprSource = source.substring(exprStart, current - 1);
+
+                // Recursively scan the expression inside the braces
+                Scanner inner = new Scanner(exprSource);
+                List<Token> exprTokens = inner.scanTokens();
+                exprTokens.remove(exprTokens.size() - 1); // drop inner EOF
+                segments.add(exprTokens);
+            } else {
+                if (peek() == '\n') line++;
+                literal.append(advance());
+            }
+        }
+
+        if (isAtEnd()) {
+            Lox.error(line, "Unterminated f-string.");
+            return;
+        }
+        advance(); // consume closing '"'
+
+        // Save any remaining literal text
+        if (literal.length() > 0) {
+            segments.add(literal.toString());
+        }
+
+        // Edge case: empty f-string
+        if (segments.isEmpty()) {
+            tokens.add(new Token(TokenType.STRING, "\"\"", "", line));
+            return;
+        }
+
+        // Emit: ( seg1 + seg2 + ... + segN )
+        // String segments → STRING tokens
+        // Expression segments → wrapped in ( ) for correct precedence
+        tokens.add(new Token(TokenType.LEFT_PAREN, "(", null, line));
+        for (int i = 0; i < segments.size(); i++) {
+            Object seg = segments.get(i);
+            if (seg instanceof String) {
+                String s = (String) seg;
+                tokens.add(new Token(TokenType.STRING, "\"" + s + "\"", s, line));
+            } else {
+                @SuppressWarnings("unchecked")
+                List<Token> exprTokens = (List<Token>) seg;
+                tokens.add(new Token(TokenType.LEFT_PAREN, "(", null, line));
+                tokens.addAll(exprTokens);
+                tokens.add(new Token(TokenType.RIGHT_PAREN, ")", null, line));
+            }
+            if (i < segments.size() - 1) {
+                tokens.add(new Token(TokenType.PLUS, "+", null, line));
+            }
+        }
+        tokens.add(new Token(TokenType.RIGHT_PAREN, ")", null, line));
     }
 
     // Conditional advance — consume the next character only if it matches expected

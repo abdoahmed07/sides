@@ -20,6 +20,6 @@ The site was trying to hide `/8028f.html` from search engines. Navigating there 
 
 ## What I learned
 
-`robots.txt` is one of the most common places attackers look when exploring a web app. The irony is that it's literally a public file listing the pages you want to hide. It's not a security mechanism — it's a convention that search engines follow voluntarily. Sensitive paths should be protected by authentication, not excluded from robots.txt.
+`robots.txt` is one of the most common places attackers look when exploring a web app. The irony is that it's literally a public file listing the pages you want to hide. It's not a security mechanism. It's a convention that search engines follow voluntarily. Sensitive paths should be protected by authentication, not excluded from robots.txt.
 
 In a real pentest, checking robots.txt and sitemap.xml is standard practice during the reconnaissance phase.

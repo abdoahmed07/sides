@@ -8,13 +8,13 @@ Target: 60 seconds when spoken.
 ## Draft (Week 9)
 
 I'm a second-year computer engineering student at [University]. This summer I spent three
-months building serious projects from scratch — a real-time collaborative code review tool
+months building serious projects from scratch: a real-time collaborative code review tool
 with WebSockets and a full authentication system, a physically-based ray tracer in C++ that
 implements Monte Carlo importance sampling, and a neural network trained from scratch in
 NumPy without using any ML libraries. I also contributed a bug fix to socket.io that got
 merged into their production codebase.
 
-I'm most interested in the intersection of systems and software — understanding how things
+I'm most interested in the intersection of systems and software. Understanding how things
 actually work at a low level while still building products people use. That's what drew me to
 networks and graphics alongside the full-stack work. I'm looking for a role where I can keep
 going deep on technical problems, ideally at a company building developer tools, infrastructure,

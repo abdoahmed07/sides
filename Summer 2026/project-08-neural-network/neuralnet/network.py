@@ -17,6 +17,9 @@ class NeuralNetwork:
         self.layers = layers
         self.lr = learning_rate
 
+        # Global step counter for Adam bias correction
+        self._step = 1
+
         # Track loss and accuracy history for plotting
         self.train_loss_history: List[float] = []
         self.train_acc_history:  List[float] = []
@@ -48,6 +51,29 @@ class NeuralNetwork:
         for layer in self.layers:
             layer.W -= self.lr * layer.dW
             layer.b -= self.lr * layer.db
+
+    def _adam_update(self, t: int, beta1: float = 0.9, beta2: float = 0.999, eps: float = 1e-8) -> None:
+        """
+        Adam optimizer update.
+        Keeps a running average of gradients (m) and squared gradients (v),
+        which acts like momentum + adaptive learning rates per parameter.
+        t is the global step count (used for bias correction).
+        """
+        for layer in self.layers:
+            # Update first moment (mean of gradients)
+            layer.m_W = beta1 * layer.m_W + (1 - beta1) * layer.dW
+            layer.m_b = beta1 * layer.m_b + (1 - beta1) * layer.db
+            # Update second moment (mean of squared gradients)
+            layer.v_W = beta2 * layer.v_W + (1 - beta2) * (layer.dW ** 2)
+            layer.v_b = beta2 * layer.v_b + (1 - beta2) * (layer.db ** 2)
+            # Bias correction — moments are zero-biased at the start
+            m_W_hat = layer.m_W / (1 - beta1 ** t)
+            m_b_hat = layer.m_b / (1 - beta1 ** t)
+            v_W_hat = layer.v_W / (1 - beta2 ** t)
+            v_b_hat = layer.v_b / (1 - beta2 ** t)
+            # Update weights
+            layer.W -= self.lr * m_W_hat / (np.sqrt(v_W_hat) + eps)
+            layer.b -= self.lr * m_b_hat / (np.sqrt(v_b_hat) + eps)
 
     def train(
         self,
@@ -89,7 +115,8 @@ class NeuralNetwork:
                 predictions = self.forward(X_batch)
                 loss = cross_entropy_loss(predictions, y_batch)
                 self.backward(predictions, y_batch)
-                self._sgd_update()
+                self._adam_update(t=self._step)
+                self._step += 1
 
                 epoch_loss += loss
                 n_batches  += 1

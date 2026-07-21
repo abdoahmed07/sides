@@ -1,7 +1,7 @@
 # How I set up a Node + PostgreSQL backend from scratch (no tutorial)
 
 This post is about the exact steps I took to get a Node.js Express server talking to PostgreSQL
-for the first time — including the thing that confused me for two hours that turned out to be
+for the first time. Including the thing that confused me for two hours that turned out to be
 a one-line fix.
 
 ---
@@ -59,7 +59,7 @@ This printed the current timestamp. The connection worked.
 When I tried to create my first table, I kept getting `ERROR: role "postgres" does not exist`.
 
 I spent two hours on this. It turns out macOS's Homebrew PostgreSQL doesn't create a `postgres`
-superuser by default — it creates a user matching your macOS username. So when I tried to
+superuser by default. It creates a user matching your macOS username instead. So when I tried to
 connect as `postgres`, it failed.
 
 The fix: I just needed to use my actual macOS username in the connection string, or create the
@@ -78,7 +78,7 @@ When you call `pool.query(sql, params)`, the pool picks an available connection 
 (or opens a new one up to the max size, default 10), sends the query to PostgreSQL over TCP,
 waits for the response, and returns it as a JavaScript object.
 
-The parameterised query format — using `$1`, `$2` instead of string interpolation — sends the
+The parameterised query format (using `$1`, `$2` instead of string interpolation) sends the
 values separately from the SQL text. PostgreSQL receives them as data, not as part of the query
 string, which is why it prevents SQL injection. The `pg` package handles the encoding for you.
 

@@ -10,23 +10,23 @@ Run: python train_mnist.py
 
 import numpy as np
 import matplotlib.pyplot as plt
-from mnist import MNIST  # pip install python-mnist
+from sklearn.datasets import fetch_openml  # pip install scikit-learn
 
 from neuralnet.layer import Layer
 from neuralnet.network import NeuralNetwork
 
 
 def load_mnist():
-    """Load and preprocess MNIST data."""
-    mndata = MNIST("./data/mnist")
-    X_train, y_train = mndata.load_training()
-    X_test,  y_test  = mndata.load_testing()
+    """Load and preprocess MNIST data via sklearn (downloads automatically on first run)."""
+    print("Loading MNIST (downloading if needed — ~11 MB, one-time)...")
+    mnist = fetch_openml("mnist_784", version=1, as_frame=False, parser="liac-arff")
 
-    # Convert to numpy arrays
-    X_train = np.array(X_train, dtype=float)
-    X_test  = np.array(X_test,  dtype=float)
-    y_train = np.array(y_train)
-    y_test  = np.array(y_test)
+    X = mnist.data.astype(float)        # shape: (70000, 784)
+    y = mnist.target.astype(int)        # shape: (70000,)
+
+    # Standard MNIST split: first 60k train, last 10k test
+    X_train, X_test = X[:60000], X[60000:]
+    y_train, y_test = y[:60000], y[60000:]
 
     # Normalize pixel values from [0, 255] to [0, 1]
     # This makes gradient descent work much better — without normalization, the gradients
@@ -61,16 +61,15 @@ def main():
             Layer(256, 128, activation="relu"),
             Layer(128, 10,  activation="softmax"),
         ],
-        learning_rate=0.01,
+        learning_rate=0.001,  # Adam works best with a smaller lr than SGD
     )
 
     print("Training on MNIST...")
     net.train(
         X_train, y_train,
         epochs=20,
-        batch_size=32,
+        batch_size=64,
         X_val=X_test, y_val=y_test,
-        lr_decay=0.9,  # decay learning rate by 10% every 5 epochs
     )
 
     # Final evaluation

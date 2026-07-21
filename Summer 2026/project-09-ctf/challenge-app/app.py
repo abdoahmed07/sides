@@ -87,6 +87,13 @@ LOGIN_PAGE = """
              border-radius: 4px; cursor: pointer; font-size: 1rem; }
     .hint { color: #888; font-size: 0.75rem; margin-top: 1rem; }
     .error { color: #e94560; margin-bottom: 1rem; font-size: 0.85rem; }
+    .give-up-btn { margin-top: 1rem; background: #2a2a4a; color: #888; font-size: 0.8rem; }
+    .give-up-btn:hover { background: #3a3a5a; color: #aaa; }
+    .explanation { display: none; margin-top: 1.5rem; background: #0f1e35; border-left: 3px solid #4ecca3;
+                   padding: 1rem; border-radius: 4px; font-size: 0.82rem; line-height: 1.6; text-align: left; }
+    .explanation h3 { color: #4ecca3; margin: 0 0 0.75rem; font-size: 0.9rem; }
+    .explanation code { background: #1a3a5a; padding: 0.15rem 0.4rem; border-radius: 3px; color: #f0c040; }
+    .explanation .answer { color: #4ecca3; font-weight: bold; margin: 0.75rem 0 0.25rem; }
   </style>
 </head>
 <body>
@@ -103,6 +110,22 @@ LOGIN_PAGE = """
       <button type="submit">Sign in</button>
     </form>
     <div class="hint">Hint: the login is very secure. Or is it?</div>
+    <button class="give-up-btn" onclick="document.getElementById('explanation').style.display='block'; this.style.display='none';">
+      🏳️ Give up — show me the answer
+    </button>
+    <div class="explanation" id="explanation">
+      <h3>What's going on here?</h3>
+      <p>This login checks your username and password by asking a database:</p>
+      <p><code>WHERE username = '[what you typed]' AND password = '[what you typed]'</code></p>
+      <p>The problem: it pastes whatever you type <em>directly</em> into that question. So you can rewrite the question itself.</p>
+      <p class="answer">The answer:</p>
+      <p>Type this as the username (password doesn't matter):</p>
+      <p><code>' OR '1'='1' --</code></p>
+      <p>The database question becomes:</p>
+      <p><code>WHERE username = '' OR '1'='1' --...</code></p>
+      <p>Since 1 always equals 1, the answer is always yes. The <code>--</code> deletes the password check entirely. You're in.</p>
+      <p style="margin-top:0.75rem; color:#888;">This is called <strong style="color:#e0e0e0;">SQL injection</strong>. The fix is one line of code — never paste user input directly into a database query.</p>
+    </div>
   </div>
 </body>
 </html>

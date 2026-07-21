@@ -21,8 +21,7 @@ No 'Access-Control-Allow-Origin' header is present on the requested resource.
 
 CORS (Cross-Origin Resource Sharing) is the browser's security mechanism that prevents a page
 on `vercel.app` from making requests to `railway.app` unless the server explicitly allows it.
-Locally I was using Vite's proxy, which avoided the issue entirely — but in production there's
-no proxy.
+Locally I was using Vite's proxy, which avoided the issue entirely. In production there's no proxy.
 
 The fix was two lines in my backend:
 
@@ -57,13 +56,13 @@ Error: password authentication failed for user "undefined"
 ```
 
 My database URL was being read as `undefined`. I'd set `DATABASE_URL` in a `.env` file locally,
-but Railway uses its own environment variable system — you set them in the Railway dashboard,
-not in a file. The `.env` file is not uploaded to Railway (and shouldn't be — it contains secrets).
+but Railway uses its own environment variable system. You set them in the Railway dashboard,
+not in a file. The `.env` file is not uploaded to Railway (and shouldn't be, since it contains secrets).
 
 I'd already added `DATABASE_URL` in the Railway dashboard, but the app was still failing.
 The reason: Railway injects the PostgreSQL connection string automatically when you add a
 PostgreSQL addon, but it uses the variable name `DATABASE_URL` and the format is a bit different
-from what I expected — it includes `?sslmode=require` at the end.
+from what I expected. It includes `?sslmode=require` at the end.
 
 My `pg` Pool config needed to handle SSL:
 

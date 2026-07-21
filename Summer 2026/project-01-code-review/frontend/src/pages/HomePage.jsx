@@ -26,8 +26,8 @@ export default function HomePage() {
           Code review, instantly
         </h1>
         <p className="text-gray-400 text-lg mb-10">
-          Paste code, share the link, and leave inline comments in real time —
-          no setup, no PRs, no waiting.
+          Paste code, share the link, and leave inline comments in real time.
+          No setup, no PRs, no waiting.
         </p>
         <div className="flex items-center justify-center gap-4">
           <Link

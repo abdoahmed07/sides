@@ -31,4 +31,4 @@ Flag: `picoCTF{tru3_d3t3ct1ve_0r_ju5t_sp3c1al_sk1lls}`
 
 ## What I learned
 
-Developers hide things in HTML comments, CSS comments, and JS comments all the time — either intentionally (bad) or by accident. In real engagements, "view source" is always one of the first things you do. Also: never put anything in client-side code you wouldn't put on a billboard. The client gets everything.
+Developers hide things in HTML comments, CSS comments, and JS comments all the time, either intentionally (bad) or by accident. In real engagements, "view source" is always one of the first things you do. Also: never put anything in client-side code you wouldn't put on a billboard. The client gets everything.
