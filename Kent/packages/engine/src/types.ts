@@ -35,11 +35,7 @@ export interface Partnership {
   signal: SignalIconId | null;
 }
 
-export interface Packet {
-  id: string;
-  /** Face-down; index 0 is the top (next card drawn). */
-  cards: Card[];
-}
+export const CENTER_SIZE = 4;
 
 export interface SignalTapEvent {
   id: string;
@@ -94,10 +90,13 @@ export interface GameState {
   dealerSeat: number;
   handNumber: number;
   hands: Record<string, Card[]>;
-  packets: Packet[];
+  /** Face-down, drawn to refill a center slot the instant it's swapped. */
+  stock: Card[];
+  /** Always CENTER_SIZE cards, face-up, visible to everyone. */
+  center: Card[];
   discardPile: Card[];
-  turnPlayerId: string | null;
-  awaitingDiscardBy: string | null;
+  /** Per-hand, one-way: once true a player can no longer swap this hand (they can still signal / call Kent). */
+  doneStatus: Record<string, boolean>;
   signals: SignalTapEvent[];
   lastHandResult: HandOutcome | null;
   matchLoserPartnershipId: string | null;
@@ -110,8 +109,8 @@ export type GameAction =
   | { type: "SET_READY"; playerId: string; ready: boolean }
   | { type: "START_MATCH"; playerId: string }
   | { type: "SET_TEAM_SIGNAL"; playerId: string; icon: SignalIconId }
-  | { type: "DRAW_CARD"; playerId: string; packetId: string }
-  | { type: "DISCARD_CARD"; playerId: string; cardId: string }
+  | { type: "SWAP_CARD"; playerId: string; handCardId: string; centerSlot: number }
+  | { type: "DECLARE_DONE"; playerId: string }
   | { type: "TAP_SIGNAL"; playerId: string; icon: SignalIconId }
   | { type: "CALL_KENT"; playerId: string }
   | { type: "CALL_COUNTER_KENT"; playerId: string };

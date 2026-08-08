@@ -7,7 +7,7 @@ export * from "./rules/dealing.js";
 export * from "./rules/fourOfAKind.js";
 export * from "./rules/kent.js";
 export * from "./rules/scoring.js";
-export * from "./rules/turns.js";
+export * from "./rules/swapping.js";
 export * from "./seating.js";
 export * from "./socketEvents.js";
 export * from "./types.js";

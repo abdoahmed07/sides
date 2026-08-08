@@ -19,17 +19,13 @@ export interface RedactedPartnership {
   signalChosen: boolean;
 }
 
-export interface RedactedPacket {
-  id: string;
-  count: number;
-}
-
 /**
  * The view of GameState sent to one specific player: their own hand in
- * full, everyone else's hands as counts only, packets/discard as counts
- * only (blind draw means contents are never inspectable), and other teams'
- * real signals hidden — this is the server-authoritative boundary that
- * keeps clients from ever seeing hidden information over the wire.
+ * full, everyone else's hands as counts only, the stock as a count only
+ * (it's face-down), the center in full (it's face-up and public by design),
+ * and other teams' real signals hidden — this is the server-authoritative
+ * boundary that keeps clients from ever seeing hidden information over the
+ * wire.
  */
 export interface RedactedGameState {
   roomCode: string;
@@ -44,10 +40,10 @@ export interface RedactedGameState {
   yourPlayerId: string;
   yourHand: Card[];
   handCounts: Record<string, number>;
-  packets: RedactedPacket[];
+  center: Card[];
+  stockCount: number;
   discardCount: number;
-  turnPlayerId: string | null;
-  awaitingDiscardBy: string | null;
+  doneStatus: Record<string, boolean>;
   signals: SignalTapEvent[];
   lastHandResult: HandOutcome | null;
   matchLoserPartnershipId: string | null;
@@ -86,10 +82,10 @@ export function redactStateFor(state: GameState, viewerId: string): RedactedGame
     yourPlayerId: viewerId,
     yourHand: state.hands[viewerId] ?? [],
     handCounts,
-    packets: state.packets.map((p) => ({ id: p.id, count: p.cards.length })),
+    center: state.center,
+    stockCount: state.stock.length,
     discardCount: state.discardPile.length,
-    turnPlayerId: state.turnPlayerId,
-    awaitingDiscardBy: state.awaitingDiscardBy,
+    doneStatus: state.doneStatus,
     signals: state.signals,
     lastHandResult: state.lastHandResult,
     matchLoserPartnershipId: state.matchLoserPartnershipId,

@@ -1,7 +1,7 @@
 import { EngineError } from "./errors.js";
 import { dealNewHand } from "./rules/dealing.js";
 import { callCounterKent, callKent, tapSignal } from "./rules/kent.js";
-import { discardCard, drawCard } from "./rules/turns.js";
+import { declareDone, swapCard } from "./rules/swapping.js";
 import { buildPartnerships } from "./seating.js";
 import type { GameAction, GameState, PlayerCount, SignalIconId } from "./types.js";
 
@@ -32,10 +32,10 @@ export function createGameState(params: {
     dealerSeat: 0,
     handNumber: 0,
     hands: {},
-    packets: [],
+    stock: [],
+    center: [],
     discardPile: [],
-    turnPlayerId: null,
-    awaitingDiscardBy: null,
+    doneStatus: {},
     signals: [],
     lastHandResult: null,
     matchLoserPartnershipId: null,
@@ -185,19 +185,18 @@ function maybeDealNextHand(state: GameState): GameState {
     const pid = state.seats[seat];
     if (pid) dealOrder.push(pid);
   }
-  const { hands, packets } = dealNewHand(dealOrder);
-  const firstTurnSeat = (state.dealerSeat + 1) % seatCount;
+  const { hands, center, stock } = dealNewHand(dealOrder);
 
   return {
     ...state,
     phase: "playing",
     handNumber: state.handNumber + 1,
     hands,
-    packets,
+    center,
+    stock,
     discardPile: [],
+    doneStatus: {},
     signals: [],
-    turnPlayerId: state.seats[firstTurnSeat] ?? null,
-    awaitingDiscardBy: null,
     lastHandResult: null,
   };
 }
@@ -214,10 +213,10 @@ export function applyAction(state: GameState, action: GameAction, now: number = 
       return startMatch(state, action.playerId);
     case "SET_TEAM_SIGNAL":
       return setTeamSignal(state, action.playerId, action.icon);
-    case "DRAW_CARD":
-      return drawCard(state, action.playerId, action.packetId);
-    case "DISCARD_CARD":
-      return discardCard(state, action.playerId, action.cardId, now);
+    case "SWAP_CARD":
+      return swapCard(state, action.playerId, action.handCardId, action.centerSlot);
+    case "DECLARE_DONE":
+      return declareDone(state, action.playerId, now);
     case "TAP_SIGNAL":
       return tapSignal(state, action.playerId, action.icon, now);
     case "CALL_KENT":

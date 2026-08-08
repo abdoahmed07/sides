@@ -2,18 +2,18 @@ import { SIGNAL_ICONS, type SignalIconId } from "@kent/engine";
 import { useEffect, useRef, useState } from "react";
 import { PlayingCard } from "../components/Card";
 import { DiscardPile } from "../components/DiscardPile";
-import { PacketPile } from "../components/PacketPile";
 import { PlayerAvatar, type PlayerAvatarFlash } from "../components/PlayerAvatar";
 import { ScoreTrack } from "../components/ScoreTrack";
 import { SeatCircle } from "../components/SeatCircle";
 import { SignalButtons } from "../components/SignalButtons";
+import { StockPile } from "../components/StockPile";
 import { useGameStore } from "../store/gameStore";
 
 const ICON_EMOJI = Object.fromEntries(SIGNAL_ICONS.map((s) => [s.id, s.emoji])) as Record<SignalIconId, string>;
 const FLASH_DURATION_MS = 900;
 
 export function TableScreen() {
-  const { gameState, session, drawCard, discardCard, tapSignal, callKent, callCounterKent } = useGameStore();
+  const { gameState, session, swapCard, declareDone, tapSignal, callKent, callCounterKent } = useGameStore();
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [flashes, setFlashes] = useState<Record<string, PlayerAvatarFlash>>({});
   const seenSignalCount = useRef(0);
@@ -52,21 +52,20 @@ export function TableScreen() {
 
   useEffect(() => {
     setSelectedCardId(null);
-  }, [gameState?.awaitingDiscardBy, gameState?.handNumber]);
+  }, [gameState?.handNumber]);
 
   if (!gameState || !session) return null;
 
   const you = gameState.players[session.playerId];
   const yourSeat = you?.seat ?? 0;
-  const isYourTurn = gameState.turnPlayerId === session.playerId;
-  const mustDiscard = gameState.awaitingDiscardBy === session.playerId;
-  const turnPlayerName = gameState.turnPlayerId ? gameState.players[gameState.turnPlayerId]?.name : null;
+  const youAreDone = gameState.doneStatus[session.playerId] ?? false;
   const recentTaps = gameState.signals.slice(-6).reverse();
 
-  async function handleConfirmDiscard() {
-    if (!selectedCardId) return;
-    await discardCard(selectedCardId);
+  async function handleCenterTap(slot: number) {
+    if (!selectedCardId || youAreDone) return;
+    const cardId = selectedCardId;
     setSelectedCardId(null);
+    await swapCard(cardId, slot);
   }
 
   return (
@@ -93,27 +92,37 @@ export function TableScreen() {
                 name={player.name}
                 teamId={player.partnershipId ?? "team-0"}
                 connected={player.connected}
-                isTurn={gameState.turnPlayerId === playerId}
-                awaitingDiscard={gameState.awaitingDiscardBy === playerId}
+                done={gameState.doneStatus[playerId] ?? false}
                 flash={flashes[playerId] ?? null}
               />
             );
           }}
         />
 
-        <div className="flex flex-wrap items-center justify-center gap-2.5">
-          {gameState.packets.map((packet) => (
-            <PacketPile
-              key={packet.id}
-              count={packet.count}
-              drawable={isYourTurn && !mustDiscard}
-              onDraw={() => void drawCard(packet.id)}
-            />
-          ))}
-          <DiscardPile count={gameState.discardCount} />
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-xs tracking-wide text-cream-500 uppercase">Center — up for grabs</p>
+          <div className="flex items-center gap-2">
+            {gameState.center.map((card, slot) => (
+              <PlayingCard
+                key={slot}
+                card={card}
+                size="md"
+                onClick={selectedCardId && !youAreDone ? () => void handleCenterTap(slot) : undefined}
+              />
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            <StockPile count={gameState.stockCount} />
+            <DiscardPile count={gameState.discardCount} />
+          </div>
         </div>
-        <p className="text-sm text-cream-300">
-          {mustDiscard ? "Choose a card to discard" : isYourTurn ? "Your turn — draw from any pile" : `Waiting for ${turnPlayerName ?? "…"}`}
+
+        <p className="text-center text-sm text-cream-300">
+          {youAreDone
+            ? "You're done swapping — waiting for everyone else."
+            : selectedCardId
+              ? "Tap a center card to swap for it."
+              : "Tap a card in your hand, then tap a center card to swap."}
         </p>
 
         {recentTaps.length > 0 && (
@@ -135,22 +144,22 @@ export function TableScreen() {
               key={card.id}
               card={card}
               selected={selectedCardId === card.id}
-              onClick={mustDiscard ? () => setSelectedCardId((id) => (id === card.id ? null : card.id)) : undefined}
+              onClick={youAreDone ? undefined : () => setSelectedCardId((id) => (id === card.id ? null : card.id))}
               size="lg"
             />
           ))}
         </div>
 
-        {mustDiscard && (
-          <button
-            type="button"
-            disabled={!selectedCardId}
-            onClick={() => void handleConfirmDiscard()}
-            className="rounded-lg bg-gold-400 px-6 py-2 font-display font-bold text-felt-950 disabled:opacity-30"
-          >
-            Discard
-          </button>
-        )}
+        <button
+          type="button"
+          disabled={youAreDone}
+          onClick={() => void declareDone()}
+          className={`rounded-lg px-6 py-2 font-display font-bold transition-colors ${
+            youAreDone ? "bg-success/20 text-success ring-1 ring-success" : "bg-felt-800 text-cream-200 hover:bg-felt-700"
+          } disabled:cursor-default`}
+        >
+          {youAreDone ? "Done ✓" : "I'm done swapping"}
+        </button>
 
         <SignalButtons onTap={(icon) => void tapSignal(icon)} />
 

@@ -103,8 +103,9 @@ describe("between_hands -> playing", () => {
     expect(state.phase).toBe("playing");
     expect(state.handNumber).toBe(1);
     for (const id of ["p0", "p1", "p2", "p3"]) expect(state.hands[id]).toHaveLength(4);
-    expect(state.packets.reduce((sum, p) => sum + p.cards.length, 0)).toBe(52 - 16);
-    expect(state.turnPlayerId).toBe(state.seats[(state.dealerSeat + 1) % 4]);
+    expect(state.center).toHaveLength(4);
+    expect(state.stock).toHaveLength(52 - 16 - 4);
+    expect(state.doneStatus).toEqual({});
   });
 
   it("does not deal while any team's signal is still unset even if everyone is ready", () => {

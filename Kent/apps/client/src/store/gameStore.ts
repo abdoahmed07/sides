@@ -47,8 +47,8 @@ interface GameStoreState {
   setReady: (ready: boolean) => Promise<AckResponse>;
   startMatch: () => Promise<AckResponse>;
   setTeamSignal: (icon: SignalIconId) => Promise<AckResponse>;
-  drawCard: (packetId: string) => Promise<AckResponse>;
-  discardCard: (cardId: string) => Promise<AckResponse>;
+  swapCard: (handCardId: string, centerSlot: number) => Promise<AckResponse>;
+  declareDone: () => Promise<AckResponse>;
   tapSignal: (icon: SignalIconId) => Promise<AckResponse>;
   callKent: () => Promise<AckResponse>;
   callCounterKent: () => Promise<AckResponse>;
@@ -130,8 +130,8 @@ export const useGameStore = create<GameStoreState>((set, get) => {
     setReady: (ready) => dispatch({ type: "SET_READY", ready }),
     startMatch: () => dispatch({ type: "START_MATCH" }),
     setTeamSignal: (icon) => dispatch({ type: "SET_TEAM_SIGNAL", icon }),
-    drawCard: (packetId) => dispatch({ type: "DRAW_CARD", packetId }),
-    discardCard: (cardId) => dispatch({ type: "DISCARD_CARD", cardId }),
+    swapCard: (handCardId, centerSlot) => dispatch({ type: "SWAP_CARD", handCardId, centerSlot }),
+    declareDone: () => dispatch({ type: "DECLARE_DONE" }),
     tapSignal: (icon) => dispatch({ type: "TAP_SIGNAL", icon }),
     callKent: () => dispatch({ type: "CALL_KENT" }),
     callCounterKent: () => dispatch({ type: "CALL_COUNTER_KENT" }),

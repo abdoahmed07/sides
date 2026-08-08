@@ -34,8 +34,7 @@ function resetReadiness(players: GameState["players"]): GameState["players"] {
 /**
  * Shared hand-ending path for every way a hand can conclude (Kent, Counter
  * Kent, or a Real Deal): award letters, check whether the match is now over,
- * rotate the dealer, clear ready flags for the next ready-up, and reset the
- * in-progress turn state.
+ * rotate the dealer, and clear ready flags for the next ready-up.
  */
 export function finishHand(state: GameState, outcome: HandOutcome, losingPartnershipIds: string[]): GameState {
   const next = applyLetters(state, losingPartnershipIds);
@@ -45,8 +44,6 @@ export function finishHand(state: GameState, outcome: HandOutcome, losingPartner
     phase: loserId ? "match_over" : "between_hands",
     lastHandResult: outcome,
     matchLoserPartnershipId: loserId,
-    turnPlayerId: null,
-    awaitingDiscardBy: null,
     dealerSeat: (state.dealerSeat + 1) % state.seats.length,
     players: resetReadiness(next.players),
   };

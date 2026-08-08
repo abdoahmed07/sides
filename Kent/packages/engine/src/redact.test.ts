@@ -4,8 +4,7 @@ import { basePlayingState, fourOfAKindHand, mixedHand, withSignal } from "./test
 
 describe("redactStateFor", () => {
   it("shows the viewer's own hand in full but only counts for everyone else", () => {
-    let state = basePlayingState(4, { p0: fourOfAKindHand("A"), p1: mixedHand() });
-    state = { ...state, packets: [{ id: "packet-0", cards: fourOfAKindHand("K") }], discardPile: [mixedHand()[0]!] };
+    const state = basePlayingState(4, { p0: fourOfAKindHand("A"), p1: mixedHand() });
 
     const viewOfP0 = redactStateFor(state, "p0");
     expect(viewOfP0.yourHand).toEqual(fourOfAKindHand("A"));
@@ -20,12 +19,13 @@ describe("redactStateFor", () => {
     expect(JSON.stringify(viewOfP1)).not.toContain("A-clubs");
   });
 
-  it("exposes packet and discard counts only, never contents", () => {
+  it("exposes the center in full (face-up, public) but the stock and discard as counts only", () => {
     let state = basePlayingState(4);
-    state = { ...state, packets: [{ id: "packet-0", cards: fourOfAKindHand("K") }], discardPile: fourOfAKindHand("9") };
+    state = { ...state, stock: fourOfAKindHand("K"), discardPile: fourOfAKindHand("9") };
 
     const view = redactStateFor(state, "p0");
-    expect(view.packets).toEqual([{ id: "packet-0", count: 4 }]);
+    expect(view.center).toEqual(state.center);
+    expect(view.stockCount).toBe(4);
     expect(view.discardCount).toBe(4);
     expect(JSON.stringify(view)).not.toContain("K-clubs");
     expect(JSON.stringify(view)).not.toContain("9-clubs");

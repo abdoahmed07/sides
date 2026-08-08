@@ -12,13 +12,13 @@ export interface PlayerAvatarProps {
   teamId: string;
   isYou?: boolean;
   connected: boolean;
+  /** Ready-up (lobby / between hands) or declared done (mid-hand) — same "settled" visual either way. */
   ready?: boolean;
-  isTurn?: boolean;
-  awaitingDiscard?: boolean;
+  done?: boolean;
   flash?: PlayerAvatarFlash | null;
 }
 
-export function PlayerAvatar({ name, teamId, isYou, connected, ready, isTurn, awaitingDiscard, flash }: PlayerAvatarProps) {
+export function PlayerAvatar({ name, teamId, isYou, connected, ready, done, flash }: PlayerAvatarProps) {
   const palette = teamPalette(teamId);
   const initial = name.trim().charAt(0).toUpperCase() || "?";
   const avatarStyle: CSSProperties = { opacity: connected ? 1 : 0.45, ["--flash-color" as string]: palette.hex };
@@ -28,7 +28,7 @@ export function PlayerAvatar({ name, teamId, isYou, connected, ready, isTurn, aw
       <div className="relative">
         <div
           className={`flex h-14 w-14 items-center justify-center rounded-full border-2 ${palette.border} ${palette.bgSoft} font-display text-lg font-bold ${palette.text} ${
-            isTurn ? "ring-4 ring-gold-400" : ""
+            done ? "opacity-60" : ""
           } ${flash ? "animate-signal-flash" : ""}`}
           style={avatarStyle}
         >
@@ -50,14 +50,14 @@ export function PlayerAvatar({ name, teamId, isYou, connected, ready, isTurn, aw
         </AnimatePresence>
         {!connected ? (
           <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-felt-900 bg-danger" title="Disconnected" />
-        ) : ready ? (
-          <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-felt-900 bg-success text-[9px] text-felt-950">
+        ) : ready || done ? (
+          <span
+            className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-felt-900 bg-success text-[9px] text-felt-950"
+            title={done ? "Done swapping" : "Ready"}
+          >
             ✓
           </span>
         ) : null}
-        {awaitingDiscard && (
-          <span className="absolute -top-1 -right-1 h-3.5 w-3.5 animate-pulse rounded-full bg-gold-400" title="Choosing a discard" />
-        )}
       </div>
       <span className={`max-w-[5.5rem] truncate text-xs font-medium ${isYou ? "text-gold-300" : "text-cream-300"}`}>
         {name}
