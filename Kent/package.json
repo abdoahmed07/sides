@@ -1,0 +1,19 @@
+{
+  "name": "kent-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev": "concurrently -n engine,server,client -c blue,green,magenta \"pnpm --filter @kent/engine dev\" \"pnpm --filter @kent/server dev\" \"pnpm --filter @kent/client dev\"",
+    "build": "pnpm --filter @kent/engine build && pnpm --filter @kent/server build && pnpm --filter @kent/client build",
+    "start": "pnpm --filter @kent/server start",
+    "test": "pnpm --filter @kent/engine test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.6.3"
+  }
+}

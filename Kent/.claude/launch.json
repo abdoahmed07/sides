@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "kent-client",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@kent/client", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "kent-prod",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["run", "start"],
+      "port": 3001
+    }
+  ]
+}

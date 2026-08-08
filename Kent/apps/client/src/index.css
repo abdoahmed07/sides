@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Baloo 2", "Inter", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --color-felt-950: #080c0a;
+  --color-felt-900: #0d1512;
+  --color-felt-800: #14201b;
+  --color-felt-700: #1c2c24;
+  --color-felt-600: #26392f;
+  --color-felt-500: #34503f;
+
+  --color-gold-300: #f6d98a;
+  --color-gold-400: #f0c766;
+  --color-gold-500: #dba53e;
+
+  --color-cream-100: #f7f4ec;
+  --color-cream-300: #d9d3c2;
+  --color-cream-500: #9ca9a2;
+
+  --color-team-a: #22d3ee;
+  --color-team-a-dim: #0e7490;
+  --color-team-b: #f472b6;
+  --color-team-b-dim: #a3336f;
+  --color-team-c: #a3e635;
+  --color-team-c-dim: #65821f;
+  --color-team-d: #fb923c;
+  --color-team-d-dim: #b5591a;
+
+  --color-danger: #f2555f;
+  --color-success: #4ade80;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 20px -6px rgba(0, 0, 0, 0.55);
+  --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: radial-gradient(ellipse 120% 90% at 50% -10%, var(--color-felt-700), var(--color-felt-950) 70%);
+  color: var(--color-cream-100);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Felt table texture: a very faint grain so the surface doesn't read as flat gradient. */
+.felt-texture {
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.03), transparent 40%),
+    radial-gradient(circle at 80% 60%, rgba(255, 255, 255, 0.025), transparent 45%);
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes signal-flash {
+  0% {
+    box-shadow: 0 0 0 0 var(--flash-color, var(--color-gold-400));
+    transform: scale(1);
+  }
+  35% {
+    box-shadow: 0 0 0 14px color-mix(in srgb, var(--flash-color, var(--color-gold-400)) 0%, transparent);
+    transform: scale(1.12);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    transform: scale(1);
+  }
+}
+
+.animate-signal-flash {
+  animation: signal-flash 700ms ease-out;
+}
