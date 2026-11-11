@@ -8,7 +8,7 @@ name: Deploy to Pages
 on:
   push:
     branches: [main]
-    paths: ['Habit_tracker/**', 'Kent/**', '.github/workflows/deploy-pages.yml']
+    paths: ['Habit_tracker/**', 'Kent/**', '.github/workflows/deploy-pages.yml', '.github/pages-root/**']
   workflow_dispatch:
 
 permissions:
@@ -59,6 +59,8 @@ jobs:
           cp -r Habit_tracker/dist/. site/streak/
           mkdir -p site/kent
           cp -r Kent/apps/client/dist/. site/kent/
+          # Removes the service worker Streak used to register at /sides/ (see the file for details).
+          cp .github/pages-root/sw.js site/sw.js
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
