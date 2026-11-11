@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Airport Simulator · Sides</title>
+  <meta name="description" content="Watch my C++ airport simulator run: arrivals, departures, runways and fuel emergencies, minute by minute." />
+  <style>
+    :root {
+      --bg: #f4f4f5; --surface: #ffffff; --surface-2: #ececef; --text: #18181b; --muted: #52525b;
+      --line: #dcdce0; --accent: #c2410c; --accent-text: #ffffff; --radius: 14px;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0d0d10; --surface: #16161a; --surface-2: #1d1d22; --text: #f1f1f3; --muted: #a1a1aa;
+              --line: #2a2a31; --accent: #f0703a; --accent-text: #1a0d06; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+           font: 16px/1.6 ui-sans-serif, -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    .bar { display: flex; align-items: center; justify-content: space-between; height: 68px; }
+    .bar a { text-decoration: none; }
+    .wordmark { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
+    .bar .back { color: var(--muted); font-size: 15px; }
+
+    .layout { display: grid; grid-template-columns: 1fr 340px; gap: 40px; align-items: start; padding-top: 24px; padding-bottom: 72px; }
+    .layout > * { min-width: 0; } /* let the terminal / bars scroll inside their box instead of widening the page */
+    h1 { font-size: clamp(2rem, 4vw, 2.8rem); line-height: 1.1; letter-spacing: -0.03em; margin: 0 0 14px; }
+    .lede { color: var(--muted); margin: 0 0 28px; max-width: 46ch; }
+
+    /* Terminal: the simulator's own output, with its ANSI colors */
+    .term { background: #0e1013; color: #d4d4d8; border-radius: var(--radius); border: 1px solid #23262c;
+            padding: 18px 20px; overflow-x: auto; }
+    .term pre { margin: 0; font: 13px/1.38 ui-monospace, "SF Mono", Menlo, Consolas, monospace; min-height: 52em; }
+    .b { font-weight: 700; } .c31 { color: #f87171; } .c32 { color: #4ade80; } .c33 { color: #facc15; }
+    .c34 { color: #60a5fa; } .c35 { color: #e879f9; } .c36 { color: #22d3ee; } .c37 { color: #f4f4f5; } .c90 { color: #71717a; }
+
+    .controls { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; height: 42px; padding: 0 18px;
+           border-radius: 10px; font: 600 15px/1 inherit; cursor: pointer; border: 1px solid var(--line);
+           background: var(--surface); color: var(--text); transition: transform .2s cubic-bezier(.16,1,.3,1); }
+    .btn:active { transform: translateY(1px) scale(.98); }
+    .btn.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; min-width: 96px; }
+    input[type=range] { flex: 1; min-width: 140px; accent-color: var(--accent); }
+    .clock { font: 14px ui-monospace, Menlo, monospace; color: var(--muted); min-width: 92px; text-align: right; }
+
+    aside h2 { font-size: 1.05rem; margin: 0 0 12px; }
+    .scenarios { display: grid; gap: 10px; margin-bottom: 28px; }
+    .scenario { text-align: left; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line);
+                background: var(--surface); color: var(--text); cursor: pointer; font: inherit; }
+    .scenario strong { display: block; font-size: 15px; }
+    .scenario span { color: var(--muted); font-size: 14px; }
+    .scenario[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+    .speeds { display: flex; gap: 8px; margin-bottom: 28px; }
+    .speeds .btn { flex: 1; height: 38px; padding: 0; }
+    .speeds .btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+    .note { color: var(--muted); font-size: 14px; margin: 0 0 10px; }
+    code { font: 13px ui-monospace, Menlo, monospace; background: var(--surface-2); border: 1px solid var(--line);
+           border-radius: 6px; padding: 2px 6px; }
+    button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; gap: 28px; }
+      /* 66 columns at ~0.6em per monospace character: size the text so the full screen fits the width. */
+      .term pre { font-size: min(13px, calc((100vw - 58px) / 40)); min-height: 0; }
+      .term { padding: 14px 12px; }
+    }
+    @media (max-width: 480px) { .wrap { padding: 0 16px; } }
+  </style>
+</head>
+<body>
+  <header class="wrap bar">
+    <a class="wordmark" href="../">Sides</a>
+    <a class="back" href="https://github.com/abdoahmed07/sides/tree/main/Airplane-simulator">Source code</a>
+  </header>
+
+  <main class="wrap layout">
+    <div>
+      <h1>Airport Simulator</h1>
+      <p class="lede">Planes arrive and wait to land, others queue to take off, and anyone running low on fuel jumps the line. Each frame is one minute.</p>
+      <div class="controls">
+        <button class="btn primary" id="play" type="button">Pause</button>
+        <input id="scrub" type="range" min="0" max="0" value="0" aria-label="Simulation minute" />
+        <span class="clock" id="clock"></span>
+      </div>
+      <div class="term" aria-live="off"><pre id="screen">Loading…</pre></div>
+    </div>
+
+    <aside>
+      <h2>Pick an airport</h2>
+      <div class="scenarios" id="scenarios">
+        <button class="scenario" type="button" data-run="regional"><strong>Harbour Regional</strong><span>1 runway, light traffic</span></button>
+        <button class="scenario" type="button" data-run="hub"><strong>Metro International</strong><span>4 runways, heavy traffic</span></button>
+        <button class="scenario" type="button" data-run="overload"><strong>One Runway Too Few</strong><span>1 runway, more planes than it can handle</span></button>
+      </div>
+      <h2>Speed</h2>
+      <div class="speeds" id="speeds">
+        <button class="btn" type="button" data-ms="500">1×</button>
+        <button class="btn" type="button" data-ms="250">2×</button>
+        <button class="btn" type="button" data-ms="100">5×</button>
+      </div>
+      <p class="note">This is the real program's output. Every time the site is updated, the C++ code is compiled and run with these settings and its screen is recorded, frame by frame.</p>
+      <p class="note">To run it yourself with your own settings: <code>make run</code></p>
+    </aside>
+  </main>
+
+  <script>
+    const screen = document.getElementById("screen");
+    const playBtn = document.getElementById("play");
+    const scrub = document.getElementById("scrub");
+    const clock = document.getElementById("clock");
+    const runs = {};
+    let frames = [], index = 0, timer = null, tickMs = 500, current = null;
+
+    // The simulator redraws the whole screen each minute with "clear screen" (ESC[2J ESC[H).
+    // Splitting on that gives one frame per minute; keep the minute-by-minute frames and the final summary.
+    function splitFrames(text) {
+      return text.split("\x1b[2J\x1b[H").filter((f) => f.includes("Time:") || f.includes("SIMULATION COMPLETE"));
+    }
+
+    // Turns the program's ANSI color codes into styled spans.
+    function ansiToHtml(text) {
+      const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      let html = "", open = 0, classes = new Set();
+      for (const part of text.split(/(\x1b\[[0-9;]*m)/)) {
+        const m = part.match(/^\x1b\[([0-9;]*)m$/);
+        if (!m) { html += esc(part); continue; }
+        for (const code of (m[1] || "0").split(";")) {
+          if (code === "0") classes.clear();
+          else if (code === "1") classes.add("b");
+          else { for (const c of [...classes]) if (c !== "b") classes.delete(c); classes.add("c" + code); }
+        }
+        html += "</span>".repeat(open);
+        open = classes.size ? 1 : 0;
+        if (open) html += `<span class="${[...classes].join(" ")}">`;
+      }
+      return html + "</span>".repeat(open);
+    }
+
+    function show(i) {
+      index = Math.max(0, Math.min(i, frames.length - 1));
+      screen.innerHTML = ansiToHtml(frames[index] || "");
+      scrub.value = index;
+      const last = index === frames.length - 1;
+      clock.textContent = last ? "finished" : `minute ${index} / ${frames.length - 2}`;
+      if (last) stop();
+    }
+
+    function play() {
+      if (index >= frames.length - 1) show(0);
+      clearInterval(timer);
+      timer = setInterval(() => show(index + 1), tickMs);
+      playBtn.textContent = "Pause";
+    }
+    function stop() { clearInterval(timer); timer = null; playBtn.textContent = index >= frames.length - 1 ? "Replay" : "Play"; }
+
+    async function load(id) {
+      current = id;
+      document.querySelectorAll(".scenario").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.run === id)));
+      if (!runs[id]) {
+        screen.textContent = "Loading…";
+        const res = await fetch(`runs/${id}.txt`);
+        runs[id] = splitFrames(await res.text());
+      }
+      if (current !== id) return;
+      frames = runs[id];
+      scrub.max = frames.length - 1;
+      show(0);
+      play();
+    }
+
+    function setSpeed(ms) {
+      tickMs = ms;
+      document.querySelectorAll("#speeds .btn").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.ms) === ms)));
+      if (timer) play();
+    }
+
+    playBtn.addEventListener("click", () => (timer ? stop() : play()));
+    scrub.addEventListener("input", () => { stop(); show(Number(scrub.value)); });
+    document.getElementById("scenarios").addEventListener("click", (e) => {
+      const b = e.target.closest(".scenario"); if (b) load(b.dataset.run);
+    });
+    document.getElementById("speeds").addEventListener("click", (e) => {
+      const b = e.target.closest(".btn"); if (b) setSpeed(Number(b.dataset.ms));
+    });
+
+    setSpeed(matchMedia("(prefers-reduced-motion: reduce)").matches ? 500 : 250);
+    load("regional");
+  </script>
+</body>
+</html>

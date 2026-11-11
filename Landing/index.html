@@ -100,23 +100,22 @@
     .app.review { background: linear-gradient(160deg, var(--surface-2), var(--surface) 70%); }
     .tag { font-size: 13px; color: var(--muted); }
 
-    /* Terminal projects: two columns, no cards */
-    .runs { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
-    .run h3 { margin: 0 0 6px; font-size: 1.2rem; }
-    .run h3 a { text-decoration: none; }
-    .run h3 a:hover { color: var(--accent); }
-    .run p { margin: 0 0 12px; color: var(--muted); }
-    .run code {
-      font: 13px/1 ui-monospace, "SF Mono", Menlo, monospace; background: var(--surface-2);
-      border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; display: inline-block;
-    }
+    /* Second row of browser demos: mirrored proportions so the two rows don't look alike */
+    .apps.second { grid-template-columns: 1fr 1.6fr; grid-template-rows: auto; margin-top: 16px; }
+    .app img.shot { border-bottom: 1px solid var(--line); object-fit: cover; object-position: top left; width: 100%; }
+    /* Same image height in both cards so the row lines up; crops keep the top-left of each screenshot. */
+    .apps.second img.shot { height: 300px; }
+    .app.airport img.shot { background: #0e1013; }
 
-    /* Summer 2026: compact three-column index */
-    .grid9 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 32px; margin: 0; padding: 0; list-style: none; }
-    .grid9 a { display: block; padding: 14px 0; text-decoration: none; border-bottom: 1px solid var(--line); }
-    .grid9 a:hover strong { color: var(--accent); }
-    .grid9 strong { display: block; font-size: 15px; }
-    .grid9 span { color: var(--muted); font-size: 14px; line-height: 1.45; display: block; }
+    /* More projects: two groups, plain rows */
+    .groups { display: grid; grid-template-columns: 1.4fr 1fr; gap: 56px; }
+    .groups h3 { font-size: 1.05rem; margin: 0 0 4px; }
+    .groups ul { list-style: none; margin: 0; padding: 0; }
+    .groups a { display: grid; grid-template-columns: 1fr auto; gap: 2px 16px; padding: 14px 0; text-decoration: none; border-bottom: 1px solid var(--line); }
+    .groups a:hover strong { color: var(--accent); }
+    .groups strong { font-size: 15px; }
+    .groups .lang { font-size: 13px; color: var(--muted); text-align: right; }
+    .groups .what { grid-column: 1 / -1; color: var(--muted); font-size: 14px; line-height: 1.45; }
 
     footer { border-top: 1px solid var(--line); padding: 32px 0 48px; color: var(--muted); font-size: 14px; }
     footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
@@ -135,15 +134,13 @@
       .app:hover { transform: none; }
     }
 
-    @media (max-width: 1000px) and (min-width: 861px) {
-      .grid9 { grid-template-columns: 1fr 1fr; }
-    }
     @media (max-width: 860px) {
       .hero { grid-template-columns: 1fr; gap: 36px; padding-top: 16px; padding-bottom: 64px; }
       .apps { grid-template-columns: 1fr; }
       .app.kent { grid-row: auto; }
-      .runs { grid-template-columns: 1fr; gap: 36px; }
-      .grid9 { grid-template-columns: 1fr; }
+      .apps.second { grid-template-columns: 1fr; }
+      .apps.second img.shot { height: auto; aspect-ratio: 16 / 10; }
+      .groups { grid-template-columns: 1fr; gap: 40px; }
       section { padding: 56px 0; }
     }
     @media (max-width: 480px) {
@@ -204,43 +201,53 @@
             </div>
           </a>
         </div>
-      </div>
-    </section>
-
-    <section>
-      <div class="wrap">
-        <h2>Run them in your terminal</h2>
-        <p class="section-lede">Two programs that live in the command line.</p>
-        <div class="runs">
-          <div class="run">
-            <h3><a href="https://github.com/abdoahmed07/sides/tree/main/Airplane-simulator">Airport Simulator</a></h3>
-            <p>Planes arrive and depart, get runways, and run into fuel emergencies, all on a live terminal display. Every data structure is written by hand.</p>
-            <code>make run</code> <span class="tag">C++</span>
-          </div>
-          <div class="run">
-            <h3><a href="https://github.com/abdoahmed07/sides/tree/main/HeroFight">HeroFight</a></h3>
-            <p>A text RPG. Pick a hero class, fight through seven rooms of enemies, loot and merchants, then face the Ancient Dragon.</p>
-            <code>dotnet run</code> <span class="tag">C#</span>
-          </div>
+        <div class="apps second">
+          <a class="app digits" href="./digits/">
+            <img class="shot" src="img/digits.jpg" width="900" height="500" alt="A hand-drawn 4 on a black pad, recognised as 4 with 100% confidence" loading="lazy" />
+            <div class="app-body">
+              <h3>Draw a Digit</h3>
+              <p>Draw a number and a neural network I wrote from scratch guesses it as you draw.</p>
+              <span class="tag">Python + NumPy model, running in your browser</span>
+              <span class="go">Try it</span>
+            </div>
+          </a>
+          <a class="app airport" href="./airport/">
+            <img class="shot" src="img/airport.jpg" width="740" height="440" alt="The airport simulator's live terminal display: four runways, an empty arrival queue and a long departure queue" loading="lazy" />
+            <div class="app-body">
+              <h3>Airport Simulator</h3>
+              <p>Watch planes land, take off and declare fuel emergencies, minute by minute. Pick a quiet airport or one with too few runways.</p>
+              <span class="tag">C++, real program output</span>
+              <span class="go">Watch it run</span>
+            </div>
+          </a>
         </div>
       </div>
     </section>
 
     <section>
       <div class="wrap">
-        <h2>Summer 2026</h2>
-        <p class="section-lede">Nine projects from one summer, each one a different corner of computer science.</p>
-        <ul class="grid9">
-            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-01-code-review"><strong>Code Review Tool</strong><span>Real-time, line-by-line code comments</span></a></li>
-            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-02-open-source"><strong>Open Source</strong><span>A bug fix contributed to socket.io</span></a></li>
-            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-03-technical-writing"><strong>Technical Writing</strong><span>Five posts on building and shipping apps</span></a></li>
-            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-04-ray-tracer"><strong>Ray Tracer</strong><span>Realistic 3D renders from scratch in C++</span></a></li>
-            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-05-career-prep"><strong>Career Prep</strong><span>CV, pitch, outreach and LeetCode practice</span></a></li>
-            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-06-interpreter"><strong>Interpreter</strong><span>A programming language, in Java and in C</span></a></li>
-            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-07-packet-analyser"><strong>Packet Analyser</strong><span>Reads live network traffic, in C</span></a></li>
-            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-08-neural-network"><strong>Neural Network</strong><span>Reads handwritten digits, Python and NumPy only</span></a></li>
-            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-09-ctf"><strong>Capture the Flag</strong><span>Ten security challenges solved, one built</span></a></li>
-        </ul>
+        <h2>More projects</h2>
+        <p class="section-lede">The rest live on GitHub, each with a write-up of how it works.</p>
+        <div class="groups">
+          <div>
+            <h3>Built from scratch</h3>
+            <ul>
+              <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-04-ray-tracer"><strong>Ray Tracer</strong><span class="lang">C++</span><span class="what">Renders realistic 3D scenes with matte, metal and glass, from first principles.</span></a></li>
+              <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-06-interpreter"><strong>Interpreter</strong><span class="lang">Java, C</span><span class="what">A small programming language, built twice: once as a tree-walker, once as a bytecode VM.</span></a></li>
+              <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-07-packet-analyser"><strong>Packet Analyser</strong><span class="lang">C</span><span class="what">Captures live network traffic and decodes each packet by hand.</span></a></li>
+              <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-08-neural-network"><strong>Neural Network</strong><span class="lang">Python</span><span class="what">The model behind Draw a Digit: training, backpropagation and all.</span></a></li>
+              <li><a href="https://github.com/abdoahmed07/sides/tree/main/HeroFight"><strong>HeroFight</strong><span class="lang">C#</span><span class="what">A text RPG: pick a class, clear seven rooms, beat the Ancient Dragon.</span></a></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Security, open source and writing</h3>
+            <ul>
+              <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-09-ctf"><strong>Capture the Flag</strong><span class="lang">Security</span><span class="what">Write-ups for ten security challenges, plus one I built.</span></a></li>
+              <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-02-open-source"><strong>socket.io fix</strong><span class="lang">TypeScript</span><span class="what">A bug fix contributed to a widely used real-time library.</span></a></li>
+              <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-03-technical-writing"><strong>Technical writing</strong><span class="lang">Blog posts</span><span class="what">Five posts on what I learned building and deploying apps.</span></a></li>
+            </ul>
+          </div>
+        </div>
       </div>
     </section>
   </main>
