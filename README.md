@@ -1,44 +1,41 @@
 # Sides
 
-My side projects, all in one place. Each folder is its own self-contained project with its own README that goes into the details — this page is just the map.
+My side projects, all in one place. Each folder is a self-contained project with its own README that goes into the details. This page is the map.
 
-## Play / use in the browser
+**Website: [abdoahmed07.github.io/sides](https://abdoahmed07.github.io/sides/)**
+
+## Try them in your browser
+
+No install, no setup. Open the link and go.
 
 | Project | What it is | Link |
 |---|---|---|
-| **Kent** | A partnership card game with secret hand signals — you vs. bots | [Play Kent](https://abdoahmed07.github.io/sides/kent/) |
-| **Streak** | A calm, minimal habit tracker | [Open Streak](https://abdoahmed07.github.io/sides/streak/) |
-| **Code Review Tool** | Share code and comment on it line by line, live | [Live demo](https://codereview-rho.vercel.app) |
+| 🃏 **[Kent](Kent/)** | A card game from my childhood. Collect four of a kind, then secretly signal your partner with a hand gesture before the other team catches you. You vs. bots. | [Play](https://abdoahmed07.github.io/sides/kent/) |
+| ✅ **[Streak](Habit_tracker/)** | A calm, minimal habit tracker. One tap a day to keep your streaks going, synced across your devices. | [Open](https://abdoahmed07.github.io/sides/streak/) |
+| 💬 **[Code Review](Summer%202026/project-01-code-review/)** | Paste code, share the link, and comment on any line. Everyone viewing sees new comments instantly. | [Open](https://codereview-rho.vercel.app) |
+| ✏️ **[Draw a Digit](Summer%202026/project-08-neural-network/)** | Draw a number and a neural network I wrote from scratch guesses it as you draw. | [Try it](https://abdoahmed07.github.io/sides/digits/) |
+| ✈️ **[Airport Simulator](Airplane-simulator/)** | Watch planes circle, land, line up and take off, animated from the real C++ program's output. | [Watch it run](https://abdoahmed07.github.io/sides/airport/) |
 
-## All projects
+## More projects
 
-### 🃏 [Kent](Kent/) — card game
-A web version of Kent (a variant of Kemps/Cash). Four cards sit face-up in the middle and everyone swaps from them at the same time, trying to collect four of a kind. When you get one, you secretly signal your partner with a hand gesture — but everyone can see the gestures, so the other team is watching to catch you. Lose a hand and your team gets a letter; spell K-E-N-T and you lose.
-*TypeScript · React · plays in the browser against bots* — **[Play](https://abdoahmed07.github.io/sides/kent/)**
+### Built from scratch
 
-### ✅ [Streak](Habit_tracker/) — habit tracker
-A dark, minimal habit tracker: one tap a day to keep your streaks going. Has accounts, syncs across devices, and can be installed on your phone like an app.
-*TypeScript · React · Supabase · PWA* — **[Open](https://abdoahmed07.github.io/sides/streak/)**
-
-### ✈️ [Airplane-simulator](Airplane-simulator/) — airport simulator
-A terminal airport simulator in C++: planes arrive and depart, get assigned runways, and run into fuel emergencies, all shown in a live terminal display. The data structures are written by hand.
-*C++ · runs in the terminal*
-
-### ⚔️ [HeroFight](HeroFight/) — text RPG
-A text-based RPG: pick a hero class, fight through 7 rooms of enemies, loot and merchants, then take on the Ancient Dragon. Built to practice object-oriented programming.
-*C# · runs in the terminal*
-
-### ☀️ [Summer 2026](Summer%202026/) — summer learning projects
-Nine projects from a summer of learning, each covering a different area:
-
-| # | Project | What it is |
+| Project | Language | What it is |
 |---|---|---|
-| 01 | [Code Review Tool](Summer%202026/project-01-code-review/) | Real-time collaborative code commenting — [live demo](https://codereview-rho.vercel.app) |
-| 02 | [Open Source](Summer%202026/project-02-open-source/) | A bug fix contributed to socket.io, with the full write-up |
-| 03 | [Technical Writing](Summer%202026/project-03-technical-writing/) | Five blog posts on things I learned building and deploying apps |
-| 04 | [Ray Tracer](Summer%202026/project-04-ray-tracer/) | A ray tracer from scratch in C++ — spheres, metal, glass, depth of field |
-| 05 | [Career Prep](Summer%202026/project-05-career-prep/) | CV, pitch, outreach templates and LeetCode practice |
-| 06 | [Interpreter](Summer%202026/project-06-interpreter/) | The Lox language, twice: a Java interpreter and a C bytecode VM |
-| 07 | [Packet Analyser](Summer%202026/project-07-packet-analyser/) | A terminal tool in C that captures and decodes live network traffic |
-| 08 | [Neural Network](Summer%202026/project-08-neural-network/) | A neural network in plain Python + NumPy (97.4% on MNIST), with a draw-a-digit web page |
-| 09 | [CTF](Summer%202026/project-09-ctf/) | Ten security challenge write-ups, plus an original SQL injection challenge |
+| [Ray Tracer](Summer%202026/project-04-ray-tracer/) | C++ | Renders realistic 3D scenes with matte, metal and glass, from first principles. |
+| [Interpreter](Summer%202026/project-06-interpreter/) | Java, C | A small programming language, built twice: once as a tree-walker, once as a bytecode VM. |
+| [Packet Analyser](Summer%202026/project-07-packet-analyser/) | C | Captures live network traffic and decodes each packet by hand. |
+| [Neural Network](Summer%202026/project-08-neural-network/) | Python | The model behind Draw a Digit: training, backpropagation and all. |
+| [HeroFight](HeroFight/) | C# | A text RPG: pick a class, clear seven rooms, beat the Ancient Dragon. |
+
+### Security, open source and writing
+
+| Project | Type | What it is |
+|---|---|---|
+| [Capture the Flag](Summer%202026/project-09-ctf/) | Security | Write-ups for ten security challenges, plus one I built. |
+| [socket.io fix](Summer%202026/project-02-open-source/) | TypeScript | A bug fix contributed to a widely used real-time library. |
+| [Technical writing](Summer%202026/project-03-technical-writing/) | Blog posts | Five posts on what I learned building and deploying apps. |
+
+## How the website is built
+
+Everything under [abdoahmed07.github.io/sides](https://abdoahmed07.github.io/sides/) is published by one GitHub Actions workflow, [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml), on every push to `main`. The landing page and the two demos live in [`Landing/`](Landing/); [`Landing/build.sh`](Landing/build.sh) builds them, recording fresh runs of the airport simulator and converting the neural network's trained weights so both demos always match the real code.

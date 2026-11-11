@@ -5,7 +5,7 @@
 #
 # Besides copying the static pages, it generates two things from the real projects so the
 # demos can never drift from the code:
-#   airport/runs/*.txt   - frames recorded from the actual C++ airport simulator
+#   airport/runs/*.json  - runs recorded from the actual C++ airport simulator, parsed per minute
 #   digits/model.bin     - the trained neural-network weights, converted for the browser
 set -euo pipefail
 
@@ -15,7 +15,7 @@ mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
 
 # Static pages and images (skip this script itself).
-rsync -a --exclude build.sh "$ROOT/Landing/" "$OUT/"
+rsync -a --exclude build.sh --exclude tools "$ROOT/Landing/" "$OUT/"
 
 # ── Airport simulator: build it, then record a few runs ──────────────────────
 SIM="$ROOT/Airplane-simulator"
@@ -29,7 +29,9 @@ mkdir -p "$OUT/airport/runs"
 # name, runways, duration (min), arrivals/10min, departures/10min, step mode, fast mode.
 record() {
   local id="$1"; shift
-  printf '%s\n' "$@" n y | "$BUILD/airport_sim" > "$OUT/airport/runs/$id.txt"
+  printf '%s\n' "$@" n y | "$BUILD/airport_sim" > "$BUILD/$id.txt"
+  # Turn the recorded screens into data for the animated airport (fails loudly if the format changes).
+  python3 "$ROOT/Landing/tools/airport_frames.py" "$BUILD/$id.txt" "$OUT/airport/runs/$id.json"
 }
 record regional "Harbour Regional"        1 60 3 3
 record hub      "Metro International"     4 90 8 8

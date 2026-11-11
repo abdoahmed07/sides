@@ -105,7 +105,7 @@
     .app img.shot { border-bottom: 1px solid var(--line); object-fit: cover; object-position: top left; width: 100%; }
     /* Same image height in both cards so the row lines up; crops keep the top-left of each screenshot. */
     .apps.second img.shot { height: 300px; }
-    .app.airport img.shot { background: #0e1013; }
+    .app.airport img.shot { background: #16241b; object-position: center; }
 
     /* More projects: two groups, plain rows */
     .groups { display: grid; grid-template-columns: 1.4fr 1fr; gap: 56px; }
@@ -212,11 +212,11 @@
             </div>
           </a>
           <a class="app airport" href="./airport/">
-            <img class="shot" src="img/airport.jpg" width="740" height="440" alt="The airport simulator's live terminal display: four runways, an empty arrival queue and a long departure queue" loading="lazy" />
+            <img class="shot" src="img/airport.jpg" width="860" height="550" alt="Animated airport: planes circling in a holding pattern, one landing on the runway, and a long line waiting to take off" loading="lazy" />
             <div class="app-body">
               <h3>Airport Simulator</h3>
-              <p>Watch planes land, take off and declare fuel emergencies, minute by minute. Pick a quiet airport or one with too few runways.</p>
-              <span class="tag">C++, real program output</span>
+              <p>Watch planes circle, land, line up and take off. Pick a quiet airport or one with too few runways.</p>
+              <span class="tag">C++, animated from the real program</span>
               <span class="go">Watch it run</span>
             </div>
           </a>
