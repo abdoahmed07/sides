@@ -1,4 +1,5 @@
 # Builds every web app in this repo into ONE GitHub Pages site (a repo can only have one):
+#   Landing page          → https://abdoahmed07.github.io/sides/
 #   Streak habit tracker  → https://abdoahmed07.github.io/sides/streak/
 #   Kent card game        → https://abdoahmed07.github.io/sides/kent/
 # One-time setup: Settings → Pages → Source: "GitHub Actions", and add repository
@@ -8,7 +9,7 @@ name: Deploy to Pages
 on:
   push:
     branches: [main]
-    paths: ['Habit_tracker/**', 'Kent/**', '.github/workflows/deploy-pages.yml', '.github/pages-root/**']
+    paths: ['Habit_tracker/**', 'Kent/**', '.github/workflows/deploy-pages.yml', 'Landing/**']
   workflow_dispatch:
 
 permissions:
@@ -55,12 +56,12 @@ jobs:
 
       - name: Assemble site
         run: |
+          mkdir -p site
+          cp -r Landing/. site/
           mkdir -p site/streak
           cp -r Habit_tracker/dist/. site/streak/
           mkdir -p site/kent
           cp -r Kent/apps/client/dist/. site/kent/
-          # Removes the service worker Streak used to register at /sides/ (see the file for details).
-          cp .github/pages-root/sw.js site/sw.js
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sides · Abdalla's side projects</title>
+  <meta name="description" content="Games, tools and experiments. Some you can play in your browser, the rest you can read and run." />
+  <meta name="theme-color" content="#f4f4f5" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0d0d10" media="(prefers-color-scheme: dark)" />
+  <meta property="og:title" content="Sides" />
+  <meta property="og:description" content="Games, tools and experiments by Abdalla." />
+  <meta property="og:image" content="https://abdoahmed07.github.io/sides/img/kent.jpg" />
+  <style>
+    :root {
+      --bg: #f4f4f5;
+      --surface: #ffffff;
+      --surface-2: #ececef;
+      --text: #18181b;
+      --muted: #52525b;
+      --line: #dcdce0;
+      --accent: #c2410c;
+      --accent-text: #ffffff;
+      --accent-soft: #fbe9df;
+      --radius: 14px;
+      --shadow: 0 1px 2px rgb(24 24 27 / .06), 0 12px 32px -12px rgb(24 24 27 / .18);
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d0d10;
+        --surface: #16161a;
+        --surface-2: #1d1d22;
+        --text: #f1f1f3;
+        --muted: #a1a1aa;
+        --line: #2a2a31;
+        --accent: #f0703a;
+        --accent-text: #1a0d06;
+        --accent-soft: #2a1710;
+        --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 16px 40px -16px rgb(0 0 0 / .7);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.6 ui-sans-serif, -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; }
+    img { display: block; max-width: 100%; height: auto; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+    /* Top bar */
+    .bar { display: flex; align-items: center; justify-content: space-between; height: 68px; }
+    .wordmark { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; text-decoration: none; }
+    .bar a.gh { color: var(--muted); text-decoration: none; font-size: 15px; }
+    .bar a.gh:hover { color: var(--text); }
+
+    /* Hero */
+    .hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; padding-top: 40px; padding-bottom: 88px; }
+    h1 { font-size: clamp(2.4rem, 5vw, 3.6rem); line-height: 1.05; letter-spacing: -0.035em; margin: 0 0 20px; font-weight: 750; }
+    .lede { color: var(--muted); font-size: 1.125rem; max-width: 34ch; margin: 0 0 32px; }
+    .ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; height: 46px; padding: 0 20px; border-radius: 10px;
+      font-weight: 600; font-size: 15px; text-decoration: none; white-space: nowrap;
+      transition: transform .2s cubic-bezier(.16,1,.3,1), background-color .2s;
+    }
+    .btn:active { transform: translateY(1px) scale(.98); }
+    .btn-primary { background: var(--accent); color: var(--accent-text); }
+    .btn-primary:hover { filter: brightness(1.06); }
+    .btn-ghost { border: 1px solid var(--line); color: var(--text); }
+    .btn-ghost:hover { background: var(--surface-2); }
+    .hero figure { margin: 0; }
+    .hero img { border-radius: var(--radius); box-shadow: var(--shadow); aspect-ratio: 3 / 2; object-fit: cover; width: 100%; }
+    .hero figcaption { color: var(--muted); font-size: 13px; margin-top: 10px; }
+
+    section { padding: 72px 0; border-top: 1px solid var(--line); }
+    h2 { font-size: clamp(1.6rem, 3vw, 2.1rem); letter-spacing: -0.025em; line-height: 1.15; margin: 0 0 10px; }
+    .section-lede { color: var(--muted); margin: 0 0 36px; max-width: 60ch; }
+
+    /* Browser apps: Kent large, two smaller stacked */
+    .apps { display: grid; grid-template-columns: 1.6fr 1fr; grid-template-rows: auto auto; gap: 16px; }
+    .app {
+      display: flex; flex-direction: column; border-radius: var(--radius); background: var(--surface);
+      border: 1px solid var(--line); text-decoration: none; overflow: hidden;
+      transition: transform .3s cubic-bezier(.16,1,.3,1), box-shadow .3s;
+    }
+    .app:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+    .app-body { padding: 22px 24px 24px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .app h3 { margin: 0; font-size: 1.25rem; letter-spacing: -0.015em; }
+    .app p { margin: 0; color: var(--muted); font-size: 15px; }
+    .app .go { margin-top: auto; padding-top: 14px; font-weight: 600; font-size: 15px; color: var(--accent); }
+    .app.kent { grid-row: span 2; }
+    .app.kent img { aspect-ratio: 1280 / 620; object-fit: cover; border-bottom: 1px solid var(--line); }
+    .app.streak { background: linear-gradient(160deg, var(--accent-soft), var(--surface) 70%); }
+    .app.review { background: linear-gradient(160deg, var(--surface-2), var(--surface) 70%); }
+    .tag { font-size: 13px; color: var(--muted); }
+
+    /* Terminal projects: two columns, no cards */
+    .runs { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+    .run h3 { margin: 0 0 6px; font-size: 1.2rem; }
+    .run h3 a { text-decoration: none; }
+    .run h3 a:hover { color: var(--accent); }
+    .run p { margin: 0 0 12px; color: var(--muted); }
+    .run code {
+      font: 13px/1 ui-monospace, "SF Mono", Menlo, monospace; background: var(--surface-2);
+      border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; display: inline-block;
+    }
+
+    /* Summer 2026: compact three-column index */
+    .grid9 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 32px; margin: 0; padding: 0; list-style: none; }
+    .grid9 a { display: block; padding: 14px 0; text-decoration: none; border-bottom: 1px solid var(--line); }
+    .grid9 a:hover strong { color: var(--accent); }
+    .grid9 strong { display: block; font-size: 15px; }
+    .grid9 span { color: var(--muted); font-size: 14px; line-height: 1.45; display: block; }
+
+    footer { border-top: 1px solid var(--line); padding: 32px 0 48px; color: var(--muted); font-size: 14px; }
+    footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+    a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+
+    /* Entry motion: content settles in on load, off for reduced motion */
+    @media (prefers-reduced-motion: no-preference) {
+      .rise { animation: rise .7s cubic-bezier(.16,1,.3,1) both; }
+      .rise.d1 { animation-delay: .08s; }
+      .rise.d2 { animation-delay: .16s; }
+      @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .app, .btn { transition: none; }
+      .app:hover { transform: none; }
+    }
+
+    @media (max-width: 1000px) and (min-width: 861px) {
+      .grid9 { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 860px) {
+      .hero { grid-template-columns: 1fr; gap: 36px; padding-top: 16px; padding-bottom: 64px; }
+      .apps { grid-template-columns: 1fr; }
+      .app.kent { grid-row: auto; }
+      .runs { grid-template-columns: 1fr; gap: 36px; }
+      .grid9 { grid-template-columns: 1fr; }
+      section { padding: 56px 0; }
+    }
+    @media (max-width: 480px) {
+      .wrap { padding: 0 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="wrap bar">
+    <a class="wordmark" href="./">Sides</a>
+    <a class="gh" href="https://github.com/abdoahmed07/sides">GitHub</a>
+  </header>
+
+  <main>
+    <div class="wrap hero">
+      <div>
+        <h1 class="rise">Things I build on the side.</h1>
+        <p class="lede rise d1">Games, tools and experiments. Some you can play right here in your browser, the rest you can read and run.</p>
+        <div class="ctas rise d2">
+          <a class="btn btn-primary" href="./kent/">Play Kent</a>
+          <a class="btn btn-ghost" href="https://github.com/abdoahmed07/sides">See the code</a>
+        </div>
+      </div>
+      <figure class="rise d1">
+        <img src="img/raytracer.jpg" width="1200" height="801" alt="Hundreds of matte, metal and glass spheres rendered by my ray tracer" />
+        <figcaption>Rendered by my ray tracer, written from scratch in C++.</figcaption>
+      </figure>
+    </div>
+
+    <section>
+      <div class="wrap">
+        <h2>Try them in your browser</h2>
+        <p class="section-lede">No install, no setup. Open the link and go.</p>
+        <div class="apps">
+          <a class="app kent" href="./kent/">
+            <img src="img/kent.jpg" width="1280" height="620" alt="A game of Kent in progress: four cards in the middle, my hand, and the signal buttons" loading="lazy" />
+            <div class="app-body">
+              <h3>Kent</h3>
+              <p>A card game from my childhood. Collect four of a kind, then secretly signal your partner with a hand gesture before the other team catches you. Play against bots.</p>
+              <span class="tag">TypeScript · React</span>
+              <span class="go">Play Kent</span>
+            </div>
+          </a>
+          <a class="app streak" href="./streak/">
+            <div class="app-body">
+              <h3>Streak</h3>
+              <p>A calm, minimal habit tracker. One tap a day to keep your streaks going, synced across your devices.</p>
+              <span class="tag">React · Supabase · installable on your phone</span>
+              <span class="go">Open Streak</span>
+            </div>
+          </a>
+          <a class="app review" href="https://codereview-rho.vercel.app">
+            <div class="app-body">
+              <h3>Code Review</h3>
+              <p>Paste code, share the link, and comment on any line. Everyone viewing sees new comments instantly.</p>
+              <span class="tag">React · Node · Socket.io · PostgreSQL</span>
+              <span class="go">Open Code Review</span>
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>Run them in your terminal</h2>
+        <p class="section-lede">Two programs that live in the command line.</p>
+        <div class="runs">
+          <div class="run">
+            <h3><a href="https://github.com/abdoahmed07/sides/tree/main/Airplane-simulator">Airport Simulator</a></h3>
+            <p>Planes arrive and depart, get runways, and run into fuel emergencies, all on a live terminal display. Every data structure is written by hand.</p>
+            <code>make run</code> <span class="tag">C++</span>
+          </div>
+          <div class="run">
+            <h3><a href="https://github.com/abdoahmed07/sides/tree/main/HeroFight">HeroFight</a></h3>
+            <p>A text RPG. Pick a hero class, fight through seven rooms of enemies, loot and merchants, then face the Ancient Dragon.</p>
+            <code>dotnet run</code> <span class="tag">C#</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>Summer 2026</h2>
+        <p class="section-lede">Nine projects from one summer, each one a different corner of computer science.</p>
+        <ul class="grid9">
+            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-01-code-review"><strong>Code Review Tool</strong><span>Real-time, line-by-line code comments</span></a></li>
+            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-02-open-source"><strong>Open Source</strong><span>A bug fix contributed to socket.io</span></a></li>
+            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-03-technical-writing"><strong>Technical Writing</strong><span>Five posts on building and shipping apps</span></a></li>
+            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-04-ray-tracer"><strong>Ray Tracer</strong><span>Realistic 3D renders from scratch in C++</span></a></li>
+            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-05-career-prep"><strong>Career Prep</strong><span>CV, pitch, outreach and LeetCode practice</span></a></li>
+            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-06-interpreter"><strong>Interpreter</strong><span>A programming language, in Java and in C</span></a></li>
+            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-07-packet-analyser"><strong>Packet Analyser</strong><span>Reads live network traffic, in C</span></a></li>
+            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-08-neural-network"><strong>Neural Network</strong><span>Reads handwritten digits, Python and NumPy only</span></a></li>
+            <li><a href="https://github.com/abdoahmed07/sides/tree/main/Summer%202026/project-09-ctf"><strong>Capture the Flag</strong><span>Ten security challenges solved, one built</span></a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>Built by Ab.</span>
+      <a href="https://github.com/abdoahmed07/sides">github.com/abdoahmed07/sides</a>
+    </div>
+  </footer>
+</body>
+</html>
