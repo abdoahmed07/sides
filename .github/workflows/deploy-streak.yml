@@ -1,4 +1,4 @@
-# Builds the Streak habit tracker in R/ and publishes it to this repo's GitHub Pages site.
+# Builds the Streak habit tracker in Habit_tracker/ and publishes it to this repo's GitHub Pages site.
 # One-time setup: Settings → Pages → Source: "GitHub Actions", and add repository
 # variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (Settings → Secrets and variables → Actions → Variables).
 name: Deploy Streak to Pages
@@ -6,7 +6,7 @@ name: Deploy Streak to Pages
 on:
   push:
     branches: [main]
-    paths: ['R/**', '.github/workflows/deploy-streak.yml']
+    paths: ['Habit_tracker/**', '.github/workflows/deploy-streak.yml']
   workflow_dispatch:
 
 permissions:
@@ -23,14 +23,14 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: R
+        working-directory: Habit_tracker
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: R/package-lock.json
+          cache-dependency-path: Habit_tracker/package-lock.json
       - run: npm ci
       - run: npm test
       - run: npm run build
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: R/dist
+          path: Habit_tracker/dist
 
   deploy:
     needs: build

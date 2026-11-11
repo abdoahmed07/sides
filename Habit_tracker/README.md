@@ -26,7 +26,7 @@ Step 10 (a week of real use) is yours: see [the checklist](#step-10-a-week-of-re
 ## Deploy (GitHub Pages)
 
 The workflow `.github/workflows/deploy-streak.yml` (at the root of the Sides repo) tests, builds and
-publishes `R/` on every push to `main` that touches `R/`. One-time setup in the GitHub repo:
+publishes `Habit_tracker/` on every push to `main` that touches `Habit_tracker/`. One-time setup in the GitHub repo:
 
 - Settings → Pages → Source: **GitHub Actions**.
 - Settings → Secrets and variables → Actions → **Variables**: add `VITE_SUPABASE_URL` and
