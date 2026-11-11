@@ -1,12 +1,14 @@
-# Builds the Streak habit tracker in Habit_tracker/ and publishes it to this repo's GitHub Pages site.
+# Builds every web app in this repo into ONE GitHub Pages site (a repo can only have one):
+#   Streak habit tracker  → https://abdoahmed07.github.io/sides/streak/
+#   Kent card game        → https://abdoahmed07.github.io/sides/kent/
 # One-time setup: Settings → Pages → Source: "GitHub Actions", and add repository
 # variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (Settings → Secrets and variables → Actions → Variables).
-name: Deploy Streak to Pages
+name: Deploy to Pages
 
 on:
   push:
     branches: [main]
-    paths: ['Habit_tracker/**', '.github/workflows/deploy-streak.yml']
+    paths: ['Habit_tracker/**', 'Kent/**', '.github/workflows/deploy-pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -21,26 +23,47 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: Habit_tracker
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up pnpm (Kent)
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: Kent/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: Habit_tracker/package-lock.json
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
+
+      - name: Build Streak
+        working-directory: Habit_tracker
+        run: |
+          npm ci
+          npm test
+          npm run build
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Build Kent
+        working-directory: Kent
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm test
+          pnpm run build
+
+      - name: Assemble site
+        run: |
+          mkdir -p site/streak
+          cp -r Habit_tracker/dist/. site/streak/
+          mkdir -p site/kent
+          cp -r Kent/apps/client/dist/. site/kent/
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: Habit_tracker/dist
+          path: site
 
   deploy:
     needs: build

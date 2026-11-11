@@ -7,9 +7,8 @@
   },
   "packageManager": "pnpm@9.15.9",
   "scripts": {
-    "dev": "concurrently -n engine,server,client -c blue,green,magenta \"pnpm --filter @kent/engine dev\" \"pnpm --filter @kent/server dev\" \"pnpm --filter @kent/client dev\"",
-    "build": "pnpm --filter @kent/engine build && pnpm --filter @kent/server build && pnpm --filter @kent/client build",
-    "start": "pnpm --filter @kent/server start",
+    "dev": "concurrently -n engine,client -c blue,magenta \"pnpm --filter @kent/engine dev\" \"pnpm --filter @kent/client dev\"",
+    "build": "pnpm --filter @kent/engine build && pnpm --filter @kent/client build",
     "test": "pnpm --filter @kent/engine test"
   },
   "devDependencies": {

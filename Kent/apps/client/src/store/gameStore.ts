@@ -1,139 +1,117 @@
-import type { AckResponse, ClientGameAction, EngineErrorCode, RedactedGameState, SignalIconId } from "@kent/engine";
+import {
+  EngineError,
+  HUMAN_ID,
+  applyAction,
+  chooseBotAction,
+  createSoloMatch,
+  isBotId,
+  redactStateFor,
+  type EngineErrorCode,
+  type GameAction,
+  type GameState,
+  type PlayerCount,
+  type RedactedGameState,
+  type SignalIconId,
+} from "@kent/engine";
 import { create } from "zustand";
-import { socket } from "../lib/socket";
 
-const SESSION_KEY = "kent:session";
+/** How often bots get a chance to act. Each bot acts at most once per tick, and only some of the time. */
+const BOT_TICK_MS = 700;
 
-interface StoredSession {
-  roomCode: string;
-  playerId: string;
-  token: string;
-}
-
-function loadSession(): StoredSession | null {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? (JSON.parse(raw) as StoredSession) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveSession(session: StoredSession | null): void {
-  if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  else localStorage.removeItem(SESSION_KEY);
-}
-
-export type ConnectionStatus = "connecting" | "connected" | "offline";
 export type ActionError = { code: EngineErrorCode | "UNKNOWN"; message: string };
-
-type RoomAck = AckResponse<{ playerId: string; token: string; roomCode: string }>;
+type HumanAction = GameAction extends infer A ? (A extends { playerId: string } ? Omit<A, "playerId"> : never) : never;
 
 interface GameStoreState {
-  status: ConnectionStatus;
-  session: StoredSession | null;
+  /** Full game state — lives only in this browser. Screens read the redacted `gameState` view instead. */
+  fullState: GameState | null;
   gameState: RedactedGameState | null;
+  session: { playerId: string } | null;
   lastError: ActionError | null;
-  busy: boolean;
 
-  createRoom: (hostName: string, seatCount: number) => Promise<void>;
-  joinRoom: (roomCode: string, name: string) => Promise<void>;
-  leaveRoom: () => void;
+  startGame: (name: string, seatCount: PlayerCount) => void;
+  quit: () => void;
   clearError: () => void;
 
-  dispatch: (action: ClientGameAction) => Promise<AckResponse>;
-  joinSeat: (seat: number) => Promise<AckResponse>;
-  leaveSeat: () => Promise<AckResponse>;
-  setReady: (ready: boolean) => Promise<AckResponse>;
-  startMatch: () => Promise<AckResponse>;
-  setTeamSignal: (icon: SignalIconId) => Promise<AckResponse>;
-  swapCard: (handCardId: string, centerSlot: number) => Promise<AckResponse>;
-  declareDone: () => Promise<AckResponse>;
-  tapSignal: (icon: SignalIconId) => Promise<AckResponse>;
-  callKent: () => Promise<AckResponse>;
-  callCounterKent: () => Promise<AckResponse>;
+  setReady: (ready: boolean) => void;
+  setTeamSignal: (icon: SignalIconId) => void;
+  swapCard: (handCardId: string, centerSlot: number) => void;
+  declareDone: () => void;
+  tapSignal: (icon: SignalIconId) => void;
+  callKent: () => void;
+  callCounterKent: () => void;
 }
 
-function applyRoomResult(res: RoomAck): StoredSession | undefined {
-  if (!res.ok) return undefined;
-  return { roomCode: res.roomCode, playerId: res.playerId, token: res.token };
+function shuffled<T>(items: T[]): T[] {
+  return [...items].sort(() => Math.random() - 0.5);
 }
 
 export const useGameStore = create<GameStoreState>((set, get) => {
-  socket.on("connect", () => {
-    set({ status: "connected" });
-    const session = get().session;
-    if (session) {
-      socket.emit("room:rejoin", { roomCode: session.roomCode, token: session.token }, (res) => {
-        if (!res.ok) {
-          saveSession(null);
-          set({ session: null });
-        }
+  let botTimer: number | null = null;
+
+  function commit(next: GameState) {
+    set({ fullState: next, gameState: redactStateFor(next, HUMAN_ID) });
+  }
+
+  function botTick() {
+    const start = get().fullState;
+    if (!start || start.phase === "match_over") return;
+    const now = Date.now();
+    let state: GameState = start;
+    for (const id of shuffled(Object.keys(state.players).filter(isBotId))) {
+      const action = chooseBotAction(state, id, isBotId, now);
+      if (!action) continue;
+      const phaseBefore: GameState["phase"] = state.phase;
+      try {
+        state = applyAction(state, action, now);
+      } catch {
+        // A bot's move can go stale between deciding and applying (e.g. the round turned over) — just skip it.
+        continue;
+      }
+      if (state.phase !== phaseBefore) break; // a hand just ended or dealt — let the table settle first
+    }
+    if (state !== start) commit(state);
+  }
+
+  function act(action: HumanAction) {
+    const state = get().fullState;
+    if (!state) return;
+    try {
+      commit(applyAction(state, { ...action, playerId: HUMAN_ID } as GameAction, Date.now()));
+      set({ lastError: null });
+    } catch (err) {
+      set({
+        lastError:
+          err instanceof EngineError ? { code: err.code, message: err.message } : { code: "UNKNOWN", message: "Something went wrong" },
       });
     }
-  });
-  socket.on("disconnect", () => set({ status: "offline" }));
-  socket.on("state:update", (state) => set({ gameState: state }));
-
-  async function dispatch(action: ClientGameAction): Promise<AckResponse> {
-    set({ lastError: null });
-    const res = await new Promise<AckResponse>((resolve) => socket.emit("game:action", action, resolve));
-    if (!res.ok) set({ lastError: res.error });
-    return res;
   }
 
   return {
-    status: socket.connected ? "connected" : "connecting",
-    session: loadSession(),
+    fullState: null,
     gameState: null,
+    session: null,
     lastError: null,
-    busy: false,
 
-    async createRoom(hostName, seatCount) {
-      set({ busy: true, lastError: null });
-      const res = await new Promise<RoomAck>((resolve) => socket.emit("room:create", { hostName, seatCount }, resolve));
-      set({ busy: false });
-      const session = applyRoomResult(res);
-      if (session) {
-        saveSession(session);
-        set({ session });
-      } else if (!res.ok) {
-        set({ lastError: res.error });
-      }
+    startGame(name, seatCount) {
+      commit(createSoloMatch(name.trim() || "Player", seatCount));
+      set({ session: { playerId: HUMAN_ID }, lastError: null });
+      if (botTimer === null) botTimer = window.setInterval(botTick, BOT_TICK_MS);
     },
 
-    async joinRoom(roomCode, name) {
-      set({ busy: true, lastError: null });
-      const res = await new Promise<RoomAck>((resolve) => socket.emit("room:join", { roomCode, name }, resolve));
-      set({ busy: false });
-      const session = applyRoomResult(res);
-      if (session) {
-        saveSession(session);
-        set({ session });
-      } else if (!res.ok) {
-        set({ lastError: res.error });
-      }
+    quit() {
+      if (botTimer !== null) window.clearInterval(botTimer);
+      botTimer = null;
+      set({ fullState: null, gameState: null, session: null, lastError: null });
     },
 
-    leaveRoom() {
-      saveSession(null);
-      set({ session: null, gameState: null });
-    },
+    clearError: () => set({ lastError: null }),
 
-    clearError() {
-      set({ lastError: null });
-    },
-
-    dispatch,
-    joinSeat: (seat) => dispatch({ type: "JOIN_SEAT", seat }),
-    leaveSeat: () => dispatch({ type: "LEAVE_SEAT" }),
-    setReady: (ready) => dispatch({ type: "SET_READY", ready }),
-    startMatch: () => dispatch({ type: "START_MATCH" }),
-    setTeamSignal: (icon) => dispatch({ type: "SET_TEAM_SIGNAL", icon }),
-    swapCard: (handCardId, centerSlot) => dispatch({ type: "SWAP_CARD", handCardId, centerSlot }),
-    declareDone: () => dispatch({ type: "DECLARE_DONE" }),
-    tapSignal: (icon) => dispatch({ type: "TAP_SIGNAL", icon }),
-    callKent: () => dispatch({ type: "CALL_KENT" }),
-    callCounterKent: () => dispatch({ type: "CALL_COUNTER_KENT" }),
+    setReady: (ready) => act({ type: "SET_READY", ready }),
+    setTeamSignal: (icon) => act({ type: "SET_TEAM_SIGNAL", icon }),
+    swapCard: (handCardId, centerSlot) => act({ type: "SWAP_CARD", handCardId, centerSlot }),
+    declareDone: () => act({ type: "DECLARE_DONE" }),
+    tapSignal: (icon) => act({ type: "TAP_SIGNAL", icon }),
+    callKent: () => act({ type: "CALL_KENT" }),
+    callCounterKent: () => act({ type: "CALL_COUNTER_KENT" }),
   };
 });

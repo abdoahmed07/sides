@@ -12,8 +12,7 @@ export type EngineErrorCode =
   | "UNKNOWN_PLAYER"
   | "SIGNAL_LOCKED_DURING_HAND"
   | "PLAYER_NOT_SEATED"
-  | "ROOM_FULL"
-  | "ROOM_NOT_FOUND";
+  | "ROOM_FULL";
 
 export class EngineError extends Error {
   code: EngineErrorCode;

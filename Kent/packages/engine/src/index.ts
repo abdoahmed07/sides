@@ -9,5 +9,6 @@ export * from "./rules/kent.js";
 export * from "./rules/scoring.js";
 export * from "./rules/swapping.js";
 export * from "./seating.js";
-export * from "./socketEvents.js";
 export * from "./types.js";
+export * from "./rules/bots.js";
+export * from "./solo.js";

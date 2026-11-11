@@ -12,7 +12,7 @@ Step 10 (a week of real use) is yours: see [the checklist](#step-10-a-week-of-re
    - SQL Editor → paste and run [`supabase/schema.sql`](supabase/schema.sql).
    - Authentication → Sign In / Providers → Email: enabled (email + password).
    - Authentication → URL Configuration → add your site URL
-     (`https://abdoahmed07.github.io/sides/`) and `http://localhost:5173` to the redirect URLs,
+     (`https://abdoahmed07.github.io/sides/streak/`) and `http://localhost:5173` to the redirect URLs,
      so the confirmation email links back to the app.
    - Once your friends have accounts, you can turn off "Allow new users to sign up" to keep it private.
 2. **Local env.** `cp .env.example .env.local` and fill in the project URL and **anon** key
@@ -32,7 +32,7 @@ publishes `Habit_tracker/` on every push to `main` that touches `Habit_tracker/`
 - Settings → Secrets and variables → Actions → **Variables**: add `VITE_SUPABASE_URL` and
   `VITE_SUPABASE_ANON_KEY`.
 
-The build uses a relative base and hash routes (`#/new`), so it works under `/sides/` and refreshes
+The build uses a relative base and hash routes (`#/new`), so it works under `/sides/streak/` and refreshes
 never 404.
 
 **Install on a phone:** open the site, then Share → Add to Home Screen (iPhone, Safari) or

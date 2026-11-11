@@ -4,7 +4,7 @@ import { teamPalette } from "../lib/teamColors";
 import { useGameStore } from "../store/gameStore";
 
 export function MatchOverScreen() {
-  const { gameState, leaveRoom } = useGameStore();
+  const { gameState, quit } = useGameStore();
   if (!gameState) return null;
 
   const loserId = gameState.matchLoserPartnershipId;
@@ -28,7 +28,7 @@ export function MatchOverScreen() {
 
       <button
         type="button"
-        onClick={leaveRoom}
+        onClick={quit}
         className="mt-4 rounded-lg bg-gold-400 px-6 py-2.5 font-display font-bold text-felt-950 transition-transform hover:scale-[1.02]"
       >
         Back to home
