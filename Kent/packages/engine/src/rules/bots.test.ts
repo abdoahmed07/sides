@@ -9,6 +9,15 @@ const c = (rank: Card["rank"], suit: Card["suit"]): Card => ({ id: `${rank}-${su
 const always = () => 0; // rng that always passes every probability check
 const never = () => 0.999;
 const allBots = () => true;
+// Small seeded random generator so the "many tries" tests are repeatable.
+function mulberry(seed: number) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 describe("bestSwap", () => {
   it("takes a center card that grows the biggest group, giving up a loner", () => {
@@ -64,7 +73,9 @@ describe("chooseBotAction", () => {
   it("calls COUNTER KENT when an opponent keeps tapping the same gesture", () => {
     let state = basePlayingState(4, { p1: fourOfAKindHand("Q") });
     state = withSignal(withSignal(state, "team-0", "palm"), "team-1", "ok");
+    // Medium bots need three of the same gesture before they get suspicious.
     state = applyAction(state, { type: "TAP_SIGNAL", playerId: "p1", icon: "ok" }, 1000);
+    state = applyAction(state, { type: "TAP_SIGNAL", playerId: "p1", icon: "ok" }, 1500);
     state = applyAction(state, { type: "TAP_SIGNAL", playerId: "p1", icon: "ok" }, 2000);
     expect(chooseBotAction(state, "p0", allBots, 2500, always)).toEqual({ type: "CALL_COUNTER_KENT", playerId: "p0" });
   });
@@ -73,6 +84,55 @@ describe("chooseBotAction", () => {
     let state = basePlayingState(4, { p1: [c("3", "hearts"), c("3", "spades"), c("9", "clubs"), c("K", "clubs")] });
     state = withSignal(withSignal(state, "team-0", "palm"), "team-1", "ok");
     expect(chooseBotAction(state, "p1", allBots, 0, never)).toBeNull();
+  });
+});
+
+describe("bluffing and difficulty", () => {
+  const rngFrom = (values: number[]) => { let i = 0; return () => values[i++ % values.length]!; };
+
+  it("bluffs with a fake gesture while idle, never with its team's real signal", () => {
+    let state = basePlayingState(4, { p1: [c("A", "hearts"), c("K", "spades"), c("Q", "clubs"), c("J", "clubs")] });
+    state = withSignal(withSignal(state, "team-0", "palm"), "team-1", "ok");
+    state = { ...state, doneStatus: { p1: true } }; // passed the round, nothing else to do
+    const seen = new Set<string>();
+    for (let seed = 0; seed < 400; seed++) {
+      const rnd = mulberry(seed);
+      const action = chooseBotAction(state, "p1", allBots, 0, rnd, "hard");
+      if (action?.type === "TAP_SIGNAL") seen.add(action.icon);
+    }
+    expect(seen.size).toBeGreaterThan(0);
+    expect(seen.has("ok")).toBe(false);
+  });
+
+  it("hard bots space out real-signal taps so they don't form an obvious pattern", () => {
+    let state = basePlayingState(4, { p1: fourOfAKindHand("Q") });
+    state = withSignal(withSignal(state, "team-0", "palm"), "team-1", "ok");
+    state = applyAction(state, { type: "TAP_SIGNAL", playerId: "p1", icon: "ok" }, 1000);
+    const soon = chooseBotAction(state, "p1", allBots, 1500, always, "hard");
+    expect(soon).toMatchObject({ type: "TAP_SIGNAL" });
+    expect(soon).not.toMatchObject({ icon: "ok" });
+    expect(chooseBotAction(state, "p1", allBots, 4000, always, "hard")).toMatchObject({ type: "TAP_SIGNAL", icon: "ok" });
+  });
+
+  it("hard bots only suspect repeated taps from opponents who have stopped swapping", () => {
+    let state = basePlayingState(4, { p0: [c("A", "hearts"), c("K", "spades"), c("Q", "clubs"), c("J", "clubs")] });
+    state = withSignal(withSignal(state, "team-0", "palm"), "team-1", "ok");
+    state = applyAction(state, { type: "TAP_SIGNAL", playerId: "p1", icon: "peace" }, 1000);
+    state = applyAction(state, { type: "TAP_SIGNAL", playerId: "p1", icon: "peace" }, 2000);
+    // p1 still swapping: looks like a bluffer, so no accusation (p0 has no useful swap and passes instead).
+    expect(chooseBotAction(state, "p0", allBots, 2500, rngFrom([0.99, 0.99, 0]), "hard")?.type).not.toBe("CALL_COUNTER_KENT");
+    state = { ...state, doneStatus: { p1: true } };
+    expect(chooseBotAction(state, "p0", allBots, 2500, always, "hard")).toEqual({ type: "CALL_COUNTER_KENT", playerId: "p0" });
+  });
+
+  it("easy bots sometimes make careless swaps", () => {
+    let state = basePlayingState(4, { p1: [c("3", "hearts"), c("3", "spades"), c("9", "clubs"), c("K", "clubs")] });
+    state = withSignal(withSignal(state, "team-0", "palm"), "team-1", "ok");
+    const best = chooseBotAction(state, "p1", allBots, 0, always, "easy");
+    const careless = chooseBotAction(state, "p1", allBots, 0, rngFrom([0, 0, 0.99, 0.99]), "easy");
+    expect(best).toMatchObject({ type: "SWAP_CARD", centerSlot: 0 });
+    expect(careless).toMatchObject({ type: "SWAP_CARD" });
+    expect(careless).not.toEqual(best);
   });
 });
 

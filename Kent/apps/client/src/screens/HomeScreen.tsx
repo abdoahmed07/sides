@@ -1,18 +1,39 @@
-import type { PlayerCount } from "@kent/engine";
+import { BOT_DIFFICULTIES, type BotDifficulty, type PlayerCount } from "@kent/engine";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { useGameStore } from "../store/gameStore";
 
 const SEAT_OPTIONS = [4, 6, 8] as const;
+const DIFFICULTY_HINT: Record<BotDifficulty, string> = {
+  easy: "Slow, careless bots that sometimes miss their partner's signal.",
+  medium: "Bots that play sensibly and bluff now and then.",
+  hard: "Quick bots that bluff, hide their signals and watch you closely.",
+};
+const STORED_DIFFICULTY = "kent:difficulty";
+
+function loadDifficulty(): BotDifficulty {
+  try {
+    const saved = localStorage.getItem(STORED_DIFFICULTY);
+    return (BOT_DIFFICULTIES as readonly string[]).includes(saved ?? "") ? (saved as BotDifficulty) : "medium";
+  } catch {
+    return "medium";
+  }
+}
 
 export function HomeScreen() {
   const [name, setName] = useState("");
   const [seatCount, setSeatCount] = useState<PlayerCount>(4);
+  const [difficulty, setDifficulty] = useState<BotDifficulty>(loadDifficulty);
   const startGame = useGameStore((s) => s.startGame);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    startGame(name, seatCount);
+    try {
+      localStorage.setItem(STORED_DIFFICULTY, difficulty);
+    } catch {
+      // Private browsing etc.: just don't remember the choice.
+    }
+    startGame(name, seatCount, difficulty);
   }
 
   return (
@@ -52,6 +73,25 @@ export function HomeScreen() {
             ))}
           </div>
           <p className="text-xs text-cream-500">You + {seatCount - 1} bots. Your partner is the bot sitting across from you.</p>
+        </div>
+
+        <div className="flex flex-col gap-1 text-sm text-cream-300">
+          Bots
+          <div className="flex gap-2">
+            {BOT_DIFFICULTIES.map((level) => (
+              <button
+                type="button"
+                key={level}
+                onClick={() => setDifficulty(level)}
+                className={`flex-1 rounded-lg border py-2 text-sm font-semibold capitalize transition-colors ${
+                  difficulty === level ? "border-gold-400 bg-gold-400/15 text-gold-300" : "border-cream-500/20 text-cream-400"
+                }`}
+              >
+                {level}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-cream-500">{DIFFICULTY_HINT[difficulty]}</p>
         </div>
 
         <button

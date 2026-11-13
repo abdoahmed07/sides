@@ -1,4 +1,5 @@
 import {
+  type BotDifficulty,
   EngineError,
   HUMAN_ID,
   applyAction,
@@ -14,6 +15,7 @@ import {
   type SignalIconId,
 } from "@kent/engine";
 import { create } from "zustand";
+import { playSoundsFor } from "../lib/gameSounds";
 
 /** How often bots get a chance to act. Each bot acts at most once per tick, and only some of the time. */
 const BOT_TICK_MS = 700;
@@ -28,7 +30,8 @@ interface GameStoreState {
   session: { playerId: string } | null;
   lastError: ActionError | null;
 
-  startGame: (name: string, seatCount: PlayerCount) => void;
+  difficulty: BotDifficulty;
+  startGame: (name: string, seatCount: PlayerCount, difficulty: BotDifficulty) => void;
   quit: () => void;
   clearError: () => void;
 
@@ -49,6 +52,7 @@ export const useGameStore = create<GameStoreState>((set, get) => {
   let botTimer: number | null = null;
 
   function commit(next: GameState) {
+    playSoundsFor(get().fullState, next, HUMAN_ID);
     set({ fullState: next, gameState: redactStateFor(next, HUMAN_ID) });
   }
 
@@ -58,7 +62,7 @@ export const useGameStore = create<GameStoreState>((set, get) => {
     const now = Date.now();
     let state: GameState = start;
     for (const id of shuffled(Object.keys(state.players).filter(isBotId))) {
-      const action = chooseBotAction(state, id, isBotId, now);
+      const action = chooseBotAction(state, id, isBotId, now, Math.random, get().difficulty);
       if (!action) continue;
       const phaseBefore: GameState["phase"] = state.phase;
       try {
@@ -92,9 +96,11 @@ export const useGameStore = create<GameStoreState>((set, get) => {
     session: null,
     lastError: null,
 
-    startGame(name, seatCount) {
+    difficulty: "medium",
+
+    startGame(name, seatCount, difficulty) {
       commit(createSoloMatch(name.trim() || "Player", seatCount));
-      set({ session: { playerId: HUMAN_ID }, lastError: null });
+      set({ session: { playerId: HUMAN_ID }, lastError: null, difficulty });
       if (botTimer === null) botTimer = window.setInterval(botTick, BOT_TICK_MS);
     },
 

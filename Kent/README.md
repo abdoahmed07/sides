@@ -35,7 +35,9 @@ A Counter Kent only counts if the opponent really has four of a kind **and** tap
 
 **Winning.** Each lost hand gives your team the next letter of **K-E-N-T**. The first team to spell the whole word loses the match.
 
-**Bots.** Bots swap toward four of a kind, signal their partner when they get it (sometimes with a decoy mixed in), call KENT when their partner signals, and call COUNTER KENT when an opponent keeps tapping the same gesture — so don't spam your real one.
+**Bots.** Pick Easy, Medium or Hard before you play. Bots swap toward four of a kind, signal their partner when they get it, call KENT when their partner signals, and call COUNTER KENT when an opponent keeps tapping the same gesture — so don't spam your real one. They also bluff: now and then a bot taps a fake gesture to throw you off. Easy bots are sloppy and rarely catch you; Hard bots swap sharply, space out their real signal, and only get suspicious of players who are already done.
+
+**Sound.** Swaps, gestures, new rounds and wins/losses all have their own sounds. Use the speaker button in the top-right corner to mute.
 
 ## Run it locally
 
@@ -76,4 +78,3 @@ Every push to `main` that touches `Kent/` rebuilds the game and publishes it to 
 ## Planned
 
 - Online multiplayer, so friends can play from their own devices
-- Sound effects

@@ -2,6 +2,7 @@ import { BetweenHandsScreen } from "./screens/BetweenHandsScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { MatchOverScreen } from "./screens/MatchOverScreen";
 import { TableScreen } from "./screens/TableScreen";
+import { SoundToggle } from "./components/SoundToggle";
 import { useGameStore } from "./store/gameStore";
 
 function Screen() {
@@ -22,6 +23,7 @@ function Screen() {
 export default function App() {
   return (
     <div className="felt-texture flex min-h-svh flex-col">
+      <SoundToggle />
       <Screen />
     </div>
   );
