@@ -1,21 +1,46 @@
 import { SIGNAL_ICONS, type SignalIconId } from "@kent/engine";
+import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { PlayingCard } from "../components/Card";
 import { DiscardPile } from "../components/DiscardPile";
+import { EmotePicker } from "../components/EmotePicker";
 import { PlayerAvatar, type PlayerAvatarFlash } from "../components/PlayerAvatar";
 import { ScoreTrack } from "../components/ScoreTrack";
-import { SeatCircle } from "../components/SeatCircle";
 import { SignalButtons } from "../components/SignalButtons";
 import { StockPile } from "../components/StockPile";
+import { THROW_BY_ID, type ThrowId } from "../lib/reactions";
+import { useShake } from "../lib/useShake";
 import { useGameStore } from "../store/gameStore";
 
 const ICON_EMOJI = Object.fromEntries(SIGNAL_ICONS.map((s) => [s.id, s.emoji])) as Record<SignalIconId, string>;
-const FLASH_DURATION_MS = 900;
+const FLASH_DURATION_MS = 1100;
+
+/**
+ * Seats everyone except you along the far side of the table, in seating order, so your partner
+ * always lands at the top (straight across) and opponents fan out to the left and right.
+ */
+function seatPosition(relSeat: number, seatCount: number): { left: string; top: string } {
+  const t = (relSeat / seatCount) * Math.PI; // 0 = your left, π = your right
+  const x = 50 - 44 * Math.cos(t);
+  const y = 33 - 23 * Math.sin(t);
+  return { left: `${x}%`, top: `${y}%` };
+}
+
+/** Tilt and lift for each card in a fanned hand. */
+function fanPose(i: number, count: number) {
+  const mid = (count - 1) / 2;
+  const off = i - mid;
+  return { rotate: off * 5, y: off * off * 3 };
+}
 
 export function TableScreen() {
-  const { gameState, session, swapCard, declareDone, tapSignal, callKent, callCounterKent } = useGameStore();
+  const { gameState, session, swapCard, declareDone, tapSignal, callKent, callCounterKent, cardOrigins, quit, react, hits } = useGameStore();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [aiming, setAiming] = useState<ThrowId | null>(null);
+  const handShakeRef = useShake<HTMLDivElement>(session ? hits[session.playerId] : undefined, 5);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [flashes, setFlashes] = useState<Record<string, PlayerAvatarFlash>>({});
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const seenSignalCount = useRef(0);
 
   const signals = gameState?.signals;
@@ -31,9 +56,7 @@ export function TableScreen() {
     const nonces = new Map(newTaps.map((tap) => [tap.playerId, tap.atMs + Math.random()]));
     setFlashes((prev) => {
       const next = { ...prev };
-      for (const tap of newTaps) {
-        next[tap.playerId] = { icon: ICON_EMOJI[tap.icon], nonce: nonces.get(tap.playerId)! };
-      }
+      for (const tap of newTaps) next[tap.playerId] = { icon: ICON_EMOJI[tap.icon], nonce: nonces.get(tap.playerId)! };
       return next;
     });
 
@@ -54,132 +77,256 @@ export function TableScreen() {
     setSelectedCardId(null);
   }, [gameState?.handNumber]);
 
+  useEffect(() => {
+    if (!confirmLeave) return;
+    const t = window.setTimeout(() => setConfirmLeave(false), 3000);
+    return () => window.clearTimeout(t);
+  }, [confirmLeave]);
+
   if (!gameState || !session) return null;
 
-  const you = gameState.players[session.playerId];
+  const me = session.playerId;
+  const you = gameState.players[me];
   const yourSeat = you?.seat ?? 0;
-  const youAreDone = gameState.doneStatus[session.playerId] ?? false;
-  const recentTaps = gameState.signals.slice(-6).reverse();
+  const seatCount = gameState.seats.length;
+  const youAreDone = gameState.doneStatus[me] ?? false;
+  const recentTaps = gameState.signals.slice(-5).reverse();
+  const canSwap = !!selectedCardId && !youAreDone;
+  const yourSignal = you?.partnershipId ? (gameState.partnerships[you.partnershipId]?.signal ?? null) : null;
+  const othersDone = Object.entries(gameState.doneStatus).filter(([id, d]) => d && id !== me).length;
 
-  async function handleCenterTap(slot: number) {
+  function handleCenterTap(slot: number) {
     if (!selectedCardId || youAreDone) return;
     const cardId = selectedCardId;
     setSelectedCardId(null);
-    await swapCard(cardId, slot);
+    swapCard(cardId, slot);
   }
 
+  const hint = youAreDone
+    ? `You're done. Waiting on ${seatCount - 1 - othersDone} more…`
+    : selectedCardId
+      ? "Now tap a center card to swap it in."
+      : "Pick a card from your hand to swap.";
+
   return (
-    <div className="mx-auto flex min-h-full max-w-4xl flex-col gap-3 px-3 py-3 lg:flex-row lg:items-center lg:gap-8">
-      <div className="flex flex-col items-center gap-2 lg:flex-1">
-        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-          {Object.entries(gameState.partnerships).map(([teamId, team]) => (
-            <ScoreTrack key={teamId} teamId={teamId} letters={team.letters} />
-          ))}
+    <LayoutGroup>
+      <div className="mx-auto flex min-h-full w-full max-w-xl flex-col items-center gap-2 px-3 pt-3 pb-4">
+        {/* Top bar: leave, hand number, scores. The sound toggle sits fixed in the right corner. */}
+        <div className="flex w-full items-center gap-2 pr-12">
+          <button
+            type="button"
+            onClick={() => (confirmLeave ? quit() : setConfirmLeave(true))}
+            className={`flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors ${
+              confirmLeave ? "border-danger/60 bg-danger/15 text-danger" : "border-white/10 bg-felt-900/70 text-cream-300 hover:text-cream-100"
+            }`}
+          >
+            <svg viewBox="0 0 256 256" width="14" height="14" fill="currentColor" aria-hidden="true">
+              <path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z" />
+            </svg>
+            {confirmLeave ? "Leave game?" : "Leave"}
+          </button>
+          <div className="flex flex-1 flex-wrap items-center justify-center gap-x-3 gap-y-1">
+            {Object.entries(gameState.partnerships).map(([teamId, team]) => (
+              <ScoreTrack key={teamId} teamId={teamId} letters={team.letters} compact />
+            ))}
+          </div>
         </div>
 
-        <SeatCircle
-          seatCount={gameState.seats.length}
-          anchorSeat={yourSeat}
-          radiusPct={40}
-          maxWidthPx={300}
-          renderSeat={(seat) => {
-            const playerId = gameState.seats[seat];
-            if (!playerId || playerId === session.playerId) return null;
+        {/* The table. */}
+        <div className="relative mt-1 h-[322px] w-full max-w-[560px] sm:h-[370px]">
+          <div className="table-felt absolute inset-x-[3%] top-[17%] bottom-[2%] rounded-[50%]" />
+
+          {gameState.seats.map((playerId, seat) => {
+            if (!playerId || playerId === me) return null;
             const player = gameState.players[playerId];
             if (!player) return null;
+            const rel = (seat - yourSeat + seatCount) % seatCount;
             return (
-              <PlayerAvatar
-                name={player.name}
-                teamId={player.partnershipId ?? "team-0"}
-                connected={player.connected}
-                done={gameState.doneStatus[playerId] ?? false}
-                flash={flashes[playerId] ?? null}
-              />
+              <div key={seat} className="absolute z-10 -translate-x-1/2 -translate-y-1/2" style={seatPosition(rel, seatCount)}>
+                <PlayerAvatar
+                  playerId={playerId}
+                  name={player.name}
+                  teamId={player.partnershipId ?? "team-0"}
+                  isPartner={player.partnershipId === you?.partnershipId}
+                  connected={player.connected}
+                  done={gameState.doneStatus[playerId] ?? false}
+                  flash={flashes[playerId] ?? null}
+                  compact={seatCount > 6}
+                  hitAt={hits[playerId]}
+                  onTarget={
+                    aiming
+                      ? () => {
+                          react({ kind: "throw", item: aiming, to: playerId });
+                          setAiming(null);
+                        }
+                      : undefined
+                  }
+                />
+              </div>
             );
-          }}
-        />
+          })}
 
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-xs tracking-wide text-cream-500 uppercase">Center — up for grabs</p>
-          <div className="flex items-center gap-2">
-            {gameState.center.map((card, slot) => (
-              <PlayingCard
-                key={slot}
-                card={card}
-                size="md"
-                onClick={selectedCardId && !youAreDone ? () => void handleCenterTap(slot) : undefined}
-              />
-            ))}
-          </div>
-          <div className="flex items-center gap-3">
-            <StockPile count={gameState.stockCount} />
-            <DiscardPile count={gameState.discardCount} />
+          <div className="absolute inset-x-0 top-[44%] flex flex-col items-center gap-3">
+            <div className="flex items-center gap-2">
+              {gameState.center.map((card, slot) => (
+                <PlayingCard
+                  key={card.id}
+                  layoutId={card.id}
+                  card={card}
+                  size="md"
+                  origin={cardOrigins[card.id]}
+                  target={canSwap}
+                  onClick={canSwap ? () => handleCenterTap(slot) : undefined}
+                  label={`Center card ${slot + 1}: ${card.rank} of ${card.suit}`}
+                />
+              ))}
+            </div>
+            <div className="flex items-end gap-5">
+              <StockPile count={gameState.stockCount} />
+              <DiscardPile count={gameState.discardCount} />
+            </div>
           </div>
         </div>
 
-        <p className="text-center text-sm text-cream-300">
-          {youAreDone
-            ? "You're done swapping — waiting for everyone else."
-            : selectedCardId
-              ? "Tap a center card to swap for it."
-              : "Tap a card in your hand, then tap a center card to swap."}
-        </p>
+        {/* Hint + recent signals. */}
+        <div className="flex h-6 items-center">
+          <AnimatePresence mode="wait">
+            {aiming ? (
+              <motion.p
+                key="aiming"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center gap-2 text-sm font-semibold text-danger"
+              >
+                Tap someone to throw {THROW_BY_ID[aiming].emoji}
+                <button type="button" onClick={() => setAiming(null)} className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-cream-100">
+                  Cancel
+                </button>
+              </motion.p>
+            ) : (
+              <motion.p
+                key={hint}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+                className="text-center text-sm text-cream-300"
+              >
+                {hint}
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </div>
 
-        {recentTaps.length > 0 && (
-          <div className="no-scrollbar flex w-full max-w-md items-center gap-2 overflow-x-auto rounded-lg bg-felt-900/60 px-3 py-2 text-xs text-cream-400">
-            <span className="shrink-0 tracking-wide text-cream-500 uppercase">Signals</span>
+        <div className="flex h-7 w-full max-w-md items-center justify-center gap-1.5 overflow-hidden">
+          <AnimatePresence initial={false}>
             {recentTaps.map((tap) => (
-              <span key={tap.id} className="shrink-0 rounded-full bg-felt-800 px-2 py-1">
-                {ICON_EMOJI[tap.icon]} {gameState.players[tap.playerId]?.name ?? "?"}
-              </span>
+              <motion.span
+                key={tap.id}
+                layout
+                initial={{ opacity: 0, scale: 0.6, x: -12 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.6 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                className="shrink-0 rounded-full border border-white/5 bg-felt-900/70 px-2 py-0.5 text-xs whitespace-nowrap text-cream-300"
+              >
+                {ICON_EMOJI[tap.icon]} {tap.playerId === me ? "You" : (gameState.players[tap.playerId]?.name ?? "?")}
+              </motion.span>
             ))}
-          </div>
-        )}
-      </div>
+          </AnimatePresence>
+        </div>
 
-      <div className="flex flex-col items-center gap-3 pt-1 lg:flex-1">
-        <div className="flex justify-center gap-2">
-          {gameState.yourHand.map((card) => (
+        {/* Your hand. */}
+        <div
+          ref={handShakeRef}
+          data-anchor={`player:${me}`}
+          className="flex justify-center gap-1.5 pt-3"
+          style={{ minHeight: 124 }}
+        >
+          {gameState.yourHand.map((card, i) => (
             <PlayingCard
               key={card.id}
+              layoutId={card.id}
               card={card}
+              size="lg"
+              origin={cardOrigins[card.id]}
+              pose={fanPose(i, gameState.yourHand.length)}
               selected={selectedCardId === card.id}
               onClick={youAreDone ? undefined : () => setSelectedCardId((id) => (id === card.id ? null : card.id))}
-              size="lg"
             />
           ))}
         </div>
 
-        <button
-          type="button"
-          disabled={youAreDone}
-          onClick={() => void declareDone()}
-          className={`rounded-lg px-6 py-2 font-display font-bold transition-colors ${
-            youAreDone ? "bg-success/20 text-success ring-1 ring-success" : "bg-felt-800 text-cream-200 hover:bg-felt-700"
-          } disabled:cursor-default`}
-        >
-          {youAreDone ? "Done ✓" : "I'm done swapping"}
-        </button>
-
-        <SignalButtons onTap={(icon) => void tapSignal(icon)} />
-
-        <div className="flex gap-3">
-          <button
+        <div className="flex items-center gap-2">
+          <motion.button
             type="button"
-            onClick={() => void callKent()}
-            className="rounded-full bg-success px-6 py-2.5 font-display font-extrabold tracking-wide text-felt-950 shadow-pop"
+            disabled={youAreDone}
+            onClick={() => declareDone()}
+            whileTap={youAreDone ? undefined : { scale: 0.95 }}
+            className={`flex items-center gap-2 rounded-full px-6 py-2.5 font-display font-bold transition-colors ${
+              youAreDone
+                ? "bg-success/15 text-success ring-1 ring-success/60"
+                : "border border-white/10 bg-felt-800 text-cream-100 hover:border-gold-400/40 hover:bg-felt-700"
+            } disabled:cursor-default`}
           >
-            KENT!
-          </button>
-          <button
+            {youAreDone ? "Done for this round" : "I'm done swapping"}
+          </motion.button>
+          <motion.button
             type="button"
-            onClick={() => void callCounterKent()}
-            className="rounded-full bg-danger px-6 py-2.5 font-display font-extrabold tracking-wide text-felt-950 shadow-pop"
+            onClick={() => setPickerOpen(true)}
+            whileTap={{ scale: 0.9, rotate: -10 }}
+            whileHover={{ rotate: 8 }}
+            aria-label="React: send a sticker or throw something"
+            className="flex h-11 items-center gap-1.5 rounded-full border border-white/10 bg-felt-800 px-3.5 text-sm font-semibold text-cream-100 hover:border-gold-400/40"
           >
-            COUNTER KENT!
-          </button>
+            <span className="text-lg leading-none">😜</span>
+            React
+          </motion.button>
+        </div>
+
+        <SignalButtons onTap={(icon) => tapSignal(icon)} ownIcon={yourSignal} />
+
+        <div className="mt-1 flex w-full max-w-sm gap-3">
+          <CallButton label="KENT!" tone="kent" onClick={() => callKent()} />
+          <CallButton label="COUNTER KENT!" tone="counter" onClick={() => callCounterKent()} />
         </div>
       </div>
-    </div>
+      <EmotePicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSay={(item) => {
+          setPickerOpen(false);
+          react({ kind: "say", item });
+        }}
+        onAim={(item) => {
+          setPickerOpen(false);
+          setAiming(item);
+        }}
+      />
+    </LayoutGroup>
+  );
+}
+
+function CallButton({ label, tone, onClick }: { label: string; tone: "kent" | "counter"; onClick: () => void }) {
+  const kent = tone === "kent";
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.93, y: 2 }}
+      transition={{ type: "spring", stiffness: 600, damping: 20 }}
+      className={`flex-1 rounded-2xl py-3 font-display text-base font-extrabold tracking-wide text-felt-950 ${
+        kent ? "bg-gradient-to-b from-[#7ef0a6] to-success" : "bg-gradient-to-b from-[#ff8a90] to-danger"
+      }`}
+      style={{
+        boxShadow: kent
+          ? "inset 0 1px 0 rgba(255,255,255,0.5), 0 4px 0 #23964d, 0 10px 24px -8px rgba(74,222,128,0.6)"
+          : "inset 0 1px 0 rgba(255,255,255,0.5), 0 4px 0 #a92a33, 0 10px 24px -8px rgba(242,85,95,0.6)",
+      }}
+    >
+      {label}
+    </motion.button>
   );
 }

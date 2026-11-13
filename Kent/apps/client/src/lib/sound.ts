@@ -141,6 +141,31 @@ export const sounds = {
   call() {
     tone(196, { dur: 0.18, type: "sawtooth", gain: 0.12, slideTo: 392 });
   },
+  /** A sticker popped up. */
+  sticker() {
+    tone(660, { dur: 0.09, gain: 0.14, slideTo: 990 });
+    tone(1320, { at: 0.05, dur: 0.07, gain: 0.06 });
+  },
+  /** Something was thrown across the table. */
+  whoosh() {
+    swish({ from: 700, to: 3400, dur: 0.38, gain: 0.16 });
+  },
+  /** A thrown item landed. */
+  impact(item: string) {
+    if (item === "slipper") {
+      tone(320, { dur: 0.14, type: "square", gain: 0.14, slideTo: 140 });
+      tone(1200, { at: 0.08, dur: 0.25, gain: 0.05, slideTo: 1500 });
+    } else if (item === "rose") {
+      [784, 988, 1175].forEach((f, i) => tone(f, { at: i * 0.07, dur: 0.3, gain: 0.1 }));
+    } else if (item === "money") {
+      [1318.5, 1760].forEach((f, i) => tone(f, { at: i * 0.08, dur: 0.22, type: "square", gain: 0.05 }));
+    } else if (item === "ice") {
+      [2093, 2637, 3136].forEach((f, i) => tone(f, { at: i * 0.05, dur: 0.18, gain: 0.05 }));
+    } else {
+      swish({ from: 900, to: 160, dur: 0.22, gain: 0.45 });
+      tone(110, { dur: 0.12, type: "sawtooth", gain: 0.12, slideTo: 60 });
+    }
+  },
   /** The match ended. */
   matchOver(won: boolean) {
     const notes = won ? [523.25, 659.25, 783.99, 1046.5, 1318.5] : [392, 349.23, 311.13, 261.63];

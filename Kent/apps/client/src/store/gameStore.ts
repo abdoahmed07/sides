@@ -16,6 +16,10 @@ import {
 } from "@kent/engine";
 import { create } from "zustand";
 import { playSoundsFor } from "../lib/gameSounds";
+import { cardOriginsFor, type CardOrigins } from "../lib/cardOrigins";
+import { banterForHandEnd, idleBanter, replyTo, retaliate, type PlannedReaction } from "../lib/banter";
+import { FLIGHT_MS, type Reaction, type ReactionInput } from "../lib/reactions";
+import { sounds } from "../lib/sound";
 
 /** How often bots get a chance to act. Each bot acts at most once per tick, and only some of the time. */
 const BOT_TICK_MS = 700;
@@ -29,6 +33,13 @@ interface GameStoreState {
   gameState: RedactedGameState | null;
   session: { playerId: string } | null;
   lastError: ActionError | null;
+  /** Where newly visible cards should fly in from (the stock, or the bot who just put them down). */
+  cardOrigins: CardOrigins;
+  /** Stickers and thrown items currently on screen. */
+  reactions: Reaction[];
+  /** When each player was last hit by something thrown (drives the wobble). */
+  hits: Record<string, number>;
+  react: (reaction: ReactionInput) => void;
 
   difficulty: BotDifficulty;
   startGame: (name: string, seatCount: PlayerCount, difficulty: BotDifficulty) => void;
@@ -50,10 +61,53 @@ function shuffled<T>(items: T[]): T[] {
 
 export const useGameStore = create<GameStoreState>((set, get) => {
   let botTimer: number | null = null;
+  let reactionId = 0;
+  let lastBotReactionAt = 0;
+  let lastHumanReactionAt = 0;
+  const pending = new Set<number>();
+
+  function later(fn: () => void, ms: number) {
+    const t = window.setTimeout(() => {
+      pending.delete(t);
+      fn();
+    }, ms);
+    pending.add(t);
+  }
+
+  function emit(from: string, input: ReactionInput) {
+    const reaction: Reaction = { ...input, id: ++reactionId, from, atMs: Date.now() };
+    set({ reactions: [...get().reactions.slice(-11), reaction] });
+    later(() => set({ reactions: get().reactions.filter((r) => r.id !== reaction.id) }), 3200);
+    if (reaction.kind === "say") {
+      sounds.sticker();
+      return;
+    }
+    sounds.whoosh();
+    const { to, item } = reaction;
+    later(() => {
+      sounds.impact(item);
+      set({ hits: { ...get().hits, [to]: Date.now() } });
+    }, FLIGHT_MS);
+  }
+
+  function schedule(plan: PlannedReaction | null) {
+    if (!plan) return;
+    later(() => {
+      if (!get().fullState) return;
+      lastBotReactionAt = Date.now();
+      emit(plan.from, plan.reaction);
+    }, plan.delayMs);
+  }
 
   function commit(next: GameState) {
-    playSoundsFor(get().fullState, next, HUMAN_ID);
-    set({ fullState: next, gameState: redactStateFor(next, HUMAN_ID) });
+    const prev = get().fullState;
+    playSoundsFor(prev, next, HUMAN_ID);
+    if (prev) banterForHandEnd(prev, next).forEach(schedule);
+    set({
+      fullState: next,
+      gameState: redactStateFor(next, HUMAN_ID),
+      cardOrigins: cardOriginsFor(prev, next, HUMAN_ID, get().cardOrigins),
+    });
   }
 
   function botTick() {
@@ -74,6 +128,7 @@ export const useGameStore = create<GameStoreState>((set, get) => {
       if (state.phase !== phaseBefore) break; // a hand just ended or dealt — let the table settle first
     }
     if (state !== start) commit(state);
+    if (now - lastBotReactionAt > 8000) schedule(idleBanter(get().fullState ?? state, HUMAN_ID));
   }
 
   function act(action: HumanAction) {
@@ -95,6 +150,19 @@ export const useGameStore = create<GameStoreState>((set, get) => {
     gameState: null,
     session: null,
     lastError: null,
+    cardOrigins: {},
+    reactions: [],
+    hits: {},
+
+    react(reaction) {
+      const state = get().fullState;
+      const now = Date.now();
+      if (!state || now - lastHumanReactionAt < 500) return;
+      lastHumanReactionAt = now;
+      emit(HUMAN_ID, reaction);
+      if (reaction.kind === "throw" && isBotId(reaction.to)) schedule(retaliate(reaction.to, reaction.item, HUMAN_ID));
+      else if (reaction.kind === "say") schedule(replyTo(reaction.item, state));
+    },
 
     difficulty: "medium",
 
@@ -107,7 +175,9 @@ export const useGameStore = create<GameStoreState>((set, get) => {
     quit() {
       if (botTimer !== null) window.clearInterval(botTimer);
       botTimer = null;
-      set({ fullState: null, gameState: null, session: null, lastError: null });
+      pending.forEach((t) => window.clearTimeout(t));
+      pending.clear();
+      set({ fullState: null, gameState: null, session: null, lastError: null, cardOrigins: {}, reactions: [], hits: {} });
     },
 
     clearError: () => set({ lastError: null }),

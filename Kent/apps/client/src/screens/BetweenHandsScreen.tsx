@@ -1,76 +1,94 @@
-import type { RedactedGameState, SignalIconId } from "@kent/engine";
-import { useState } from "react";
+import { motion } from "framer-motion";
+import { PlayingCard } from "../components/Card";
 import { PlayerAvatar } from "../components/PlayerAvatar";
 import { ScoreTrack } from "../components/ScoreTrack";
 import { SignalButtons } from "../components/SignalButtons";
 import { teamMemberNames } from "../lib/format";
+import { describeOutcome, outcomeTone } from "../lib/outcome";
 import { useGameStore } from "../store/gameStore";
 
-function describeOutcome(gameState: RedactedGameState): { headline: string; detail: string } | null {
-  const result = gameState.lastHandResult;
-  if (!result) return null;
-  switch (result.type) {
-    case "kent_confirmed": {
-      const winners = teamMemberNames(gameState, result.winningPartnershipId);
-      return { headline: `KENT! ${winners} spotted the signal.`, detail: "Nobody stepped in to block it — everyone else takes a letter." };
-    }
-    case "kent_wrong": {
-      const caller = gameState.players[result.callerPlayerId]?.name ?? "Someone";
-      return {
-        headline: `${caller} called KENT too soon.`,
-        detail: "Their partner didn't actually have four of a kind — their team takes the letter.",
-      };
-    }
-    case "counter_kent_correct": {
-      const caller = gameState.players[result.callerPlayerId]?.name ?? "Someone";
-      const culprit = gameState.players[result.culpritPlayerId]?.name ?? "someone";
-      return { headline: `COUNTER KENT! ${caller} caught ${culprit} red-handed.`, detail: "The signaling team takes the letter." };
-    }
-    case "counter_kent_wrong": {
-      const caller = gameState.players[result.callerPlayerId]?.name ?? "Someone";
-      return { headline: `${caller} called COUNTER KENT — but no real signal was active.`, detail: "Their team takes the letter for the bad call." };
-    }
-    case "real_deal":
-      return { headline: "Real Deal — the stock ran dry.", detail: "No one scores this hand. Redealing." };
-  }
-}
+const rise = (delay: number) => ({
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0 },
+  transition: { delay, duration: 0.4, ease: [0.22, 0.9, 0.3, 1] as const },
+});
+
+const TONE_STYLE = {
+  good: { ring: "border-success/40", glow: "rgba(74,222,128,0.18)", tag: "text-success", label: "Good hand" },
+  bad: { ring: "border-danger/40", glow: "rgba(242,85,95,0.16)", tag: "text-danger", label: "Ouch" },
+  neutral: { ring: "border-gold-400/30", glow: "rgba(240,199,102,0.12)", tag: "text-gold-300", label: "No score" },
+} as const;
 
 export function BetweenHandsScreen() {
   const { gameState, session, setTeamSignal, setReady } = useGameStore();
-  const [pending, setPending] = useState<SignalIconId | null>(null);
   if (!gameState || !session) return null;
 
-  const you = gameState.players[session.playerId];
+  const me = session.playerId;
+  const you = gameState.players[me];
   const yourTeamId = you?.partnershipId ?? null;
   const yourTeam = yourTeamId ? gameState.partnerships[yourTeamId] : null;
-  const outcome = describeOutcome(gameState);
-
-  async function pickSignal(icon: SignalIconId) {
-    setPending(icon);
-    await setTeamSignal(icon);
-    setPending(null);
-  }
+  const result = gameState.lastHandResult;
+  const outcome = result ? describeOutcome(gameState, result, me) : null;
+  const tone = result ? TONE_STYLE[outcomeTone(gameState, result, me)] : null;
+  const revealed = result && "revealedCards" in result ? result.revealedCards : [];
+  const losers = result && result.type !== "real_deal" ? result.losingPartnershipIds : [];
+  const partnerName = yourTeamId
+    ? teamMemberNames(gameState, yourTeamId)
+        .split(" & ")
+        .find((n) => n !== you?.name)
+    : null;
 
   return (
-    <div className="mx-auto flex min-h-full max-w-xl flex-col items-center gap-6 px-4 py-8">
-      <h2 className="font-display text-2xl font-bold text-gold-300">
-        {gameState.handNumber === 0 ? "Get ready" : `Hand ${gameState.handNumber} complete`}
-      </h2>
+    <div className="mx-auto flex min-h-full w-full max-w-xl flex-col items-center gap-6 px-4 pt-14 pb-10">
+      <motion.div {...rise(0)} className="text-center">
+        <p className="text-xs font-semibold tracking-[0.3em] text-cream-100/40 uppercase">
+          {gameState.handNumber === 0 ? "Before the first deal" : `Hand ${gameState.handNumber}`}
+        </p>
+        <h2 className="mt-1 font-display text-3xl font-extrabold text-gold-300">
+          {gameState.handNumber === 0 ? "Get ready" : "Hand over"}
+        </h2>
+      </motion.div>
 
-      {outcome && (
-        <div className="w-full rounded-xl border border-cream-500/15 bg-felt-800/70 p-4 text-center">
-          <p className="font-semibold text-cream-100">{outcome.headline}</p>
-          <p className="mt-1 text-sm text-cream-400">{outcome.detail}</p>
-        </div>
+      {outcome && tone && (
+        <motion.div
+          {...rise(0.1)}
+          className={`w-full rounded-2xl border ${tone.ring} bg-felt-800/70 p-5 text-center`}
+          style={{ boxShadow: `0 0 60px -10px ${tone.glow}, inset 0 1px 0 rgba(255,255,255,0.04)` }}
+        >
+          <p className={`text-[10px] font-bold tracking-[0.3em] uppercase ${tone.tag}`}>{tone.label}</p>
+          <p className="mt-1 text-lg font-semibold text-cream-100">{outcome.headline}</p>
+          <p className="mt-1 text-sm text-cream-300">{outcome.detail}</p>
+          {revealed.length > 0 && (
+            <div className="mt-4 flex justify-center gap-2">
+              {revealed.map((card, i) => (
+                <motion.div
+                  key={card.id}
+                  initial={{ rotateY: 180, y: 10, opacity: 0 }}
+                  animate={{ rotateY: 0, y: 0, opacity: 1 }}
+                  transition={{ delay: 0.35 + i * 0.1, duration: 0.5, ease: [0.22, 0.9, 0.3, 1] }}
+                  style={{ transformPerspective: 600 }}
+                >
+                  <PlayingCard card={card} size="sm" />
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </motion.div>
       )}
 
-      <div className="flex flex-wrap justify-center gap-4">
+      <motion.div {...rise(0.2)} className="flex w-full flex-col items-center gap-2.5 rounded-2xl border border-white/5 bg-felt-900/50 p-4">
+        <p className="text-[10px] font-semibold tracking-[0.3em] text-cream-100/40 uppercase">Spell KENT and you lose</p>
         {Object.entries(gameState.partnerships).map(([teamId, team]) => (
-          <ScoreTrack key={teamId} teamId={teamId} letters={team.letters} label={teamMemberNames(gameState, teamId)} />
+          <div key={teamId} className="flex w-full max-w-xs items-center justify-between gap-3">
+            <span className={`truncate text-sm ${teamId === yourTeamId ? "font-semibold text-gold-300" : "text-cream-300"}`}>
+              {teamMemberNames(gameState, teamId)}
+            </span>
+            <ScoreTrack teamId={teamId} letters={team.letters} stampLatest={losers.includes(teamId)} />
+          </div>
         ))}
-      </div>
+      </motion.div>
 
-      <div className="flex flex-wrap justify-center gap-x-5 gap-y-3">
+      <motion.div {...rise(0.3)} className="flex flex-wrap justify-center gap-x-5 gap-y-3">
         {gameState.seats.map((playerId, seat) => {
           if (!playerId) return null;
           const player = gameState.players[playerId];
@@ -78,35 +96,43 @@ export function BetweenHandsScreen() {
           return (
             <PlayerAvatar
               key={seat}
+              playerId={player.id}
               name={player.name}
               teamId={player.partnershipId ?? "team-0"}
-              isYou={player.id === session.playerId}
+              isYou={player.id === me}
+              isPartner={player.id !== me && player.partnershipId === yourTeamId}
               connected={player.connected}
               ready={player.ready}
+              compact
             />
           );
         })}
-      </div>
+      </motion.div>
 
       {yourTeam && (
-        <div className="flex flex-col items-center gap-3">
-          <p className="text-sm text-cream-300">
-            Pick your team's secret signal with <span className="font-semibold text-gold-300">{teamMemberNames(gameState, yourTeamId!)}</span>
+        <motion.div {...rise(0.4)} className="flex flex-col items-center gap-3">
+          <p className="text-center text-sm text-cream-300">
+            Your secret signal with <span className="font-semibold text-gold-300">{partnerName ?? "your partner"}</span>
           </p>
-          <SignalButtons mode="pick" selectedIcon={pending ?? yourTeam.signal} onTap={(icon) => void pickSignal(icon)} />
-          <p className="text-xs text-cream-500">{yourTeam.signal ? "Locked in — tap another to change it." : "Choose before you're ready."}</p>
-        </div>
+          <SignalButtons mode="pick" selectedIcon={yourTeam.signal} onTap={(icon) => setTeamSignal(icon)} />
+          <p className="text-xs text-cream-100/45">
+            {yourTeam.signal ? "Locked in. Tap another to change it." : "Pick one before you're ready."}
+          </p>
+        </motion.div>
       )}
 
-      <button
+      <motion.button
+        {...rise(0.5)}
         type="button"
-        onClick={() => void setReady(!you?.ready)}
-        className={`rounded-lg px-6 py-2.5 font-display font-bold transition-colors ${
-          you?.ready ? "bg-success/20 text-success ring-1 ring-success" : "bg-gold-400 text-felt-950"
+        onClick={() => setReady(!you?.ready)}
+        whileTap={{ scale: 0.95 }}
+        className={`min-w-56 rounded-full px-8 py-3 font-display text-lg font-bold transition-colors ${
+          you?.ready ? "bg-success/15 text-success ring-1 ring-success/60" : "bg-gold-400 text-felt-950 hover:bg-gold-300"
         }`}
+        style={you?.ready ? undefined : { boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5), 0 4px 0 #a87b26, 0 12px 28px -10px rgba(240,199,102,0.7)" }}
       >
-        {you?.ready ? "Ready ✓" : "Ready for next hand"}
-      </button>
+        {you?.ready ? "Ready, waiting…" : "Deal me in"}
+      </motion.button>
     </div>
   );
 }
