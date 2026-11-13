@@ -2,10 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="./favicon.svg?v=3" type="image/svg+xml" />
-    <link rel="icon" href="./favicon-32.png?v=3" type="image/png" sizes="32x32" />
-    <link rel="shortcut icon" href="./favicon.ico?v=3" />
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=3" />
+    <!-- PNG first: Safari doesn't use SVG tab icons. New file names (not just ?v=) so Safari's
+         icon cache treats them as a brand-new icon. -->
+    <link rel="icon" href="./kent-icon-32.png" type="image/png" sizes="32x32" />
+    <link rel="icon" href="./kent-icon.svg" type="image/svg+xml" />
+    <link rel="shortcut icon" href="./favicon.ico" />
+    <link rel="apple-touch-icon" href="./kent-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0a0f0d" />
     <title>Kent</title>
@@ -15,7 +17,7 @@
       addEventListener("load", () => {
         document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"]').forEach((link) => {
           const fresh = link.cloneNode();
-          fresh.href = link.href.split("?")[0] + "?v=3";
+          fresh.href = link.href.split("?")[0] + "?v=" + Date.now();
           link.replaceWith(fresh);
         });
       });
