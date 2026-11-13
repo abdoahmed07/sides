@@ -14,7 +14,7 @@ No install, no setup. Open the link and go.
 | ✅ **[Streak](Habit_tracker/)** | A calm, minimal habit tracker. One tap a day to keep your streaks going, synced across your devices. | [Open](https://abdoahmed07.github.io/sides/streak/) |
 | 💬 **[Code Review](Summer%202026/project-01-code-review/)** | Paste code, share the link, and comment on any line. Everyone viewing sees new comments instantly. | [Open](https://codereview-rho.vercel.app) |
 | ✏️ **[Draw a Digit](Summer%202026/project-08-neural-network/)** | Draw a number and a neural network I wrote from scratch guesses it as you draw. | [Try it](https://abdoahmed07.github.io/sides/digits/) |
-| ✈️ **[Airport Simulator](Airplane-simulator/)** | Watch planes circle, land, line up and take off, animated from the real C++ program's output. | [Watch it run](https://abdoahmed07.github.io/sides/airport/) |
+| ✈️ **[Airport Simulator](Airplane-simulator/)** | Watch planes hold, land, taxi and take off as dusk turns to night, animated from the real C++ program's output. | [Watch it run](https://abdoahmed07.github.io/sides/airport/) |
 
 ## More projects
 
