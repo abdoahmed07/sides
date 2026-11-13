@@ -2,13 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="./favicon.svg?v=2" type="image/svg+xml" />
-    <link rel="icon" href="./favicon-32.png?v=2" type="image/png" sizes="32x32" />
-    <link rel="shortcut icon" href="./favicon.ico?v=2" />
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=2" />
+    <link rel="icon" href="./favicon.svg?v=3" type="image/svg+xml" />
+    <link rel="icon" href="./favicon-32.png?v=3" type="image/png" sizes="32x32" />
+    <link rel="shortcut icon" href="./favicon.ico?v=3" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=3" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0a0f0d" />
     <title>Kent</title>
+    <script>
+      // Browsers hold on to an old tab icon even after it changes. Swapping the icon links for
+      // fresh copies once the page has loaded makes the browser fetch and redraw the new one.
+      addEventListener("load", () => {
+        document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"]').forEach((link) => {
+          const fresh = link.cloneNode();
+          fresh.href = link.href.split("?")[0] + "?v=3";
+          link.replaceWith(fresh);
+        });
+      });
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
