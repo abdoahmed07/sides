@@ -166,13 +166,13 @@
   const RX0 = 210, RX1 = 890;              // runway ends (everyone lands and takes off heading east)
   const TD_X = 285;                         // touchdown point
   const HOLD_X = 188;                       // connector from the taxiway up to the runway's west end
-  const EXIT_X = 655;                       // high-speed exit for landing planes
+  let exitX = [655];                        // each runway's own high-speed exit, so arrivals never queue on a runway
   const TAXI_Y = 470;                       // parallel taxiway
   const GATE_Y = 534;                       // parked planes
   const LANE_Y = 501;                       // apron lane that arrivals use to reach their gate
   const GATES = Array.from({ length: 13 }, (_, i) => 272 + i * 50);
-  const QX0 = 240, QS = 33, QMAX = 20;      // departure line-up on the taxiway: first spot, spacing, how many fit
-  const STACKS = [{ cx: 215, cy: 100, name: "HOLD A" }, { cx: 540, cy: 100, name: "HOLD B" }];
+  const QX0 = 240, QS = 34;                 // departure line-up on the taxiway: first spot and spacing
+  const STACKS = [{ cx: 200, cy: 100, name: "HOLD A" }, { cx: 562, cy: 100, name: "HOLD B" }];
   const HL = 150;                           // length of the straight legs of a holding racetrack
 
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -223,19 +223,6 @@
     const a = pts[lo], b = pts[hi], t = (d - cum[lo]) / (cum[hi] - cum[lo] || 1);
     return { ...mixPt(a, b, t), heading: Math.atan2(b.y - a.y, b.x - a.x) };
   }
-  // A multi-leg trip whose overall progress (0→1) is split between legs, each with its own easing.
-  function legsPose(legs, f) {
-    for (const L of legs) {
-      if (f <= L.to || L === legs[legs.length - 1]) {
-        let g = clamp((f - L.from) / (L.to - L.from), 0, 1);
-        if (L.ease === "out") g = 1 - (1 - g) * (1 - g);
-        else if (L.ease === "in") g = g * g;
-        else if (L.ease === "inout") g = g * g * (3 - 2 * g);
-        return sample(L.route, g * L.route.len);
-      }
-    }
-  }
-
   // Holding racetrack: east along the top, round the right, west along the bottom, round the left.
   function trackPos(stack, R, u) {
     const P = 2 * HL + 2 * Math.PI * R; let d = ((u % 1) + 1) % 1 * P;
@@ -248,8 +235,6 @@
     d -= HL;
     const a = Math.PI / 2 + d / R; return { x: cx - HL / 2 + R * Math.cos(a), y: cy + R * Math.sin(a), heading: a + Math.PI / 2 };
   }
-  const levelR = (lvl) => 22 + Math.min(lvl, 8) * 8.5;
-  const levelAlt = (lvl) => 0.45 + Math.min(lvl, 8) * 0.08;
 
   // ───────────────────────────── Sizing ─────────────────────────────
   function resize() {
@@ -267,6 +252,10 @@
   function layoutRunways(n) {
     runwayY = n === 1 ? [330] : Array.from({ length: n }, (_, i) => 232 + i * (418 - 232) / (n - 1));
     for (const s of STACKS) s.cy = n === 1 ? 128 : 100;
+    exitX = n === 1 ? [655] : Array.from({ length: n }, (_, i) => 700 - i * 45);
+    // Gates west of every exit are for arrivals, gates east of them for departures: the two flows never meet on the apron.
+    ARR_GATES = GATES.map((x, i) => i).filter((i) => GATES[i] < Math.min(...exitX) - 25);
+    DEP_GATES = GATES.map((x, i) => i).filter((i) => GATES[i] > Math.max(...exitX) + 40);
     rwHalf = n >= 4 ? 9 : n === 3 ? 10 : n === 2 ? 11 : 13;
     drawBackground();
   }
@@ -293,7 +282,7 @@
     // Holding patterns: faint dashed racetracks in the sky.
     g.save(); g.setLineDash([3, 6]); g.lineWidth = 1; g.strokeStyle = "rgba(255,255,255,0.13)";
     for (const s of STACKS) {
-      for (const R of [levelR(0), levelR(4)]) {
+      for (const R of RING_R) {
         g.beginPath();
         for (let u = 0; u <= 1.001; u += 0.01) { const p = trackPos(s, R, u); u === 0 ? g.moveTo(p.x, p.y) : g.lineTo(p.x, p.y); }
         g.stroke();
@@ -325,7 +314,7 @@
     };
     taxi([[HOLD_X, TAXI_Y], [945, TAXI_Y]]);
     taxi([[HOLD_X, TAXI_Y], [HOLD_X, topY]]);
-    taxi([[EXIT_X, topY], [EXIT_X, TAXI_Y]]);
+    runwayY.forEach((ry, i) => taxi([[exitX[i], ry], [exitX[i], TAXI_Y]]));
 
     // Approach-light bars west of every runway.
     for (const ry of runwayY) for (let k = 0; k < 7; k++) {
@@ -361,7 +350,7 @@
     g.strokeStyle = "rgba(0,0,0,0.12)"; g.lineWidth = 0.6;
     for (let x = 240; x < 930; x += 26) { g.beginPath(); g.moveTo(x, 482); g.lineTo(x, 564); g.stroke(); }
     g.strokeStyle = "rgba(226,178,52,0.6)"; g.lineWidth = 1;
-    g.beginPath(); g.moveTo(EXIT_X, TAXI_Y); g.lineTo(EXIT_X, LANE_Y); g.lineTo(925, LANE_Y); g.moveTo(EXIT_X, LANE_Y); g.lineTo(245, LANE_Y); g.stroke();
+    g.beginPath(); for (const x of exitX) { g.moveTo(x, TAXI_Y); g.lineTo(x, LANE_Y); } g.moveTo(Math.max(...exitX), LANE_Y); g.lineTo(245, LANE_Y); g.stroke();
     for (const gx of GATES) {
       g.strokeStyle = "rgba(226,178,52,0.75)"; g.lineWidth = 1; g.beginPath(); g.moveTo(gx, TAXI_Y + 8); g.lineTo(gx, GATE_Y + 12); g.stroke();
       g.fillStyle = "rgba(226,178,52,0.75)"; g.fillRect(gx - 6, GATE_Y + 15, 12, 1.4);
@@ -408,97 +397,212 @@
   const local = (p, lx, ly, s) => ({ x: p.x + (lx * Math.cos(p.heading) - ly * Math.sin(p.heading)) * s, y: p.y + (lx * Math.sin(p.heading) + ly * Math.cos(p.heading)) * s });
 
   // ───────────────────────────── Planes ─────────────────────────────
+  // Gates west of the runway exit are for arrivals, gates east of it for departures, so the two
+  // flows never have to cross on the apron.
+  let ARR_GATES = [], DEP_GATES = [];
+  const QVIS = 7;                       // departures that wait on the taxiway; the rest wait at their gate
+  const spotX = (k) => QX0 + k * QS;
+  const RING_R = [32, 76], RING_ALT = [0.55, 0.85];
+  const ringLen = (R) => 2 * HL + 2 * Math.PI * R;
+  const RING_CAP = RING_R.map((R) => Math.floor(ringLen(R) / 58));
+  const MIN_GAP = 31;                   // how close a taxiing plane gets to the one in front
+
   const planes = new Map();
   let gates = GATES.map(() => null);
   let particles = [];
-  let simT = 0;              // seconds of animation time (stops while paused)
-  const stackPhase = [0, 0.5], stackCount = [0, 0];
+  let simT = 0;                         // seconds of animation time (stops while paused)
 
   function create(id, kind, airline) {
     const p = { id, kind, airline: airline || "", tail: TAILS[hash(airline || id) % TAILS.length], phase: (hash(id) % 1000) / 1000,
-                x: -100, y: -100, alt: 0, heading: 0, opacity: 0, mode: "new", tracked: true, trail: [], lastTrail: 0, status: "ok" };
+                x: -100, y: -100, alt: 0, heading: 0, moveDir: 0, v: 0, opacity: 0, mode: "new", tracked: true,
+                trail: [], lastTrail: 0, status: "ok", gate: -1, stuck: 0 };
     planes.set(id, p); return p;
   }
-  function allocGate(preferX) {
-    const free = gates.map((g, i) => (g ? -1 : i)).filter((i) => i >= 0);
-    if (!free.length) return -1;
-    if (preferX == null) return free[Math.floor(Math.random() * free.length)];
-    return free.sort((a, b) => Math.abs(GATES[a] - preferX) - Math.abs(GATES[b] - preferX))[Math.floor(Math.random() * Math.min(3, free.length))];
+  function allocGate(pool) {
+    const free = pool.filter((i) => !gates[i]);
+    return free.length ? free[Math.floor(Math.random() * free.length)] : -1;
   }
   function releaseGate(p) { if (p.gate >= 0 && gates[p.gate] === p.id) gates[p.gate] = null; p.gate = -1; }
   function lead(p, dist) { return pt(p.x + Math.cos(p.heading) * dist, p.y + Math.sin(p.heading) * dist, p.alt); }
 
-  function startInbound(p) {
-    const s = STACKS[p.stack], lvl = planesInStack(p.stack);
-    const entry = pt(s.cx - HL / 2, s.cy - levelR(lvl), levelAlt(lvl));
-    Object.assign(p, { x: entry.x - 170 - Math.random() * 90, y: -40, alt: 1.5, heading: 0.6, opacity: 1 });
-    p.route = buildRoute([pt(p.x, p.y, 1.5), pt(entry.x - 60, entry.y - 30, 1.0), entry], 50);
-    p.d = 0; p.mode = "inbound";
+  // Distance travelled along a leg of length L lasting D seconds, at normalised time g, starting at speed v0
+  // and ending at speed v1. (A cubic Hermite curve: speeds blend smoothly from one leg into the next.)
+  function hermite(g, L, D, v0, v1) {
+    if (L <= 0) return 0;
+    g = clamp(g, 0, 1);
+    const m0 = clamp((v0 * D) / L, 0, 2.8), m1 = clamp((v1 * D) / L, 0, 2.8), g2 = g * g, g3 = g2 * g;
+    return L * ((g3 - 2 * g2 + g) * m0 + (-2 * g3 + 3 * g2) + (g3 - g2) * m1);
   }
-  function placeHold(p) { p.mode = "hold"; p.u = Math.random(); p.R = null; p.opacity = 1; }
-  function planesInStack(s) { let n = 0; for (const q of planes.values()) if (q.stack === s && (q.mode === "hold" || q.mode === "inbound")) n++; return n; }
 
-  // A runway only ever holds one plane: anyone still finishing on it is moved straight on.
-  function clearRunway(ri, except) {
-    for (const q of planes.values()) {
-      if (q === except || q.runway !== ri || !q.finishing) continue;
-      if (q.mode === "land") { q.f = 1; startTaxiIn(q); q.d = Math.min(q.route.len, 20); }
-      else if (q.mode === "takeoff") planes.delete(q.id);
+  // ── Holding ──
+  function ringMembers(s, ring) {
+    return [...planes.values()].filter((q) => q.mode === "hold" && q.stack === s && q.ring === ring && Math.abs(q.R - RING_R[ring]) < 4);
+  }
+  // Evenly space the planes on each ring while keeping their order, so nobody ever overtakes anybody.
+  function spaceRings() {
+    for (const s of [0, 1]) for (const ring of [0, 1]) {
+      const list = ringMembers(s, ring).sort((a, b) => a.u - b.u);
+      const n = list.length;
+      if (!n) continue;
+      let cut = 0, big = -1;
+      for (let i = 0; i < n; i++) {
+        const gap = (list[(i + 1) % n].u - list[i].u + 1) % 1 || 1;
+        if (gap > big) { big = gap; cut = (i + 1) % n; }
+      }
+      const seq = [...list.slice(cut), ...list.slice(0, cut)];
+      let prev = seq[0].u, acc = 0;
+      const unwrapped = seq.map((q, i) => { if (i) { acc += (q.u - prev + 1) % 1; prev = q.u; } return seq[0].u + acc; });
+      const base = unwrapped.reduce((sum, u, i) => sum + u - i / n, 0) / n;
+      seq.forEach((q, i) => (q.uTarget = base + i / n));
     }
   }
-  function startLanding(p, ri, r, jump, isNew) {
-    clearRunway(ri, p);
+  function joinPoint(s, ring, travelTime) {
+    // Planes already circling, plus the slots that planes still flying in have reserved.
+    const P = ringLen(RING_R[ring]);
+    const reserved = [...planes.values()].filter((q) => q.mode === "inbound" && q.stack === s && q.ring === ring)
+      .map((q) => (((q.joinU - (HOLDV() * (q.route.len - q.d)) / ((AIRV() + HOLDV()) / 2) / P) % 1) + 1) % 1);
+    const list = [...ringMembers(s, ring).map((q) => q.u), ...reserved].sort((a, b) => a - b);
+    let mid = Math.random();
+    if (list.length) {
+      let big = -1;
+      list.forEach((u, i) => { const gap = ((list[(i + 1) % list.length] - u + 1) % 1) || 1; if (gap > big) { big = gap; mid = u + gap / 2; } });
+    }
+    return (((mid + (HOLDV() * travelTime) / ringLen(RING_R[ring])) % 1) + 1) % 1;
+  }
+  function startInbound(p) {
+    const ring = p.ring ?? 0, R = RING_R[ring], st = STACKS[p.stack];
+    let u = joinPoint(p.stack, ring, 0), route;
+    for (let k = 0; k < 2; k++) {        // aim for the gap where it will be by the time we get there
+      const j = trackPos(st, R, u), back = trackPos(st, R, u - 45 / ringLen(R));
+      route = buildRoute([pt(j.x - 110, -40, 1.5), pt(back.x, back.y, RING_ALT[ring] + 0.35), pt(j.x, j.y, RING_ALT[ring])], 60);
+      u = joinPoint(p.stack, ring, route.len / ((AIRV() + HOLDV()) / 2));
+    }
+    Object.assign(p, { route, d: 0, v: AIRV(), mode: "inbound", joinU: u, x: route.pts[0].x, y: route.pts[0].y, alt: 1.5, heading: 1.1, opacity: 1 });
+  }
+
+  // ── Runways: progress follows the simulator's clock, so speed never jumps from one minute to the next ──
+  function runwayTimes(p, fr, r, jump) {
+    p.endMin = fr.minute + Math.max(1, r.minutesLeft);
+    if (jump) {
+      const total = r.progress < 1 ? Math.max(1, r.minutesLeft) / (1 - r.progress) : r.minutesLeft + 1;
+      p.startMin = p.endMin - total;
+    } else p.startMin = fr.minute;
+  }
+  function startLanding(p, ri, r, fr, jump, isNew) {
     const ry = runwayY[ri];
+    runwayTimes(p, fr, r, jump);
     if (isNew || p.mode === "new") {
-      if (jump) Object.assign(p, { x: STACKS[0].cx - 60, y: STACKS[0].cy + 50, alt: 0.5, heading: Math.PI });
-      else Object.assign(p, { x: -60, y: ry - 150, alt: 1.1, heading: 0.4 });
+      if (jump) Object.assign(p, trackPos(STACKS[0], RING_R[0], 0.62), { alt: RING_ALT[0] });
+      else Object.assign(p, { x: -60, y: ry - 150, alt: 1.1, heading: 0.35 });
       p.opacity = 1;
     }
-    const approach = buildRoute([pt(p.x, p.y, p.alt), lead(p, 60), pt(40, ry - 72, 0.36), pt(108, ry, 0.2), pt(TD_X, ry, 0)], 55);
-    const rollout = buildRoute([pt(TD_X, ry, 0), pt(EXIT_X - 25, ry, 0)]);
-    p.legs = [{ route: approach, from: 0, to: 0.6, ease: "lin" }, { route: rollout, from: 0.6, to: 1, ease: "out" }];
-    p.f0 = jump ? 0 : r.progress; p.f = r.progress;
-    p.mode = "land"; p.finishing = false; p.smoked = jump && r.progress > 0.6; p.runway = ri;
+    p.v0 = p.mode === "hold" || jump ? HOLDV() : AIRV();
+    const out = lead(p, 60); out.alt = Math.max(0.2, p.alt - 0.3);
+    p.appR = buildRoute([pt(p.x, p.y, p.alt), out, pt(36, ry - 72, 0.3), pt(108, ry, 0.16), pt(TD_X, ry, 0)], 55);
+    p.rollR = buildRoute([pt(TD_X, ry, 0), pt(exitX[ri] - 25, ry, 0)]);
+    p.mode = "land"; p.runway = ri; p.smoked = false; releaseGate(p);
   }
   function startTaxiIn(p) {
     const ry = runwayY[p.runway];
-    p.gate = allocGate(EXIT_X);
-    const gx = p.gate >= 0 ? GATES[p.gate] : 960;
+    // the nearest free gate, to keep the apron lane short and quiet
+    const free = ARR_GATES.filter((i) => !gates[i]).sort((a, b) => GATES[b] - GATES[a]);
+    p.gate = free.length ? free[Math.floor(Math.random() * Math.min(2, free.length))] : -1;
+    const ex = exitX[p.runway], gx = p.gate >= 0 ? GATES[p.gate] : ex - 160;
     if (p.gate >= 0) gates[p.gate] = p.id;
-    // Arrivals cross the departure line and use the apron lane, so they never drive through the queue.
-    const pts = [pt(EXIT_X - 25, ry), pt(EXIT_X, ry), pt(EXIT_X, LANE_Y), pt(gx, LANE_Y)];
+    else p.fadeWhileTaxiing = true;   // every gate is taken: this one taxis off toward the remote stands
+    // Down the exit, across the taxiway, then along the apron lane (departures never use it).
+    const pts = [pt(ex - 25, ry), pt(ex, ry), pt(ex, LANE_Y), pt(gx, LANE_Y)];
     if (p.gate >= 0) pts.push(pt(gx, GATE_Y));
-    p.route = buildRoute(pts, 18); p.d = 0; p.mode = "taxiin"; p.tracked = false;
+    Object.assign(p, { route: buildRoute(pts, 18), d: 0, v: TAXIV(), mode: "taxiin", tracked: false });   // rolls straight off the runway
   }
-  function startTakeoff(p, ri, r, jump, isNew) {
-    clearRunway(ri, p);
+  function startTakeoff(p, ri, r, fr, jump, isNew) {
     const ry = runwayY[ri];
-    if (isNew || p.mode === "new" || p.mode === "hidden") Object.assign(p, { x: QX0, y: TAXI_Y, alt: 0, heading: Math.PI, opacity: 1 });
+    runwayTimes(p, fr, r, jump);
+    p.rollStart = p.endMin - 0.55 * (p.endMin - p.startMin);
+    p.runway = ri;
+    p.rollR = buildRoute([pt(RX0 + 32, ry), pt(RX0 + (RX1 - RX0) * 0.7, ry), pt(RX1 - 10, ry, 0.18), pt(RX1 + 110, ry - 85, 0.75), pt(1190, ry - 210, 1.5)], 90);
+    if (jump && fr.minute >= p.rollStart) {
+      Object.assign(p, { mode: "roll", rollFrom: p.rollStart, opacity: 1 });
+      return;
+    }
+    if (isNew || p.mode === "new" || p.mode === "hidden") Object.assign(p, { x: jump ? spotX(0) : spotX(QVIS), y: TAXI_Y, alt: 0, heading: Math.PI, v: 0 });
     const pts = [pt(p.x, p.y)];
-    if (p.mode === "gate" || p.mode === "pushback") { pts.push(pt(p.x, TAXI_Y)); releaseGate(p); }
+    if (p.mode === "gate" || p.mode === "pushback") { pts.push(pt(p.x, TAXI_Y)); p.committed = true; }
     pts.push(pt(HOLD_X, TAXI_Y), pt(HOLD_X, ry), pt(RX0 + 32, ry));
-    const taxi = buildRoute(pts, 18);
-    const roll = buildRoute([pt(RX0 + 32, ry), pt(RX0 + (RX1 - RX0) * 0.7, ry), pt(RX1 - 10, ry, 0.18), pt(RX1 + 110, ry - 85, 0.75), pt(1190, ry - 210, 1.5)], 90);
-    p.legs = [{ route: taxi, from: 0, to: 0.3, ease: "inout" }, { route: roll, from: 0.3, to: 1, ease: "in" }];
-    p.f0 = jump ? 0 : r.progress; p.f = r.progress;
-    p.mode = "takeoff"; p.finishing = false; p.runway = ri;
+    Object.assign(p, { route: buildRoute(pts, 18), d: 0, mode: "lineup" });
   }
-  function spawnDeparture(p) {
-    p.gate = allocGate(null);
-    if (p.gate < 0) { p.mode = "hidden"; return; }
+
+  // ── Departures at the terminal ──
+  function toGate(p, fadeIn) {
+    p.gate = allocGate(DEP_GATES);
+    if (p.gate < 0) { p.mode = "hidden"; return false; }
     gates[p.gate] = p.id;
-    Object.assign(p, { x: GATES[p.gate], y: GATE_Y, heading: Math.PI / 2, alt: 0, mode: "gate", boardUntil: simT + 0.6 * tickMs / 1000 });
+    Object.assign(p, { x: GATES[p.gate], y: GATE_Y, heading: Math.PI / 2, alt: 0, v: 0, mode: "gate", opacity: fadeIn ? 0 : 1, boardUntil: simT + 0.8 * tickMs / 1000 });
+    return true;
   }
-  function placeDeparture(p, idx) {
-    if (idx < QMAX) { Object.assign(p, { mode: "queue", qx: QX0 + idx * QS, x: QX0 + idx * QS, y: TAXI_Y, heading: Math.PI, opacity: 1 }); return; }
-    spawnDeparture(p); p.opacity = 1; p.boardUntil = 0;
+  function canPushBack(p) {
+    if (p.qIndex >= QVIS || simT < p.boardUntil) return false;
+    const gx = GATES[p.gate];
+    for (const q of planes.values()) {
+      if (q === p || q.kind !== "dep") continue;
+      // go in order: the plane ahead in line must already be out on the taxiway and clear of this gate
+      if (q.qIndex === p.qIndex - 1 && (q.mode === "gate" || q.mode === "pushback" || q.mode === "hidden" || (q.mode === "queue" && q.x > gx - 48))) return false;
+      if ((q.mode === "queue" || q.mode === "lineup") && Math.abs(q.x - gx) < 44 && Math.abs(q.y - TAXI_Y) < 10) return false;
+    }
+    return true;
   }
   function startPushback(p) {
-    const gx = GATES[p.gate], target = QX0 + p.qIndex * QS;
-    p.route = buildRoute([pt(gx, GATE_Y), pt(gx, TAXI_Y)]); p.d = 0;
-    p.pushFrom = Math.PI / 2; p.pushTo = target < gx ? Math.PI : 0; p.mode = "pushback";
+    const gx = GATES[p.gate];
+    Object.assign(p, { route: buildRoute([pt(gx, GATE_Y), pt(gx, TAXI_Y)]), d: 0, v: 0, mode: "pushback", committed: true });
   }
-  function startLost(p) { p.mode = "lost"; p.tracked = false; p.status = "emergency"; p.lostAt = simT; }
+  function startLost(p) { p.mode = "lost"; p.tracked = false; p.status = "emergency"; }
+
+  // ── Keeping a safe distance on the ground ──
+  // Returns how far ahead (in the direction of travel) the nearest plane on the ground is.
+  function gapAhead(p) {
+    const c = Math.cos(p.moveDir), s = Math.sin(p.moveDir);
+    const mainLine = Math.abs(c) > 0.7;          // moving along the taxiway or the apron lane
+    let gap = Infinity;
+    for (const q of planes.values()) {
+      if (q === p || q.alt > 0.1 || q.mode === "hidden" || q.mode === "lost" || q.fade || q.opacity < 0.3) continue;
+      const dx = q.x - p.x, dy = q.y - p.y, along = dx * c + dy * s;
+      if (along <= 0 || along > 90) continue;
+      const lateral = Math.abs(-dx * s + dy * c);
+      if (lateral >= 24) continue;
+      // Right of way: traffic on the main taxiway or lane keeps going; a plane about to cross or merge
+      // (still off to the side, heading across) waits for it. Without this, both would wait for each other.
+      const qCrossing = q.mode !== "parked" && q.mode !== "gate" && Math.abs(Math.cos(q.moveDir ?? 0)) < 0.7;
+      if (mainLine && qCrossing && lateral > 9 && !q.committed) continue;
+      gap = Math.min(gap, along);
+    }
+    // Arrivals hold short of the taxiway until both it and the apron lane are clear, then cross in one go.
+    if (p.mode === "taxiin" && !p.committed && p.y < TAXI_Y - 20) {
+      const holdY = TAXI_Y - 36;
+      const busy = [...planes.values()].some((q) => q !== p && q.alt < 0.1 && q.opacity > 0.3 && q.mode !== "hidden" && !q.fade &&
+        (Math.abs(q.y - TAXI_Y) < 12 || Math.abs(q.y - LANE_Y) < 12) && Math.abs(q.x - p.x) < 75);
+      if (busy) gap = Math.min(gap, holdY - p.y + MIN_GAP);
+      else if (p.y > holdY - 6) p.committed = true;
+    }
+    return gap;
+  }
+  // Move along the current route at up to vmax: speed up and slow down smoothly, brake behind other planes
+  // and at the end of the route. Returns true once the end is reached.
+  function drive(p, vmax, dt) {
+    const A = 46 * SPEED(), rem = p.route.len - p.d;
+    const here = sample(p.route, p.d);
+    p.moveDir = here.heading ?? p.moveDir;
+    let cap = Math.min(vmax, Math.sqrt(2 * A * rem) + 1.5);
+    const gap = gapAhead(p);
+    if (gap < Infinity) cap = Math.min(cap, Math.sqrt(2 * A * Math.max(0, gap - MIN_GAP)));
+    p.stuck = cap < 1 && rem > 1 ? p.stuck + dt : 0;
+    if (p.stuck > 3) cap = vmax * 0.4;             // never wait forever
+    p.v = p.v < cap ? Math.min(cap, p.v + A * dt) : Math.max(cap, p.v - 3 * A * dt);
+    p.d = Math.min(p.route.len, p.d + p.v * dt);
+    const pose = sample(p.route, p.d);
+    p.x = pose.x; p.y = pose.y; p.alt = pose.alt;
+    if (pose.heading != null) p.targetHeading = pose.heading;
+    return p.d >= p.route.len - 0.5;
+  }
 
   // ───────────────────────────── Matching each minute of the program to the planes on screen ─────────────────────────────
   function reconcile(fr, jump) {
@@ -508,119 +612,169 @@
       seen.add(r.id);
       let p = planes.get(r.id); const isNew = !p;
       if (!p) p = create(r.id, r.op === "landing" ? "arr" : "dep", r.airline);
-      p.rw = { p: r.progress, left: Math.max(1, r.minutesLeft) };
       if (r.emergency) p.status = "emergency";
       if (r.to) p.to = r.to;
-      if (r.op === "landing" && p.mode !== "land") startLanding(p, ri, r, jump, isNew);
-      if (r.op === "takeoff" && p.mode !== "takeoff") startTakeoff(p, ri, r, jump, isNew);
+      if (r.op === "landing") { if (p.mode !== "land") startLanding(p, ri, r, fr, jump, isNew); else p.endMin = fr.minute + Math.max(1, r.minutesLeft); }
+      else if (!["lineup", "lined", "roll"].includes(p.mode)) startTakeoff(p, ri, r, fr, jump, isNew);
+      else p.endMin = fr.minute + Math.max(1, r.minutesLeft);
     });
+
     fr.arrivals.forEach((a, idx) => {
       seen.add(a.id);
       let p = planes.get(a.id);
       if (!p) {
         p = create(a.id, "arr", a.airline);
-        const n0 = planesInStack(0), n1 = planesInStack(1);
-        p.stack = n0 === n1 ? idx % 2 : n0 < n1 ? 0 : 1;
-        jump ? placeHold(p) : startInbound(p);
+        const n = [0, 1].map((s) => [...planes.values()].filter((q) => q.stack === s && (q.mode === "hold" || q.mode === "inbound")).length);
+        p.stack = n[0] === n[1] ? idx % 2 : n[0] < n[1] ? 0 : 1;
+        p.isNewArrival = true;
       }
       Object.assign(p, { qIndex: idx, status: a.status, fuel: a.fuel, from: a.from });
     });
-    // Each stack is a ladder: the next to land circles lowest and tightest, everyone above steps down as it clears.
+    // Each stack fills its inner ring first; extra planes circle further out.
     for (const s of [0, 1]) {
-      const ladder = [...planes.values()].filter((p) => p.stack === s && (p.mode === "hold" || p.mode === "inbound"))
+      const ladder = [...planes.values()].filter((p) => p.stack === s && p.kind === "arr" && (p.mode === "hold" || p.mode === "inbound" || p.isNewArrival))
         .sort((a, b) => a.qIndex - b.qIndex);
-      ladder.forEach((p, lvl) => (p.level = lvl));
-      stackCount[s] = ladder.length;
+      ladder.forEach((p, k) => {
+        const ring = k < RING_CAP[0] ? 0 : 1;
+        if (p.mode === "inbound") return;          // already heading for a ring
+        p.ring = ring;
+      });
+      if (jump) for (const ring of [0, 1]) {
+        const onRing = ladder.filter((p) => p.ring === ring), base = Math.random();
+        onRing.forEach((p, k) => Object.assign(p, { mode: "hold", u: (base + k / onRing.length) % 1, R: RING_R[ring], alt: RING_ALT[ring], opacity: 1, isNewArrival: false }));
+      }
+      for (const p of ladder) if (p.isNewArrival) { p.isNewArrival = false; startInbound(p); }
     }
+
     fr.departures.forEach((d, idx) => {
       seen.add(d.id);
       let p = planes.get(d.id);
-      if (!p) { p = create(d.id, "dep", d.airline); jump ? placeDeparture(p, idx) : spawnDeparture(p); }
+      if (!p) {
+        p = create(d.id, "dep", d.airline);
+        p.qIndex = idx;
+        if (jump && idx < QVIS) Object.assign(p, { mode: "queue", x: spotX(idx), y: TAXI_Y, heading: Math.PI, opacity: 1 });
+        else toGate(p, !jump);
+      }
       Object.assign(p, { qIndex: idx, to: d.to, waited: d.waited });
     });
+
     for (const p of planes.values()) {
       if (seen.has(p.id) || !p.tracked) continue;
       p.tracked = false;
-      if (p.mode === "land" || p.mode === "takeoff") p.finishing = true;
+      if (p.mode === "land" || p.mode === "lineup" || p.mode === "lined" || p.mode === "roll") p.endMin = Math.min(p.endMin, fr.minute + 0.6);
       else if (p.kind === "arr") startLost(p);
       else p.fade = true;
     }
   }
 
   // ───────────────────────────── Moving everything, every animation frame ─────────────────────────────
-  function update(dt, frac) {
-    const sf = 700 / tickMs;
-    const AIR = 120 * Math.pow(sf, 0.6), HOLDV = 52 * Math.pow(sf, 0.6), TAXI = 62 * Math.pow(sf, 0.7);
-    for (const s of [0, 1]) stackPhase[s] = (stackPhase[s] + HOLDV * dt / (2 * HL + 2 * Math.PI * levelR(3))) % 1;
+  const SPEED = () => 700 / tickMs;
+  const AIRV = () => 120 * Math.pow(SPEED(), 0.6);
+  const HOLDV = () => 50 * Math.pow(SPEED(), 0.6);
+  const TAXIV = () => 60 * Math.pow(SPEED(), 0.85);
+
+  function update(dt, tNow) {
+    spaceRings();
+    const minuteSec = tickMs / 1000;
     for (const p of [...planes.values()]) {
       switch (p.mode) {
         case "inbound": {
-          p.d += AIR * dt; Object.assign(p, poseOf(sample(p.route, p.d), p));
-          if (p.d >= p.route.len) { p.mode = "hold"; p.u = 0; p.R = levelR(p.level ?? 0); }
+          const rem = p.route.len - p.d;
+          p.v = rem > 90 ? AIRV() : lerp(HOLDV(), AIRV(), rem / 90);
+          p.d = Math.min(p.route.len, p.d + p.v * dt);
+          const s = sample(p.route, p.d);
+          Object.assign(p, { x: s.x, y: s.y, alt: s.alt }); if (s.heading != null) p.targetHeading = s.heading;
+          if (p.d >= p.route.len) Object.assign(p, { mode: "hold", R: RING_R[p.ring ?? 0], u: p.joinU, uTarget: p.joinU });
           break;
         }
         case "hold": {
-          const lvl = p.level ?? 0;
-          if (p.R == null) { p.R = levelR(lvl); p.alt = levelAlt(lvl); p.u = stackPhase[p.stack] + lvl / Math.max(1, stackCount[p.stack]); }
-          const k = 1 - Math.exp(-dt * 1.2);
-          p.R += (levelR(lvl) - p.R) * k;
-          p.alt += (levelAlt(lvl) - p.alt) * k;
-          // Keep the stack evenly spread round the racetrack: each plane eases toward its own slot.
-          const slot = stackPhase[p.stack] + lvl / Math.max(1, stackCount[p.stack]);
-          const gap = ((slot - p.u) % 1 + 1.5) % 1 - 0.5;
-          p.u = (p.u + HOLDV * dt / (2 * HL + 2 * Math.PI * p.R) + gap * (1 - Math.exp(-dt * 0.7)) + 1) % 1;
-          const t = trackPos(STACKS[p.stack], p.R, p.u); p.x = t.x; p.y = t.y; p.heading = t.heading;
+          const ring = p.ring ?? 0, k = 1 - Math.exp(-dt * 0.9);
+          p.R += (RING_R[ring] - p.R) * k;
+          p.alt += (RING_ALT[ring] - p.alt) * k;
+          const drift = p.uTarget != null ? (((p.uTarget - p.u) % 1) + 1.5) % 1 - 0.5 : 0;
+          p.u = (((p.u + (HOLDV() * dt) / ringLen(p.R) + drift * (1 - Math.exp(-dt * 0.9 * Math.pow(SPEED(), 0.6)))) % 1) + 1) % 1;
+          const t = trackPos(STACKS[p.stack], p.R, p.u);
+          p.x = t.x; p.y = t.y; p.targetHeading = t.heading;
           break;
         }
-        case "land":
-        case "takeoff": {
-          const target = p.finishing ? 1 : Math.min(1, p.rw.p + frac * (1 - p.rw.p) / p.rw.left);
-          p.f += Math.max(0, target - p.f) * (1 - Math.exp(-dt * 6));
-          if (p.finishing) p.f = Math.min(1, p.f + dt * 0.7 * sf);
-          const rel = p.f0 >= 1 ? 1 : clamp((p.f - p.f0) / (1 - p.f0), 0, 1);
-          Object.assign(p, poseOf(legsPose(p.legs, rel), p));
-          if (p.mode === "land" && rel >= 0.6 && !p.smoked) { p.smoked = true; puff(p.x, p.y); }
-          if (p.finishing && p.f >= 0.999) { if (p.mode === "land") startTaxiIn(p); else planes.delete(p.id); }
+        case "land": {
+          const span = Math.max(0.05, p.endMin - p.startMin), T = span * minuteSec;
+          const f = clamp((tNow - p.startMin) / span, 0, 1);
+          const La = p.appR.len, Lr = p.rollR.len, a = La / (La + 1.5 * Lr), vTD = (1.5 * Lr) / ((1 - a) * T);
+          const s = f < a ? sample(p.appR, hermite(f / a, La, a * T, p.v0, vTD)) : sample(p.rollR, hermite((f - a) / (1 - a), Lr, (1 - a) * T, vTD, TAXIV()));
+          Object.assign(p, { x: s.x, y: s.y, alt: s.alt }); if (s.heading != null) p.targetHeading = s.heading;
+          if (f >= a && !p.smoked) { p.smoked = true; puff(p.x, p.y); }
+          // Still someone sitting in the exit as we roll toward it? They've been towed to a remote stand.
+          if (f >= a) {
+            const ex = exitX[p.runway] - 25, ey = runwayY[p.runway];
+            for (const q of planes.values()) {
+              if (q.mode === "taxiin" && !q.fade && q.d < 70 && Math.hypot(q.x - ex, q.y - ey) < 60) { q.fade = true; q.fadeRate = 3.5; releaseGate(q); }
+            }
+          }
+          if (f >= 1 && !p.tracked) startTaxiIn(p);
           break;
         }
-        case "taxiin": {
-          p.d += TAXI * dt; Object.assign(p, poseOf(sample(p.route, p.d), p));
-          if (p.d >= p.route.len) { p.mode = "parked"; p.leaveAt = simT + 3.2 * tickMs / 1000; if (p.gate < 0) p.fade = true; }
+        case "lineup":
+          if (p.gate >= 0 && Math.abs(p.y - GATE_Y) > 40) releaseGate(p);
+          if (drive(p, TAXIV(), dt)) Object.assign(p, { mode: "lined", v: 0 });
+          break;
+        case "lined":
+          p.targetHeading = 0;
+          if (tNow >= p.rollStart || !p.tracked) {
+            p.rollFrom = tNow; p.mode = "roll";
+            if (p.endMin - tNow < 0.5) p.endMin = tNow + 0.5;
+          }
+          break;
+        case "roll": {
+          const span = Math.max(0.05, p.endMin - p.rollFrom), L = p.rollR.len, D = span * minuteSec;
+          const f = clamp((tNow - p.rollFrom) / span, 0, 1);
+          const s = sample(p.rollR, hermite(f, L, D, 0, (2.6 * L) / D));
+          Object.assign(p, { x: s.x, y: s.y, alt: s.alt }); if (s.heading != null) p.targetHeading = s.heading;
+          if (f >= 1) planes.delete(p.id);
           break;
         }
+        case "taxiin":
+          if (p.fadeWhileTaxiing && p.d > p.route.len * 0.5) p.fade = true;
+          if (p.committed && p.y > LANE_Y + 6) p.committed = false;
+          if (p.stuck > 1.6 && !p.fade) { p.fade = true; p.fadeRate = 3; releaseGate(p); }   // too long a wait: off to a remote stand
+          if (drive(p, TAXIV(), dt)) { p.mode = "parked"; p.leaveAt = simT + 1.6 * minuteSec; if (p.gate < 0) p.fade = true; }
+          break;
         case "parked": if (simT > p.leaveAt) p.fade = true; break;
+        case "hidden": toGate(p, true); break;
         case "gate":
-          p.opacity = Math.min(1, p.opacity + dt * 2);
-          if (p.qIndex < QMAX && simT >= p.boardUntil) startPushback(p);
-          break;
-        case "hidden":
-          if (p.qIndex < QMAX) Object.assign(p, { mode: "queue", qx: 960, x: 960, y: TAXI_Y, heading: Math.PI });
+          p.opacity = Math.min(1, p.opacity + dt * 1.5);
+          if (canPushBack(p)) startPushback(p);
           break;
         case "pushback": {
-          p.d += TAXI * 0.45 * dt;
-          const s = sample(p.route, p.d), k = smooth(0, 1, p.d / p.route.len);
-          p.x = s.x; p.y = s.y; p.heading = lerpAngle(p.pushFrom, p.pushTo, k);
-          if (p.d >= p.route.len) { releaseGate(p); p.mode = "queue"; p.qx = p.x; }
+          const done = drive(p, TAXIV() * 0.4, dt);   // moving backwards: the nose turns from the terminal toward the runway
+          p.targetHeading = lerpAngle(Math.PI / 2, Math.PI, smooth(0, 1, p.d / p.route.len));
+          if (done) { releaseGate(p); Object.assign(p, { mode: "queue", v: 0, committed: false }); }
           break;
         }
         case "queue": {
-          p.opacity = Math.min(1, p.opacity + dt * 2);
-          const target = QX0 + p.qIndex * QS, dx = target - p.qx;
-          const step = Math.sign(dx) * Math.min(Math.abs(dx), TAXI * dt * clamp(Math.abs(dx) / 20, 0.25, 1));
-          p.qx += step; p.x = p.qx; p.y = TAXI_Y;
-          const want = Math.abs(dx) > 1.5 ? (dx < 0 ? Math.PI : 0) : Math.PI;
-          p.heading = lerpAngle(p.heading, want, Math.min(1, dt * 3));
+          p.opacity = Math.min(1, p.opacity + dt * 1.5);
+          const target = spotX(Math.min(p.qIndex, QVIS - 1)), dx = target - p.x, dist = Math.abs(dx);
+          p.moveDir = dx < 0 ? Math.PI : 0;
+          const A = 46 * SPEED();
+          let cap = Math.min(TAXIV(), Math.sqrt(2 * A * dist));
+          const gap = gapAhead(p);
+          if (gap < Infinity) cap = Math.min(cap, Math.sqrt(2 * A * Math.max(0, gap - MIN_GAP)));
+          p.v = p.v < cap ? Math.min(cap, p.v + A * dt) : Math.max(cap, p.v - 3 * A * dt);
+          p.x += Math.sign(dx) * Math.min(dist, p.v * dt); p.y = TAXI_Y;
+          p.targetHeading = p.v > 3 ? p.moveDir : Math.PI;
           break;
         }
         case "lost":
-          p.heading += dt * 2.2; p.alt = Math.max(0, p.alt - dt * 0.35);
-          p.x += Math.cos(p.heading) * AIR * 0.5 * dt; p.y += Math.sin(p.heading) * AIR * 0.5 * dt;
+          p.targetHeading = p.heading + 2.2 * dt; p.alt = Math.max(0, p.alt - dt * 0.35);
+          p.x += Math.cos(p.heading) * AIRV() * 0.5 * dt; p.y += Math.sin(p.heading) * AIRV() * 0.5 * dt;
           p.opacity -= dt * 0.45;
           if (p.opacity <= 0) planes.delete(p.id);
           break;
       }
-      if (p.mode === "inbound" || p.mode === "land" || p.mode === "takeoff") p.opacity = Math.min(1, p.opacity + dt * 3);
-      if (p.fade) { p.opacity -= dt * 1.2; if (p.opacity <= 0) { releaseGate(p); planes.delete(p.id); } }
+      // Turn smoothly toward wherever the plane is going.
+      if (p.targetHeading != null) p.heading = dt > 0 ? lerpAngle(p.heading, p.targetHeading, 1 - Math.exp(-dt * 9)) : p.targetHeading;
+      if (["inbound", "land", "lineup", "lined", "roll", "taxiin", "pushback"].includes(p.mode)) p.opacity = Math.min(1, p.opacity + dt * 3);
+      if (p.fade) { p.opacity -= dt * (p.fadeRate || 1.2); if (p.opacity <= 0) { releaseGate(p); planes.delete(p.id); } }
       // light trails behind anything flying
       if (!reduceMotion && p.alt > 0.08 && simT - p.lastTrail > 0.05) { p.trail.push({ x: p.x, y: p.y }); p.lastTrail = simT; if (p.trail.length > 28) p.trail.shift(); }
       else if (p.alt <= 0.08 && p.trail.length && dt > 0) p.trail.shift();
@@ -628,7 +782,6 @@
     for (const q of particles) { q.life -= dt; q.r += dt * 10; q.x += q.vx * dt; q.y += q.vy * dt; }
     particles = particles.filter((q) => q.life > 0);
   }
-  function poseOf(s, p) { return { x: s.x, y: s.y, alt: s.alt, heading: s.heading ?? p.heading }; }
   function lerpAngle(a, b, t) { const d = Math.atan2(Math.sin(b - a), Math.cos(b - a)); return a + d * t; }
   function puff(x, y) { for (let i = 0; i < 7; i++) particles.push({ x: x - 4 - Math.random() * 6, y: y + (Math.random() - 0.5) * 6, vx: -6 - Math.random() * 10, vy: (Math.random() - 0.5) * 6, r: 2 + Math.random() * 2, life: 1 + Math.random() * 0.6, max: 1.6 }); }
 
@@ -724,7 +877,7 @@
       });
       for (let x = HOLD_X + 10; x < 945; x += 34) { glow(GLOW.blue, x, TAXI_Y - 9, 3.5, 0.75 * lights); glow(GLOW.blue, x, TAXI_Y + 9, 3.5, 0.75 * lights); }
       for (let y = runwayY[0] + rwHalf + 14; y < TAXI_Y - 12; y += 30) {
-        for (const x of [HOLD_X, EXIT_X]) { glow(GLOW.blue, x - 9, y, 3.5, 0.75 * lights); glow(GLOW.blue, x + 9, y, 3.5, 0.75 * lights); }
+        for (const x of [HOLD_X, ...exitX]) { glow(GLOW.blue, x - 9, y, 3.5, 0.75 * lights); glow(GLOW.blue, x + 9, y, 3.5, 0.75 * lights); }
       }
       // tower beacon: alternating green and white
       const beat = Math.floor(t * 1.2) % 2;
@@ -741,7 +894,7 @@
         if (ph < 0.07) { glow(GLOW.strobe, L.x, L.y, 10, a); glow(GLOW.strobe, R.x, R.y, 10, a); }
         if ((t + p.phase) % 1 < 0.5) { const B = local(p, 0, 0, s); glow(GLOW.red, B.x, B.y, 5, 0.6 * a); }
       }
-      const landingLight = (p.mode === "land" && p.alt > 0.005) || (p.mode === "takeoff" && p.f > 0.25) || p.mode === "inbound";
+      const landingLight = (p.mode === "land" && p.alt > 0.005) || p.mode === "roll" || p.mode === "lined" || p.mode === "inbound";
       if (landingLight && lights > 0.05) {
         const N = local(p, 26, 0, s);
         ctx.save(); ctx.translate(N.x, N.y); ctx.rotate(p.heading); ctx.globalAlpha = 0.45 * lights * a;
@@ -771,7 +924,7 @@
       const r = fr.runways[i];
       if (r && r.op !== "clear") tag(`${r.op === "landing" ? "▼" : "▲"} ${r.id}`, RX0 + 44, ry - rwHalf - 5, r.op === "landing" ? "#e2e8f0" : "#7dd3fc", 1);
     });
-    const waiting = fr.departures.length - QMAX;
+    const waiting = [...planes.values()].filter((p) => p.mode === "hidden").length;
     if (waiting > 0) tag(`+${waiting} more waiting at the terminal`, 640, 625, "#7dd3fc", 1, "center");
 
     // Clock in the corner: the run is set on an evening, so the light matches the time.
@@ -814,8 +967,9 @@
       line3 = { inbound: "Joining the holding pattern", hold: `Holding · #${(p.qIndex ?? 0) + 1} to land`, land: `Landing on ${rw}`,
                 taxiin: "Taxiing to the gate", parked: "At the gate", lost: "Out of fuel" }[p.mode] || "";
     } else {
-      line2 = [p.to && `To ${esc(p.to)}`, p.waited != null && p.mode !== "takeoff" && `waited ${p.waited} min`].filter(Boolean).join(" · ");
-      line3 = { gate: "Boarding", pushback: "Pushing back", queue: `In line · #${(p.qIndex ?? 0) + 1} to take off`, takeoff: `Taking off from ${rw}` }[p.mode] || "";
+      line2 = [p.to && `To ${esc(p.to)}`, p.waited != null && p.mode !== "roll" && `waited ${p.waited} min`].filter(Boolean).join(" · ");
+      line3 = { gate: p.qIndex >= QVIS ? `Boarding · #${p.qIndex + 1} in line` : "Boarding", pushback: "Pushing back", queue: `In line · #${(p.qIndex ?? 0) + 1} to take off`,
+                lineup: `Taxiing to ${rw}`, lined: `Lined up on ${rw}`, roll: `Taking off from ${rw}` }[p.mode] || "";
     }
     return `<b>${esc(p.id)}</b> <span class="dim">${esc(p.airline)}</span><br>${line2}${line2 && line3 ? "<br>" : ""}<span class="dim">${line3}</span>`;
   }
@@ -850,7 +1004,7 @@
     frameStart = performance.now(); pausedFrac = 0;
     if (jump) { planes.clear(); particles = []; gates = GATES.map(() => null); }
     reconcile(run.frames[index], jump);
-    if (jump) update(0, 0);
+    if (jump) update(0, run.frames[index].minute);
     renderPanel(run.frames[index], index);
     if (index === run.frames.length - 1) stop();
   }
@@ -918,7 +1072,7 @@
     if (!bg.width) return;
     const dt = timer ? Math.min(0.25, (now - last) / 1000) : 0;
     last = now; simT += dt;
-    if (run) { const f = frac(now); update(dt, f); render(now, f); }
+    if (run) { const f = frac(now); update(dt, run.frames[index].minute + f); render(now, f); }
   }
   requestAnimationFrame(loop);
 
