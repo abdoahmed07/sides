@@ -1,6 +1,6 @@
 """
 Turns a recorded run of the airport simulator (its raw terminal output) into JSON the
-animated airport page can play back. Run by Landing/build.sh:
+animated airport page can play back. Run by Demos/build.sh:
 
     python3 airport_frames.py run.txt run.json
 

@@ -1,5 +1,6 @@
 # Builds every web app in this repo into ONE GitHub Pages site (a repo can only have one):
-#   Landing page + demos  → https://abdoahmed07.github.io/sides/  (/airport/, /digits/)
+#   Demos                 → https://abdoahmed07.github.io/sides/airport/ and /sides/digits/
+#   (There is no page at /sides/ itself: the projects are presented on the portfolio.)
 #   Streak habit tracker  → https://abdoahmed07.github.io/sides/streak/
 #   Kent card game        → https://abdoahmed07.github.io/sides/kent/
 # One-time setup: Settings → Pages → Source: "GitHub Actions", and add repository
@@ -9,7 +10,7 @@ name: Deploy to Pages
 on:
   push:
     branches: [main]
-    paths: ['Habit_tracker/**', 'Kent/**', '.github/workflows/deploy-pages.yml', 'Landing/**', 'Airplane-simulator/src/**', 'Summer 2026/project-08-neural-network/weights/**']
+    paths: ['Habit_tracker/**', 'Kent/**', '.github/workflows/deploy-pages.yml', 'Demos/**', 'Airplane-simulator/src/**', 'Summer 2026/project-08-neural-network/weights/**']
   workflow_dispatch:
 
 permissions:
@@ -58,10 +59,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Build landing page and demos
+      - name: Build the airport and digit demos
         run: |
           pip install --quiet numpy
-          Landing/build.sh site
+          Demos/build.sh site
 
       - name: Add the apps
         run: |

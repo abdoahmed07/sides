@@ -3,7 +3,7 @@
 // Browsers that still have it fetch this file when checking for updates; this
 // version deletes that old worker's caches, unregisters itself, and reloads
 // the open tabs so they load the real pages.
-// The landing page at /sides/ does not use a service worker, so this can stay
+// Nothing at /sides/ uses a service worker any more, so this can stay
 // until enough time has passed that no browser still has the old one, then be deleted.
 
 self.addEventListener("install", () => self.skipWaiting());
