@@ -12,6 +12,7 @@ The source code for my side projects. Each folder is a self-contained project wi
 |---|---|---|
 | [Kent](Kent/) | TypeScript, React | A card game about secretly signalling your partner. You and a bot partner against bot teams. |
 | [Habit_tracker](Habit_tracker/) | React, Supabase | Streak, a calm habit tracker. One tap a day, synced across devices. |
+| [HifzTracker](HifzTracker/) | Next.js, Claude API | Hifz Tracker: an AI-assisted Quran memorization planner with spaced revision. |
 | [Code Review](Summer%202026/project-01-code-review/) | React, Node | Paste code, share the link and comment on any line in real time. |
 | [HeroFight](HeroFight/) | C# | A text RPG: pick a class, clear seven rooms, beat the Ancient Dragon. |
 
@@ -41,6 +42,7 @@ Only the projects that need to run in a browser get a site. One GitHub Actions w
 |---|---|
 | Kent | [abdoahmed07.github.io/sides/kent](https://abdoahmed07.github.io/sides/kent/) |
 | Streak | [abdoahmed07.github.io/sides/streak](https://abdoahmed07.github.io/sides/streak/) |
+| Hifz Tracker | [abdoahmed07.github.io/sides/hifz](https://abdoahmed07.github.io/sides/hifz/) (AI chat only when run locally) |
 | Airport simulator | [abdoahmed07.github.io/sides/airport](https://abdoahmed07.github.io/sides/airport/) |
 | Draw a Digit | [abdoahmed07.github.io/sides/digits](https://abdoahmed07.github.io/sides/digits/) |
 

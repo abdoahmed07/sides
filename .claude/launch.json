@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "hifz-dev", "runtimeExecutable": "pnpm", "runtimeArgs": ["--dir", "HifzTracker", "dev", "--port", "3100"], "port": 3100 }
+  ]
+}

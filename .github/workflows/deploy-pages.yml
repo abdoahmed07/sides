@@ -3,6 +3,7 @@
 #   (There is no page at /sides/ itself: the projects are presented on the portfolio.)
 #   Streak habit tracker  → https://abdoahmed07.github.io/sides/streak/
 #   Kent card game        → https://abdoahmed07.github.io/sides/kent/
+#   Hifz Tracker          → https://abdoahmed07.github.io/sides/hifz/  (static build: AI chat only works locally)
 # One-time setup: Settings → Pages → Source: "GitHub Actions", and add repository
 # variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (Settings → Secrets and variables → Actions → Variables).
 name: Deploy to Pages
@@ -10,7 +11,7 @@ name: Deploy to Pages
 on:
   push:
     branches: [main]
-    paths: ['Habit_tracker/**', 'Kent/**', '.github/workflows/deploy-pages.yml', 'Demos/**', 'Airplane-simulator/src/**', 'Summer 2026/project-08-neural-network/weights/**']
+    paths: ['Habit_tracker/**', 'Kent/**', 'HifzTracker/**', '.github/workflows/deploy-pages.yml', 'Demos/**', 'Airplane-simulator/src/**', 'Summer 2026/project-08-neural-network/weights/**']
   workflow_dispatch:
 
 permissions:
@@ -55,6 +56,13 @@ jobs:
           pnpm test
           pnpm run build
 
+      - name: Build Hifz Tracker (static, no AI server)
+        working-directory: HifzTracker
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm test
+          pnpm run build:pages
+
       # Ubuntu's system Python refuses pip installs, so use a managed one for NumPy.
       - uses: actions/setup-python@v5
         with:
@@ -70,6 +78,8 @@ jobs:
           cp -r Habit_tracker/dist/. site/streak/
           mkdir -p site/kent
           cp -r Kent/apps/client/dist/. site/kent/
+          mkdir -p site/hifz
+          cp -r HifzTracker/out/. site/hifz/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

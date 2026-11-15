@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #f7f5f0;
+  --surface: #ffffff;
+  --surface-2: #f0ede5;
+  --text: #1f2421;
+  --muted: #6b716c;
+  --border: #e3dfd5;
+  --accent: #2f6b4f;
+  --accent-soft: #e2efe7;
+  --accent-text: #ffffff;
+  --warn: #a86a12;
+  --warn-soft: #f8ecd6;
+  --danger: #a33a32;
+  --danger-soft: #f7e1de;
+  /* Mushaf map */
+  --map-none: #e9e5db;
+  --map-partial: #bcd9c7;
+  --map-memorized: #7fb497;
+  --map-strong: #2f6b4f;
+  --map-due: #d9a441;
+  --map-weak: #c4574c;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #121614;
+  --surface: #1a1f1c;
+  --surface-2: #232925;
+  --text: #e7ebe8;
+  --muted: #98a19b;
+  --border: #2e3631;
+  --accent: #6fbf95;
+  --accent-soft: #1f3529;
+  --accent-text: #0d1a13;
+  --warn: #e0ad55;
+  --warn-soft: #3a2e17;
+  --danger: #e2837a;
+  --danger-soft: #3d2220;
+  --map-none: #262d29;
+  --map-partial: #2f4a3b;
+  --map-memorized: #3f7a5a;
+  --map-strong: #6fbf95;
+  --map-due: #c79235;
+  --map-weak: #c4574c;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-quran: var(--font-amiri-quran), "Amiri Quran", serif;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.quran {
+  font-family: var(--font-quran);
+  direction: rtl;
+  font-size: 1.65rem;
+  line-height: 2.5;
+  text-align: right;
+  word-spacing: 0.08em;
+}
+
+.ayah-num {
+  font-family: var(--font-quran);
+  color: var(--accent);
+  font-size: 0.85em;
+  margin: 0 0.25em;
+}
+
+input,
+select,
+textarea {
+  color: var(--text);
+  background: var(--surface);
+}
