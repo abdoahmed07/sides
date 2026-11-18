@@ -240,6 +240,14 @@ export function alternatives(input: ForecastInput): Alternative[] {
   };
   const { config } = input;
 
+  // Finishing well before the target date: offer an even pace that ends on it.
+  if (base.meetsTarget === true && base.completionDate && config.targetFinishDate && diffDays(base.completionDate, config.targetFinishDate) > 7) {
+    const lines = requiredLinesForTarget(input);
+    if (lines && lines < config.dailyNewLines) {
+      add("finish-on-date", "Spread it out to finish by your date", { set: { dailyNewLines: lines } }, withLines(config, lines));
+    }
+  }
+
   const budgetLines = maxLinesWithinBudget(input);
   if (base.withinBudget === false && budgetLines) {
     const c = withLines(config, budgetLines);

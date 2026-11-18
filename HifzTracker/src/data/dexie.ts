@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+import { markDirty } from "@/sync/changes";
 import type { Repo } from "./repo";
 import type { Backup, Chat, Checkin, DayLog, MemUnit, PlanVersion } from "./types";
 
@@ -114,4 +115,28 @@ export const dexieRepo: Repo = {
   },
 };
 
-export const repo: Repo = dexieRepo;
+/**
+ * Marks the device as changed after every write, so sync knows to upload.
+ * (Theme and other per-device settings are in localStorage, not here.)
+ */
+function withChangeTracking(r: Repo): Repo {
+  const after =
+    <A extends unknown[], R>(fn: (...a: A) => Promise<R>) =>
+    async (...a: A) => {
+      const out = await fn(...a);
+      markDirty();
+      return out;
+    };
+  return {
+    ...r,
+    putDayLog: after(r.putDayLog),
+    setMeta: after(r.setMeta),
+    putChat: after(r.putChat),
+    putCheckin: after(r.putCheckin),
+    commit: after(r.commit),
+    importAll: after(r.importAll),
+    clearAll: after(r.clearAll),
+  };
+}
+
+export const repo: Repo = withChangeTracking(dexieRepo);

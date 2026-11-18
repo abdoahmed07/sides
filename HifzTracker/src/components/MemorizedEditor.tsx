@@ -10,7 +10,18 @@ import { Button, Card, Field, inputCls } from "./ui";
 
 type Kind = MemorizedSelection["type"];
 
-export function MemorizedEditor({ units, today, cycleDays }: { units: MemUnit[]; today: IsoDate; cycleDays: number }) {
+export function MemorizedEditor({
+  units,
+  today,
+  cycleDays,
+  bare = false,
+}: {
+  units: MemUnit[];
+  today: IsoDate;
+  cycleDays: number;
+  /** Without its own card and heading, for use inside the plan form. */
+  bare?: boolean;
+}) {
   const [kind, setKind] = useState<Kind>("surah");
   const [list, setList] = useState("");
   const [from, setFrom] = useState(1);
@@ -47,15 +58,9 @@ export function MemorizedEditor({ units, today, cycleDays }: { units: MemUnit[];
     }
   };
 
-  return (
-    <Card className="space-y-3">
-      <div>
-        <h2 className="font-semibold">Already memorized</h2>
-        <p className="text-xs text-muted">
-          {units.length ? `About ${t.pagesEquivalent} pages (${t.ayahs} ayahs) so far.` : "Nothing marked yet."} Mark what you knew before
-          starting so it joins your revision and isn&apos;t scheduled as new.
-        </p>
-      </div>
+  const status = units.length ? `You know about ${t.pagesEquivalent} pages so far.` : "Nothing marked yet.";
+  const body = (
+    <>
       <div className="grid gap-2 sm:grid-cols-[10rem_1fr]">
         <Field label="By">
           <select className={inputCls} value={kind} onChange={(e) => setKind(e.target.value as Kind)}>
@@ -102,6 +107,31 @@ export function MemorizedEditor({ units, today, cycleDays }: { units: MemUnit[];
         </Button>
       </div>
       {msg && <p className="text-sm text-muted">{msg}</p>}
+    </>
+  );
+
+  if (bare)
+    return (
+      <div className="space-y-2.5">
+        <p className="text-sm text-muted">
+          {status} It goes into revision instead of being scheduled as new.
+        </p>
+        <details className="space-y-3 text-sm">
+          <summary className="cursor-pointer text-accent">Mark something I already know</summary>
+          <div className="mt-3 space-y-3">{body}</div>
+        </details>
+      </div>
+    );
+
+  return (
+    <Card className="space-y-3">
+      <div>
+        <h2 className="font-semibold">Already memorized</h2>
+        <p className="text-xs text-muted">
+          {status} Mark what you knew before starting so it joins your revision and isn&apos;t scheduled as new.
+        </p>
+      </div>
+      {body}
     </Card>
   );
 }

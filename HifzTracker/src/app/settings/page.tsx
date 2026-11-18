@@ -6,6 +6,7 @@ import { repo } from "@/data/dexie";
 import { usePlan } from "@/data/hooks";
 import { AI_ENABLED } from "@/lib/ai-client";
 import { Button, Card, Notice, PageTitle } from "@/components/ui";
+import { AccountCard, useSyncStatus } from "@/components/Account";
 
 type Theme = "system" | "light" | "dark";
 
@@ -33,6 +34,8 @@ function applyTheme(t: Theme) {
 
 export default function SettingsPage() {
   const plan = usePlan();
+  const sync = useSyncStatus();
+  const signedIn = sync.email !== null && sync.phase !== "signed-out";
   const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "system" as Theme);
   const [msg, setMsg] = useState<{ tone: "info" | "danger"; text: string } | null>(null);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
@@ -69,7 +72,8 @@ export default function SettingsPage() {
   };
 
   const reset = async () => {
-    if (!confirm("Delete all plans, progress and history on this device? Export a backup first if you might need it.")) return;
+    const where = signedIn ? "on this device and in your account" : "on this device";
+    if (!confirm(`Delete all plans, progress and history ${where}? Export a backup first if you might need it.`)) return;
     await repo.clearAll();
     setMsg({ tone: "info", text: "All data deleted." });
   };
@@ -78,6 +82,8 @@ export default function SettingsPage() {
     <div className="space-y-4">
       <PageTitle title="Settings" />
       {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
+
+      <AccountCard />
 
       <Card className="space-y-2">
         <h2 className="font-semibold">Plan</h2>
@@ -119,7 +125,9 @@ export default function SettingsPage() {
       <Card className="space-y-2">
         <h2 className="font-semibold">Backup</h2>
         <p className="text-sm text-muted">
-          Everything is stored only in this browser. Export a backup regularly, and use it to move between your computer and your phone.
+          {signedIn
+            ? "Your progress is saved to your account automatically. You can also keep a copy as a file."
+            : "Without an account, everything is stored only in this browser. Export a backup now and then so you don't lose it."}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button onClick={exportData}>Export JSON</Button>

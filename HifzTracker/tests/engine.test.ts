@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSequence, takePortion, targetIndices } from "../src/core/plan/sequence";
+import { buildSequence, continuation, takePortion, targetIndices } from "../src/core/plan/sequence";
 import { alternatives, dayIntensity, forecast, requiredLinesForTarget } from "../src/core/plan/engine";
 import { cfg, memorizedRange, noneMemorized, q, TODAY } from "./helpers";
 import { addDays } from "../src/core/dates";
@@ -30,11 +30,26 @@ describe("sequence", () => {
 describe("takePortion", () => {
   const seq = buildSequence(cfg({ direction: "forward", target: { type: "surah", surahs: [2] }, start: { surah: 2, ayah: 1 } }), q);
 
-  it("stays within the line quota", () => {
+  it("lands close to the line quota", () => {
     const p = takePortion(seq, noneMemorized(), 7, q);
     expect(p.indices[0]).toBe(q.indexOf(2, 1));
-    expect(p.lines).toBeLessThanOrEqual(7);
-    expect(p.lines).toBeGreaterThan(0);
+    expect(Math.abs(p.lines - 7)).toBeLessThanOrEqual(2);
+  });
+
+  it("averages close to the daily amount over many days, even with long ayahs", () => {
+    const s = buildSequence(cfg({ direction: "forward", target: { type: "surah", surahs: [2] }, start: { surah: 2, ayah: 219 } }), q);
+    const m = noneMemorized();
+    let pos = 0;
+    const sizes: number[] = [];
+    for (let d = 0; d < 20; d++) {
+      const p = takePortion(s, m, 5, q, pos);
+      p.indices.forEach((i) => (m[i] = 1));
+      pos = p.endPos;
+      sizes.push(p.lines);
+    }
+    const avg = sizes.reduce((a, b) => a + b, 0) / sizes.length;
+    expect(avg).toBeGreaterThan(4);
+    expect(avg).toBeLessThan(6.5);
   });
 
   it("skips memorized ayahs and continues after them", () => {
@@ -143,5 +158,29 @@ describe("forecast / completion date", () => {
     const small = forecast({ config: cfg({ dailyNewLines: 3 }), q, memorized: noneMemorized(), today: TODAY });
     const big = forecast({ config: cfg({ dailyNewLines: 15 }), q, memorized: noneMemorized(), today: TODAY });
     expect(big.typicalMinutes).toBeGreaterThan(small.typicalMinutes);
+  });
+});
+
+describe("recording extra memorization", () => {
+  const seq = buildSequence(cfg({ direction: "forward", target: { type: "surah", surahs: [2, 78] }, start: { surah: 2, ayah: 219 } }), q);
+
+  it("lists the ayahs after today's portion with running line totals", () => {
+    const steps = continuation(seq, noneMemorized(), q.indexOf(2, 222), q);
+    expect(steps[0].index).toBe(q.indexOf(2, 223));
+    for (let k = 1; k < steps.length; k++) expect(steps[k].lines).toBeGreaterThanOrEqual(steps[k - 1].lines);
+    expect(steps.at(-1)!.lines).toBeLessThanOrEqual(45 + 15);
+  });
+
+  it("continues into the next surah of the target and stops at memorized material", () => {
+    const m = memorizedRange(q.indexOf(78, 5), q.indexOf(78, 40));
+    const steps = continuation(seq, m, q.indexOf(2, 284), q, 100);
+    expect(steps.map((s) => s.index)).toEqual([q.indexOf(2, 285), q.indexOf(2, 286), ...[1, 2, 3, 4].map((a) => q.indexOf(78, a))]);
+  });
+
+  it("after recording extra, tomorrow's portion starts right after it at the same daily amount", () => {
+    const m = memorizedRange(q.indexOf(2, 219), q.indexOf(2, 230)); // today's page plus extra
+    const p = takePortion(seq, m, 15, q);
+    expect(p.indices[0]).toBe(q.indexOf(2, 231));
+    expect(Math.abs(p.lines - 15)).toBeLessThanOrEqual(3);
   });
 });

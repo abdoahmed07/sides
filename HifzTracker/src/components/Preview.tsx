@@ -5,7 +5,10 @@ import type { KeyNumbers } from "@/core/plan/summary";
 type Row = { label: string; get: (k: KeyNumbers) => string };
 
 const fmtDate = (d: string | null) => (d ? formatDate(d) : "—");
+const pages = (n: number) => `~${n} page${n === 1 ? "" : "s"}`;
 const ROWS: Row[] = [
+  { label: "Already memorized", get: (k) => (k.memorizedPages === undefined ? "—" : k.memorizedPages === 0 ? "Nothing yet" : pages(k.memorizedPages)) },
+  { label: "Left to memorize", get: (k) => (k.done ? "Nothing" : pages(k.remainingPages)) },
   { label: "New per study day", get: (k) => `${k.dailyNewLines} lines (${k.dailyNewPages} p)` },
   { label: "Study days", get: (k) => `${k.studyDaysPerWeek}/week` },
   { label: "Estimated finish", get: (k) => (k.done ? "Done" : k.completionDate ? fmtDate(k.completionDate) : "Never at this pace") },
@@ -13,9 +16,27 @@ const ROWS: Row[] = [
   { label: "Time per day (at the end)", get: (k) => `~${k.peakMinutes} min` },
   { label: "Revision", get: (k) => `sabqi ${k.sabqiWindowDays}d · manzil ${k.manzilCycleDays}d` },
   { label: "Target date", get: (k) => (k.targetFinishDate ? fmtDate(k.targetFinishDate) : "—") },
+  {
+    label: "Lines/day to finish by target",
+    get: (k) => (!k.targetFinishDate || k.done ? "—" : k.linesToFinishByTarget ? `${k.linesToFinishByTarget}` : "not possible"),
+  },
 ];
 
+/**
+ * Before/after numbers. With a "before", only the rows that change are shown;
+ * if none change, a one-line summary says the schedule stays the same.
+ */
 export function PreviewTable({ before, after }: { before: KeyNumbers | null; after: KeyNumbers }) {
+  // With a "before", only what changes; for a new plan, everything that has a value.
+  const rows = before ? ROWS.filter((r) => r.get(before) !== r.get(after)) : ROWS.filter((r) => r.get(after) !== "—");
+  if (before && rows.length === 0) {
+    return (
+      <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm text-muted">
+        Your schedule stays the same
+        {after.done ? "." : after.completionDate ? `: finishing around ${fmtDate(after.completionDate)}, about ${after.typicalMinutes} min a day.` : "."}
+      </p>
+    );
+  }
   return (
     <div className="overflow-hidden rounded-xl border border-border">
       <table className="w-full text-sm">
@@ -27,10 +48,10 @@ export function PreviewTable({ before, after }: { before: KeyNumbers | null; aft
           </tr>
         </thead>
         <tbody>
-          {ROWS.map((r) => {
+          {rows.map((r) => {
             const a = after ? r.get(after) : "";
             const b = before ? r.get(before) : null;
-            const changed = b !== null && a !== b;
+            const changed = b !== null;
             return (
               <tr key={r.label} className="border-t border-border">
                 <td className="px-3 py-2 text-muted">{r.label}</td>
@@ -45,20 +66,30 @@ export function PreviewTable({ before, after }: { before: KeyNumbers | null; aft
   );
 }
 
+/**
+ * A missed target date is a real problem. Taking longer than the time budget
+ * is only a heads-up: the person's chosen daily amount stays as it is.
+ */
 export function FeasibilityNote({ k }: { k: KeyNumbers }) {
-  const problems: string[] = [];
-  if (k.meetsTarget === false && k.targetFinishDate)
-    problems.push(
-      k.completionDate
+  const missed =
+    k.meetsTarget === false && k.targetFinishDate
+      ? k.completionDate
         ? `this pace finishes on ${fmtDate(k.completionDate)}, after your target of ${fmtDate(k.targetFinishDate)}`
-        : `this pace never reaches your target of ${fmtDate(k.targetFinishDate)}`,
-    );
-  if (k.withinBudget === false && k.dailyMinutesBudget)
-    problems.push(`it needs about ${k.typicalMinutes} minutes a day, more than your ${k.dailyMinutesBudget}`);
-  if (!problems.length) return null;
+        : `this pace never reaches your target of ${fmtDate(k.targetFinishDate)}`
+      : null;
+  const overTime =
+    k.withinBudget === false && k.dailyMinutesBudget
+      ? `This takes about ${k.typicalMinutes} minutes a day (about ${k.peakMinutes} near the end), more than the ${k.dailyMinutesBudget} you set.`
+      : null;
+  if (!missed && !overTime) return null;
   return (
-    <p className="rounded-xl bg-warn-soft px-3 py-2 text-sm">
-      <b>Not realistic as it stands:</b> {problems.join(", and ")}.
-    </p>
+    <div className="space-y-2">
+      {missed && (
+        <p className="rounded-xl bg-warn-soft px-3 py-2 text-sm">
+          <b>Not realistic as it stands:</b> {missed}.
+        </p>
+      )}
+      {overTime && <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm text-muted">{overTime}</p>}
+    </div>
   );
 }

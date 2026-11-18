@@ -5,7 +5,8 @@
 #   Kent card game        → https://abdoahmed07.github.io/sides/kent/
 #   Hifz Tracker          → https://abdoahmed07.github.io/sides/hifz/  (static build: AI chat only works locally)
 # One-time setup: Settings → Pages → Source: "GitHub Actions", and add repository
-# variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (Settings → Secrets and variables → Actions → Variables).
+# variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (Streak) and HIFZ_SUPABASE_URL and
+# HIFZ_SUPABASE_ANON_KEY (Hifz Tracker) under Settings → Secrets and variables → Actions → Variables.
 name: Deploy to Pages
 
 on:
@@ -62,6 +63,10 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm test
           pnpm run build:pages
+        env:
+          # Its own Supabase project for sign-in and sync (table: HifzTracker/supabase/schema.sql).
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.HIFZ_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.HIFZ_SUPABASE_ANON_KEY }}
 
       # Ubuntu's system Python refuses pip installs, so use a managed one for NumPy.
       - uses: actions/setup-python@v5

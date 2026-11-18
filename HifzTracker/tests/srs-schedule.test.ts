@@ -152,4 +152,14 @@ describe("stats", () => {
     expect(s[600]).toBe("weak");
     expect(s[1]).toBe("none");
   });
+
+  it("only counts pages left on today's list as due when the list is known", () => {
+    const [u] = markPrior([], targetIndices({ type: "pages", from: 600, to: 600 }, q), q, TODAY, 30);
+    const overdue = { ...u, strength: "okay" as const, nextDue: "2026-11-01" };
+    expect(pageStatuses([overdue], q, TODAY)[600]).toBe("due");
+    // Not on today's list (left for a later manzil day), or already revised: not due.
+    expect(pageStatuses([overdue], q, TODAY, new Set())[600]).toBe("memorized");
+    // Still to do today: due, even if its review date is later.
+    expect(pageStatuses([{ ...u, nextDue: "2026-12-30" }], q, TODAY, new Set([600]))[600]).toBe("due");
+  });
 });

@@ -67,8 +67,9 @@ export type Portion = { indices: number[]; lines: number };
 
 /**
  * Takes the next daily portion: starting at the first not-yet-memorized ayah
- * at or after `fromPos`, add ayahs in sequence order while the portion stays
- * within `quotaLines` (a single ayah longer than the quota is taken alone).
+ * at or after `fromPos`, add ayahs in sequence order while that brings the
+ * portion closer to `quotaLines` (so the average matches the daily amount;
+ * a single ayah longer than the quota is taken alone).
  * Stops at a gap (already-memorized ayah) or a jump of more than one page.
  */
 export function takePortion(
@@ -98,11 +99,43 @@ export function takePortion(
     const e = q.endLineOf[i];
     const nextSpan: [number, number] = cur ? [Math.min(cur[0], s), Math.max(cur[1], e)] : [s, e];
     const nextLines = lines - (cur ? cur[1] - cur[0] + 1 : 0) + (nextSpan[1] - nextSpan[0] + 1);
-    if (indices.length && nextLines > quotaLines) break;
+    // Aim for the closest fit: go over the quota only if that lands nearer to it
+    // than stopping short (long ayahs would otherwise make every day too small).
+    if (indices.length && nextLines > quotaLines && nextLines - quotaLines >= quotaLines - lines) break;
     spans.set(p, nextSpan);
     lines = nextLines;
     indices.push(i);
     pos++;
   }
   return { indices, lines, startPos, endPos: pos };
+}
+
+export type ContinuationStep = { index: number; lines: number };
+
+/**
+ * The ayahs that come right after `afterIndex` in the plan's order, for
+ * recording extra memorization ("I went further today"). Each step carries the
+ * total lines up to and including that ayah. Stops at already-memorized
+ * material, at the end of the target, or after `maxLines`.
+ */
+export function continuation(
+  seq: number[],
+  memorized: Uint8Array,
+  afterIndex: number,
+  q: QuranIndex,
+  maxLines = 45,
+): ContinuationStep[] {
+  const at = seq.indexOf(afterIndex);
+  if (at < 0) return [];
+  const out: ContinuationStep[] = [];
+  const picked: number[] = [];
+  for (let pos = at + 1; pos < seq.length; pos++) {
+    const i = seq[pos];
+    if (memorized[i]) break;
+    picked.push(i);
+    const lines = q.linesOf(picked);
+    if (lines > maxLines && out.length) break;
+    out.push({ index: i, lines });
+  }
+  return out;
 }

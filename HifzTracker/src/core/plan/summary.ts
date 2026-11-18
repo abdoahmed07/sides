@@ -25,6 +25,10 @@ export type KeyNumbers = {
   withinBudget: boolean | null;
   feasible: boolean;
   done: boolean;
+  /** With a target date: the smallest daily amount (lines) that still finishes by it; null if none works. */
+  linesToFinishByTarget?: number | null;
+  /** Pages already memorized (anywhere, not only in the target). */
+  memorizedPages?: number;
 };
 
 export function keyNumbers(config: PlanConfig, f: Forecast): KeyNumbers {

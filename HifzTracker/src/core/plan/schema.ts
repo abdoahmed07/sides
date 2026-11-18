@@ -67,6 +67,14 @@ export const WeekdayOverrideSchema = z
   .object({ newMultiplier: z.number().min(0).max(2), revisionOnly: z.boolean().optional() })
   .strict();
 
+/** A surah to read (not memorize) every week on a given day, e.g. Al-Kahf on Fridays. */
+export const WeeklyReadingSchema = z.object({ day: WeekdaySchema, surah: z.number().int().min(1).max(114) }).strict();
+export type WeeklyReading = z.infer<typeof WeeklyReadingSchema>;
+const WeeklyReadingsSchema = z
+  .array(WeeklyReadingSchema)
+  .max(14)
+  .refine((r) => new Set(r.map((x) => `${x.day}-${x.surah}`)).size === r.length, "Each reading is listed once");
+
 export const ExperienceSchema = z.enum(["beginner", "intermediate", "advanced"]);
 export type Experience = z.infer<typeof ExperienceSchema>;
 
@@ -95,9 +103,13 @@ export const PlanConfigSchema = z
     experience: ExperienceSchema,
     pace: PaceSchema,
     pauseNewUntilCaughtUp: z.boolean(),
+    /** Optional so plans saved before this field existed stay valid. */
+    weeklyReadings: WeeklyReadingsSchema.optional(),
   })
   .strict();
 export type PlanConfig = z.infer<typeof PlanConfigSchema>;
+
+export const readingsOf = (c: Pick<PlanConfig, "weeklyReadings">): WeeklyReading[] => c.weeklyReadings ?? [];
 
 export const PACE_BY_EXPERIENCE: Record<Experience, z.infer<typeof PaceSchema>> = {
   beginner: { minutesPerNewLine: 6, minutesPerRevisionPage: 4 },
@@ -149,6 +161,8 @@ export const PlanPatchSchema = z
         minutesPerNewLine: z.number().min(0.5).max(20).optional(),
         minutesPerRevisionPage: z.number().min(0.5).max(15).optional(),
         pauseNewUntilCaughtUp: z.boolean().optional(),
+        /** The full list of weekly readings (replaces the current one; [] removes all). */
+        weeklyReadings: WeeklyReadingsSchema.optional(),
       })
       .strict()
       .optional(),

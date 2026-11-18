@@ -86,6 +86,11 @@ export function applyPatch(
     changed.push("pauseNewUntilCaughtUp");
   }
 
+  if (s.weeklyReadings !== undefined) {
+    next.weeklyReadings = s.weeklyReadings;
+    changed.push("weeklyReadings");
+  }
+
   for (const o of patch.weekdayOverrides ?? []) {
     if (o.remove) delete next.weekdayOverrides[o.day];
     else

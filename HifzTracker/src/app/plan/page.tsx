@@ -57,7 +57,6 @@ export default function PlanPage() {
         </Notice>
       )}
       {saved && <Notice>Saved. Today&apos;s plan updates if you haven&apos;t started it yet.</Notice>}
-      <MemorizedEditor units={units} today={today} cycleDays={plan?.config.manzilCycleDays ?? 30} />
       <PlanForm
         key={formKey}
         initial={draft?.config ?? plan?.config ?? defaultConfig(today)}
@@ -65,6 +64,7 @@ export default function PlanPage() {
         units={units}
         today={today}
         saveLabel={isNew ? "Start this plan" : "Save changes"}
+        memorized={<MemorizedEditor bare units={units} today={today} cycleDays={plan?.config.manzilCycleDays ?? 30} />}
         onSave={async (c) => {
           const note = draft ? `Edited suggestion: ${draft.note}` : isNew ? "Created by hand" : "Edited by hand";
           await savePlan(isNew ? { ...c, startDate: today } : c, isNew ? "onboarding" : "manual", note, today);

@@ -13,7 +13,9 @@ export type PlanVersion = {
 
 export type DayItem = {
   id: string;
-  kind: "sabaq" | "sabqi" | "manzil";
+  kind: "sabaq" | "sabqi" | "manzil" | "reading";
+  /** Surah to read (reading items only: no memorization or rating) */
+  surah?: number;
   /** Ayah global indices (sabaq) */
   ayahs?: number[];
   /** Page (sabqi/manzil) */

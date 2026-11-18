@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CheckinReplySchema, ExplainReplySchema, PlanReplySchema, AssistantRequestSchema } from "../src/ai/schemas";
+import { CheckinReplySchema, PlanReplySchema, AssistantRequestSchema, PreviewToolInputSchema } from "../src/ai/schemas";
 import { containsArabic, unapprovedNumbers, validateOutput } from "../src/ai/validate";
 import { allowedNumbers } from "../src/core/plan/summary";
 import { rateLimit } from "../src/ai/rate-limit";
@@ -92,9 +92,9 @@ describe("explanations may only use engine numbers", () => {
     expect(unapprovedNumbers("This takes about 45 minutes and finishes in 90 days.", allowed)).toEqual(["45", "90"]);
   });
 
-  it("explain/check-in schemas validate shape and limits", () => {
-    expect(validateOutput(JSON.stringify({ text: "Fine." }), ExplainReplySchema).ok).toBe(true);
-    expect(validateOutput(JSON.stringify({ text: "" }), ExplainReplySchema).ok).toBe(false);
+  it("tool input and check-in schemas validate shape and limits", () => {
+    expect(PreviewToolInputSchema.safeParse({ patch: { set: { dailyNewLines: 5 } }, markMemorized: null }).success).toBe(true);
+    expect(PreviewToolInputSchema.safeParse({ patch: { set: { dailyNewLines: 99 } }, markMemorized: null }).success).toBe(false);
     expect(validateOutput(JSON.stringify({ message: "Well done.", suggestions: [] }), CheckinReplySchema).ok).toBe(true);
     const four = Array.from({ length: 4 }, () => ({ title: "t", reason: "r", patch: { set: { dailyNewLines: 3 } } }));
     expect(validateOutput(JSON.stringify({ message: "m", suggestions: four }), CheckinReplySchema).ok).toBe(false);
@@ -107,7 +107,7 @@ describe("request validation and rate limiting", () => {
       mode: "plan",
       purpose: "create",
       messages: [{ role: "user", text: "a".repeat(4001) }],
-      context: { today: TODAY, config: cfg(), memorizedSummary: "", current: null, upcomingExceptions: [], nextRamadanStart: null },
+      context: { today: TODAY, config: cfg(), memorizedSummary: "", memorizedRanges: [[0, 6]], current: null, upcomingExceptions: [], nextRamadanStart: null },
     };
     expect(AssistantRequestSchema.safeParse(req).success).toBe(false);
     req.messages[0].text = "I want to memorize Juz 30.";

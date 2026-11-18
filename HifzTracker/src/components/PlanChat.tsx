@@ -4,17 +4,18 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { formatDate, type IsoDate } from "@/core/dates";
 import { defaultConfig, type PlanPatch } from "@/core/plan/schema";
-import { keyNumbers, type KeyNumbers } from "@/core/plan/summary";
+import { keyNumbers } from "@/core/plan/summary";
+import { memorizedRanges } from "@/core/plan/preview";
 import type { MemUnit } from "@/core/srs";
 import type { ChatMessage, PlanVersion } from "@/data/types";
 import { repo } from "@/data/dexie";
 import { MAX_MESSAGE_CHARS } from "@/ai/schemas";
 import { askAssistant } from "@/lib/ai-client";
-import { acceptPreview, forecastFor, memorizedSummary, previewChange, ramadanHint, type Preview } from "@/lib/app";
+import { acceptPreview, forecastFor, memorizedSummary, previewChange, q, ramadanHint, type Preview } from "@/lib/app";
 import { Button, Card, PrivacyNote, Spinner, inputCls } from "./ui";
 import { FeasibilityNote, PreviewTable } from "./Preview";
 
-type Proposal = { preview: Preview; explanation: string | null; explaining: boolean; request: string; source: PlanVersion["source"] };
+type Proposal = { preview: Preview; request: string; source: PlanVersion["source"] };
 
 const GREETING: Record<"create" | "adjust", string> = {
   create:
@@ -22,18 +23,6 @@ const GREETING: Record<"create" | "adjust", string> = {
   adjust:
     "What would you like to change? For example: “I'm travelling Nov 20–27”, “make Fridays lighter”, “I want to finish before Ramadan”, “this is too fast”, or “add more revision”.",
 };
-
-/** Fallback explanation built only from engine numbers, used when AI explanation fails verification. */
-export function plainExplanation(after: KeyNumbers, before: KeyNumbers | null): string {
-  const parts: string[] = [];
-  parts.push(`${after.dailyNewLines} new lines (${after.dailyNewPages} of a page) on ${after.studyDaysPerWeek} days a week (${after.studyDays}).`);
-  if (after.done) parts.push("Your whole target is already memorized; the plan is revision only.");
-  else if (after.completionDate) parts.push(`Estimated finish: ${formatDate(after.completionDate)}${before?.completionDate && before.completionDate !== after.completionDate ? ` (was ${formatDate(before.completionDate)})` : ""}.`);
-  else parts.push("At this setting no new material gets scheduled.");
-  parts.push(`About ${after.typicalMinutes} minutes a study day now, rising to about ${after.peakMinutes} as revision grows.`);
-  if (!after.feasible) parts.push("This doesn't meet your target date or time limit; see the alternatives below.");
-  return parts.join(" ");
-}
 
 export function PlanChat({
   purpose,
@@ -76,22 +65,9 @@ export function PlanChat({
 
   const base = plan?.config ?? defaultConfig(today);
 
-  const explain = async (preview: Preview, request: string) => {
-    const facts = {
-      today,
-      before: preview.before,
-      after: preview.after,
-      alternatives: preview.alternatives.map((a) => ({ label: a.label, numbers: a.numbers })),
-    };
-    const r = await askAssistant({ mode: "explain", request: request.slice(0, MAX_MESSAGE_CHARS), facts });
-    const text = r.ok && r.mode === "explain" && r.verified ? r.reply.text : plainExplanation(preview.after, preview.before);
-    setProposal((p) => (p && p.preview === preview ? { ...p, explanation: text, explaining: false } : p));
-  };
-
-  const showPreview = (preview: Preview, request: string, source: PlanVersion["source"], withAi: boolean) => {
-    setProposal({ preview, explanation: withAi ? null : plainExplanation(preview.after, preview.before), explaining: withAi, request, source });
+  const showPreview = (preview: Preview, request: string, source: PlanVersion["source"]) => {
+    setProposal({ preview, request, source });
     setAccepted(false);
-    if (withAi) explain(preview, request);
   };
 
   const send = async () => {
@@ -115,6 +91,7 @@ export function PlanChat({
           today,
           config: base,
           memorizedSummary: memorizedSummary(units),
+          memorizedRanges: memorizedRanges(units, q),
           current: plan ? keyNumbers(base, forecastFor(base, units, today)) : null,
           upcomingExceptions: base.exceptions.filter((e) => e.to >= today).map(({ id, from, to, kind }) => ({ id, from, to, kind })),
           nextRamadanStart: ramadanHint(today),
@@ -135,7 +112,7 @@ export function PlanChat({
           setError(`That change didn't pass the plan's checks (${preview.errors.slice(0, 2).join("; ")}), so nothing was changed. Try rephrasing, or edit by hand.`);
           return;
         }
-        showPreview(preview, text, purpose === "create" ? "onboarding" : "ai", true);
+        showPreview(preview, text, purpose === "create" ? "onboarding" : "ai");
       }
     } finally {
       setSending(false);
@@ -147,7 +124,7 @@ export function PlanChat({
     const preview = previewChange({ base: proposal.preview.config, hasPlan: !!plan, patch, units: proposal.preview.units, today });
     if (!preview.ok) return setError(preview.errors.join("; "));
     // Keep "before" as the saved plan, not the rejected proposal.
-    showPreview({ ...preview, before: proposal.preview.before }, proposal.request, proposal.source, false);
+    showPreview({ ...preview, before: proposal.preview.before }, proposal.request, proposal.source);
   };
 
   const accept = async () => {
@@ -197,20 +174,17 @@ export function PlanChat({
       {proposal && (
         <Card className="space-y-3 border-accent/40">
           <h2 className="font-semibold">Proposed change</h2>
+          <div>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">What changes</p>
+            <ul className="list-disc space-y-0.5 pl-5 text-sm">
+              {proposal.preview.changes.length ? proposal.preview.changes.map((c) => <li key={c}>{c}</li>) : <li>Nothing</li>}
+            </ul>
+          </div>
           <PreviewTable before={proposal.preview.before} after={proposal.preview.after} />
           <FeasibilityNote k={proposal.preview.after} />
-          <p className="text-sm leading-relaxed">
-            {proposal.explaining ? (
-              <span className="flex items-center gap-2 text-muted">
-                <Spinner /> Explaining…
-              </span>
-            ) : (
-              proposal.explanation
-            )}
-          </p>
           {proposal.preview.alternatives.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm font-medium">Realistic alternatives</p>
+              <p className="text-sm font-medium">{proposal.preview.after.meetsTarget === false ? "Realistic alternatives" : "Other options"}</p>
               {proposal.preview.alternatives.map((a) => (
                 <button
                   key={a.id}

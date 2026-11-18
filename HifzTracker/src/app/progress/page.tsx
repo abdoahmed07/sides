@@ -12,7 +12,7 @@ const STATUS: Record<PageStatus, { label: string; color: string }> = {
   partial: { label: "Partly memorized", color: "var(--map-partial)" },
   memorized: { label: "Memorized", color: "var(--map-memorized)" },
   strong: { label: "Strong", color: "var(--map-strong)" },
-  due: { label: "Due", color: "var(--map-due)" },
+  due: { label: "To revise today", color: "var(--map-due)" },
   weak: { label: "Weak", color: "var(--map-weak)" },
 };
 
@@ -26,8 +26,12 @@ export default function ProgressPage() {
 
   const data = useMemo(() => {
     if (!units || !logs) return null;
+    const todayLog = logs.find((l) => l.date === today);
+    const pending = todayLog
+      ? new Set(todayLog.items.filter((i) => (i.kind === "sabqi" || i.kind === "manzil") && !i.done && i.page).map((i) => i.page!))
+      : undefined;
     return {
-      statuses: pageStatuses(units, q, today),
+      statuses: pageStatuses(units, q, today, pending),
       totals: totals(units, q),
       juz: juzProgress(units, q),
       surahs: surahProgress(units, q),

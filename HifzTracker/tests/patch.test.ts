@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { applyPatch } from "../src/core/plan/patch";
 import { PlanConfigSchema } from "../src/core/plan/schema";
-import { cfg, TODAY } from "./helpers";
+import { evaluateChange } from "../src/core/plan/preview";
+import { cfg, q, TODAY } from "./helpers";
 
 const id = () => "x1";
 
@@ -83,5 +84,37 @@ describe("applyPatch", () => {
     }
     expect(JSON.stringify(base)).toBe(before);
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+});
+
+describe("weekly readings", () => {
+  it("sets, replaces and clears the list", () => {
+    const r = applyPatch(cfg(), { set: { weeklyReadings: [{ day: "fri", surah: 18 }] } }, TODAY);
+    expect(r.ok && r.config.weeklyReadings).toEqual([{ day: "fri", surah: 18 }]);
+    if (!r.ok) return;
+    const cleared = applyPatch(r.config, { set: { weeklyReadings: [] } }, TODAY);
+    expect(cleared.ok && cleared.config.weeklyReadings).toEqual([]);
+  });
+
+  it("rejects bad surahs, days and duplicates", () => {
+    expect(applyPatch(cfg(), { set: { weeklyReadings: [{ day: "fri", surah: 115 }] } }, TODAY).ok).toBe(false);
+    expect(applyPatch(cfg(), { set: { weeklyReadings: [{ day: "friday", surah: 18 }] } }, TODAY).ok).toBe(false);
+    const dup = [{ day: "fri", surah: 18 }, { day: "fri", surah: 18 }];
+    expect(applyPatch(cfg(), { set: { weeklyReadings: dup } }, TODAY).ok).toBe(false);
+  });
+
+  it("plans saved before the field existed are still valid", () => {
+    const old = cfg();
+    delete (old as Partial<typeof old>).weeklyReadings;
+    expect(PlanConfigSchema.safeParse(old).success).toBe(true);
+  });
+
+  it("does not change the finish date and shows in the change list", () => {
+    const today = TODAY;
+    const base = evaluateChange({ base: cfg(), hasPlan: true, patch: null, units: [], today, q });
+    const withKahf = evaluateChange({ base: cfg(), hasPlan: true, patch: { set: { weeklyReadings: [{ day: "fri", surah: 18 }] } }, units: [], today, q });
+    if (!base.ok || !withKahf.ok) throw new Error("preview failed");
+    expect(withKahf.after.completionDate).toBe(base.after.completionDate);
+    expect(withKahf.changes).toContain("Weekly reading: none → Al-Kahf on Fri");
   });
 });

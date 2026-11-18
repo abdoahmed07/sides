@@ -35,10 +35,18 @@ export function streaks(config: PlanConfig | null, activeDates: Set<IsoDate>, to
 
 export type PageStatus = "none" | "partial" | "memorized" | "strong" | "due" | "weak";
 
-export function pageStatuses(units: MemUnit[], q: QuranIndex, today: IsoDate): PageStatus[] {
+/**
+ * Status of every page for the mushaf map. `pendingToday` is the pages still
+ * left to revise on today's list: when given, only those count as "due". (The
+ * plan spreads manzil over its cycle, so a page can be past its review date
+ * yet deliberately left for a later day.)
+ */
+export function pageStatuses(units: MemUnit[], q: QuranIndex, today: IsoDate, pendingToday?: ReadonlySet<number>): PageStatus[] {
   const out: PageStatus[] = new Array(TOTAL_PAGES + 1).fill("none");
   for (const u of units) {
-    const s = unitStatus(u, today);
+    let s = unitStatus(u, today);
+    if (pendingToday && s === "due") s = u.strength === "strong" ? "strong" : "memorized";
+    if (pendingToday?.has(u.page) && s !== "weak") s = "due";
     const full = u.ayahs.length >= q.ayahsOnPage(u.page);
     out[u.page] = s === "memorized" && !full ? "partial" : s;
   }

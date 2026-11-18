@@ -2,16 +2,19 @@
  * App services: glue between storage (Repo), the pure core and the UI.
  * Every multi-step write goes through repo.commit so it is atomic.
  */
-import { addDays, nextRamadanStart, type IsoDate } from "@/core/dates";
+import { nextRamadanStart, weekdayOf, type IsoDate } from "@/core/dates";
 import { memorizeNew, markPrior, unmark } from "@/core/memorize";
-import { alternatives, forecast, type Forecast } from "@/core/plan/engine";
-import { applyPatch } from "@/core/plan/patch";
-import { PlanConfigSchema, type MemorizedSelection, type PlanConfig, type PlanPatch } from "@/core/plan/schema";
-import { selectionIndices } from "@/core/plan/sequence";
-import { alternativeFacts, keyNumbers, type KeyNumbers } from "@/core/plan/summary";
+import type { Forecast } from "@/core/plan/engine";
+import {
+  evaluateChange,
+  forecastFor as coreForecastFor,
+  memorizedArray as coreMemorizedArray,
+  type Preview,
+} from "@/core/plan/preview";
+import { PlanConfigSchema, readingsOf, type MemorizedSelection, type PlanConfig, type PlanPatch } from "@/core/plan/schema";
+import { buildSequence, continuation, selectionIndices, type ContinuationStep } from "@/core/plan/sequence";
 import { getQuran } from "@/core/quran";
-import { buildDay, recentAdds, unitLines } from "@/core/schedule/day";
-import { estimatePauseDays } from "@/core/missed";
+import { buildDay, memorizedFromUnits, unitLines } from "@/core/schedule/day";
 import { applyRating, type MemUnit, type Strength } from "@/core/srs";
 import { totals } from "@/core/stats";
 import { repo } from "@/data/dexie";
@@ -22,37 +25,14 @@ export const q = getQuran();
 /* ---------------- forecasting ---------------- */
 
 export function memorizedArray(units: MemUnit[]): Uint8Array {
-  const m = new Uint8Array(q.count);
-  for (const u of units) for (const i of u.ayahs) m[i] = 1;
-  return m;
+  return coreMemorizedArray(units, q);
 }
 
 export function forecastFor(config: PlanConfig, units: MemUnit[], today: IsoDate): Forecast {
-  let pausedUntil: IsoDate | null = null;
-  if (config.pauseNewUntilCaughtUp) {
-    const day = buildDay(config, q, units, today);
-    const days = estimatePauseDays(day.overdueLines, day.manzilQuotaLines);
-    if (days > 0) pausedUntil = addDays(today, days);
-  }
-  return forecast({
-    config,
-    q,
-    memorized: memorizedArray(units),
-    today,
-    recentAdds: recentAdds(units, q, today, config.sabqiWindowDays),
-    pausedUntil,
-  });
+  return coreForecastFor(config, units, q, today);
 }
 
-export type Preview = {
-  ok: true;
-  before: KeyNumbers | null;
-  after: KeyNumbers;
-  config: PlanConfig;
-  units: MemUnit[];
-  changed: string[];
-  alternatives: { id: string; label: string; patch: PlanPatch; numbers: KeyNumbers }[];
-};
+export type { Preview };
 
 /**
  * Applies a patch (and optional memorized selections) in memory and computes
@@ -66,27 +46,7 @@ export function previewChange(opts: {
   units: MemUnit[];
   today: IsoDate;
 }): Preview | { ok: false; errors: string[] } {
-  const { base, today } = opts;
-  let config = base;
-  let changed: string[] = [];
-  if (opts.patch) {
-    const r = applyPatch(base, opts.patch, today);
-    if (!r.ok) return r;
-    config = r.config;
-    changed = r.changed;
-  }
-  let units = opts.units;
-  if (opts.markMemorized?.length) {
-    const idx = opts.markMemorized.flatMap((s) => selectionIndices(s, q));
-    units = markPrior(units, idx, q, today, config.manzilCycleDays);
-    changed.push("memorized");
-  }
-  const before = opts.hasPlan ? keyNumbers(base, forecastFor(base, opts.units, today)) : null;
-  const f = forecastFor(config, units, today);
-  const after = keyNumbers(config, f);
-  const rawAlts = f.feasible ? [] : alternatives({ config, q, memorized: memorizedArray(units), today });
-  const alts = alternativeFacts(config, rawAlts).map((a, k) => ({ ...a, patch: rawAlts[k].patch }));
-  return { ok: true, before, after, config, units, changed, alternatives: alts };
+  return evaluateChange({ ...opts, q });
 }
 
 export async function acceptPreview(p: Preview, source: PlanVersion["source"], note: string, today: IsoDate) {
@@ -136,7 +96,31 @@ function itemsFromDay(config: PlanConfig, units: MemUnit[], date: IsoDate): { it
     items.push({ id: `sabqi-${p}`, kind: "sabqi", page: p, lines: unitLines(byPage.get(p)!, q), done: false, rating: null, doneAt: null });
   for (const p of day.manzil)
     items.push({ id: `manzil-${p}`, kind: "manzil", page: p, lines: unitLines(byPage.get(p)!, q), done: false, rating: null, doneAt: null });
+  items.push(...readingItems(config, date));
   return { items, note: day.sabaqNote };
+}
+
+/** Weekly readings for this weekday (on any day, study day or not). */
+function readingItems(config: PlanConfig, date: IsoDate): DayItem[] {
+  const wd = weekdayOf(date);
+  return readingsOf(config)
+    .filter((r) => r.day === wd)
+    .map((r) => {
+      const [a, b] = q.surahRange(r.surah);
+      const lines = q.linesOf(Array.from({ length: b - a + 1 }, (_, k) => a + k));
+      return { id: `reading-${r.surah}`, kind: "reading", surah: r.surah, lines, done: false, rating: null, doneAt: null };
+    });
+}
+
+/** Keeps a started day's log in step with the plan's weekly readings (ticked ones stay). */
+function syncReadings(log: DayLog, config: PlanConfig): DayLog | null {
+  const wanted = readingItems(config, log.date);
+  const ids = new Set(wanted.map((i) => i.id));
+  const kept = log.items.filter((i) => i.kind !== "reading" || i.done || ids.has(i.id));
+  const have = new Set(kept.map((i) => i.id));
+  const added = wanted.filter((i) => !have.has(i.id));
+  if (!added.length && kept.length === log.items.length) return null;
+  return { ...log, items: [...kept, ...added] };
 }
 
 /**
@@ -155,7 +139,15 @@ async function ensureDayLogInner(date: IsoDate): Promise<DayLog | null> {
   const plan = await repo.getActivePlan();
   if (!plan) return null;
   const existing = await repo.getDayLog(date);
-  if (existing && (existing.planVersionId === plan.id || existing.items.some((i) => i.done))) return existing;
+  if (existing && existing.planVersionId === plan.id) return existing;
+  if (existing && existing.items.some((i) => i.done)) {
+    // A started day stays frozen, except that weekly readings follow the plan.
+    const synced = syncReadings(existing, plan.config);
+    if (!synced) return existing;
+    const log = { ...synced, planVersionId: plan.id };
+    await repo.putDayLog(log);
+    return log;
+  }
   const units = await repo.getUnits();
   let config = plan.config;
   let planVersionId = plan.id;
@@ -174,8 +166,7 @@ async function ensureDayLogInner(date: IsoDate): Promise<DayLog | null> {
 }
 
 async function refreshTodayIfUntouched(today: IsoDate) {
-  const log = await repo.getDayLog(today);
-  if (log && !log.items.some((i) => i.done)) await ensureDayLog(today);
+  if (await repo.getDayLog(today)) await ensureDayLog(today);
 }
 
 /** Pages an item touches. */
@@ -221,6 +212,15 @@ export async function updateItem(date: IsoDate, itemId: string, change: { done: 
   if (!log || !plan) return;
   const item = log.items.find((i) => i.id === itemId);
   if (!item) return;
+  if (item.kind === "sabaq" && !change.done) return untickSabaq(log, itemId);
+  if (item.kind === "reading") {
+    // Reading only: no memorization, no rating, no effect on revision.
+    const items = log.items.map((i) =>
+      i.id === itemId ? { ...i, done: change.done, rating: null, doneAt: change.done ? (i.doneAt ?? new Date().toISOString()) : null } : i,
+    );
+    await repo.commit({ dayLog: { ...log, items } });
+    return;
+  }
   const current = await repo.getUnits();
   const undo = item.undo ?? snapshot(current, itemPages(item));
   const base = item.undo ? restore(current, item.undo) : current;
@@ -231,6 +231,70 @@ export async function updateItem(date: IsoDate, itemId: string, change: { done: 
       ? { ...i, done: change.done, rating, doneAt: change.done ? (i.doneAt ?? new Date().toISOString()) : null, undo: change.done ? undo : null }
       : i,
   );
+  await repo.commit({ units, dayLog: { ...log, items } });
+}
+
+/* ---------------- extra memorization ---------------- */
+
+const isExtra = (i: DayItem) => i.id.startsWith("sabaq-extra-");
+
+/**
+ * Unticking a sabaq portion also removes any extra portions recorded after it
+ * (they build on it), restoring the pages newest first.
+ */
+async function untickSabaq(log: DayLog, itemId: string) {
+  const sabaq = log.items.filter((i) => i.kind === "sabaq");
+  const from = sabaq.findIndex((i) => i.id === itemId);
+  const affected = sabaq.slice(from).filter((i, k) => k === 0 || isExtra(i));
+  let units = await repo.getUnits();
+  for (const i of [...affected].reverse()) if (i.done && i.undo) units = restore(units, i.undo);
+  const drop = new Set(affected.filter(isExtra).map((i) => i.id));
+  const items = log.items
+    .filter((i) => !drop.has(i.id))
+    .map((i) => (i.id === itemId ? { ...i, done: false, rating: null, doneAt: null, undo: null } : i));
+  await repo.commit({ units, dayLog: { ...log, items } });
+}
+
+/** What comes after today's sabaq, for "I memorized further". Empty if nothing to record. */
+export function extraOptions(config: PlanConfig, units: MemUnit[], log: DayLog | null | undefined): ContinuationStep[] {
+  const sabaq = (log?.items ?? []).filter((i) => i.kind === "sabaq" && i.ayahs?.length);
+  const last = sabaq.at(-1)?.ayahs?.at(-1);
+  if (last === undefined) return [];
+  const memorized = memorizedFromUnits(units, q.count);
+  for (const i of sabaq) for (const a of i.ayahs!) memorized[a] = 1;
+  return continuation(buildSequence(config, q), memorized, last, q);
+}
+
+/**
+ * Records that the person memorized further than today's portion, up to
+ * `endIndex`. Today's sabaq is ticked too, the extra ayahs become memorized
+ * today (so they get sabqi revision), and tomorrow continues after them.
+ * The finish date follows from the engine.
+ */
+export async function recordExtra(date: IsoDate, endIndex: number) {
+  const plan = await repo.getActivePlan();
+  let log = await repo.getDayLog(date);
+  if (!plan || !log) return;
+  const steps = extraOptions(plan.config, await repo.getUnits(), log);
+  const upto = steps.findIndex((s) => s.index === endIndex);
+  if (upto < 0) return;
+  for (const i of log.items) if (i.kind === "sabaq" && !i.done) await updateItem(date, i.id, { done: true });
+  log = (await repo.getDayLog(date))!;
+  const ayahs = steps.slice(0, upto + 1).map((s) => s.index);
+  const current = await repo.getUnits();
+  const item: DayItem = {
+    id: `sabaq-extra-${log.items.filter(isExtra).length + 1}`,
+    kind: "sabaq",
+    ayahs,
+    lines: q.linesOf(ayahs),
+    done: true,
+    rating: null,
+    doneAt: new Date().toISOString(),
+    undo: snapshot(current, itemPages({ kind: "sabaq", ayahs } as DayItem)),
+  };
+  const units = memorizeNew(current, ayahs, q, date);
+  const sabaqEnd = log.items.findLastIndex((i) => i.kind === "sabaq");
+  const items = [...log.items.slice(0, sabaqEnd + 1), item, ...log.items.slice(sabaqEnd + 1)];
   await repo.commit({ units, dayLog: { ...log, items } });
 }
 

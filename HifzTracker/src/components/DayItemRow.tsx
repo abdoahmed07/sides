@@ -16,6 +16,7 @@ export function DayItemRow({
   onRate,
   onOpen,
   disabled,
+  rateable = true,
 }: {
   item: DayItem;
   title: string;
@@ -24,6 +25,7 @@ export function DayItemRow({
   onRate: (r: Strength) => void;
   onOpen: () => void;
   disabled?: boolean;
+  rateable?: boolean;
 }) {
   return (
     <li className="py-3">
@@ -49,7 +51,7 @@ export function DayItemRow({
           <span className="block text-xs text-muted">{detail} · tap to read</span>
         </button>
       </div>
-      {item.done && (
+      {item.done && rateable && (
         <div className="mt-2 ml-9 flex gap-1.5" role="group" aria-label="How well did it go?">
           {RATINGS.map((r) => (
             <button

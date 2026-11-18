@@ -15,7 +15,7 @@ const FRIENDLY: Record<string, string> = {
   network: "Couldn't reach the assistant. Check that the app is running locally, or edit the plan by hand.",
 };
 
-export async function askAssistant(req: AssistantRequest, timeoutMs = 90_000): Promise<AssistantResponse> {
+export async function askAssistant(req: AssistantRequest, timeoutMs = 180_000): Promise<AssistantResponse> {
   if (!AI_ENABLED) return { ok: false, error: { code: "not_configured", message: "AI is only available when running the app locally." } };
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);

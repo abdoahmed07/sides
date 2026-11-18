@@ -8,9 +8,12 @@ import {
   PlanConfigSchema,
   type PlanConfig,
   type Target,
+  type WeeklyReading,
 } from "@/core/plan/schema";
+import { surahListLabel } from "@/core/plan/preview";
 import { buildSequence } from "@/core/plan/sequence";
-import { keyNumbers } from "@/core/plan/summary";
+import { keyNumbers, type KeyNumbers } from "@/core/plan/summary";
+import { totals } from "@/core/stats";
 import type { MemUnit } from "@/core/srs";
 import { forecastFor, q } from "@/lib/app";
 import { Button, Card, Field, inputCls } from "./ui";
@@ -39,6 +42,72 @@ export function formatNumberList(ns: number[]): string {
   return out.join(", ");
 }
 
+const DAILY_PRESETS = [
+  { lines: 3, label: "3 lines" },
+  { lines: 5, label: "5 lines" },
+  { lines: 8, label: "Half a page" },
+  { lines: 15, label: "1 page" },
+  { lines: 30, label: "2 pages" },
+];
+
+function Question({ n, title, hint, children }: { n: number; title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <fieldset className="space-y-2.5">
+      <legend className="mb-2.5 flex items-center gap-2.5 font-semibold">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-soft text-xs text-accent">{n}</span>
+        {title}
+      </legend>
+      {hint && <p className="-mt-1 text-xs text-muted">{hint}</p>}
+      {children}
+    </fieldset>
+  );
+}
+
+function Option({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-2.5">
+      <div>
+        <h3 className="text-sm font-semibold">{title}</h3>
+        {hint && <p className="text-xs text-muted">{hint}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Chips({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: { value: string; label: string; hint?: string }[];
+  onChange: (v: string) => void;
+}) {
+  const hint = options.find((o) => o.value === value)?.hint;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap gap-1.5" role="radiogroup">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={o.value === value}
+            onClick={() => onChange(o.value)}
+            className={`rounded-full border px-3.5 py-1.5 text-sm transition ${
+              o.value === value ? "border-accent bg-accent text-accent-text" : "border-border text-muted hover:border-accent hover:text-text"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      {hint && <p className="text-xs text-muted">{hint}</p>}
+    </div>
+  );
+}
+
 const OVERRIDE_OPTIONS = [
   { value: "1", label: "Normal" },
   { value: "0.5", label: "Lighter (½ new)" },
@@ -52,6 +121,7 @@ export function PlanForm({
   today,
   saveLabel,
   onSave,
+  memorized,
 }: {
   initial: PlanConfig;
   current: PlanConfig | null;
@@ -59,19 +129,24 @@ export function PlanForm({
   today: IsoDate;
   saveLabel: string;
   onSave: (c: PlanConfig) => Promise<void>;
+  /** The "already memorized" editor, shown as the last question. */
+  memorized?: React.ReactNode;
 }) {
   const [c, setC] = useState<PlanConfig>(initial);
   const [listText, setListText] = useState(() => targetText(initial.target));
   const [saving, setSaving] = useState(false);
+  const [customAmount, setCustomAmount] = useState(() => !DAILY_PRESETS.some((p) => p.lines === initial.dailyNewLines));
   const [newEx, setNewEx] = useState({ from: today, to: today, kind: "travel" as (typeof EXCEPTION_KINDS)[number], note: "" });
   const set = <K extends keyof PlanConfig>(k: K, v: PlanConfig[K]) => setC((p) => ({ ...p, [k]: v }));
 
   const validation = PlanConfigSchema.safeParse(c);
   const numbers = useMemo(() => {
     if (!validation.success) return null;
+    const memorizedPages = totals(units, q).pagesEquivalent;
+    const withPages = (k: KeyNumbers): KeyNumbers => ({ ...k, memorizedPages });
     return {
-      before: current ? keyNumbers(current, forecastFor(current, units, today)) : null,
-      after: keyNumbers(c, forecastFor(c, units, today)),
+      before: current ? withPages(keyNumbers(current, forecastFor(current, units, today))) : null,
+      after: withPages(keyNumbers(c, forecastFor(c, units, today))),
     };
   }, [c, current, units, today, validation.success]);
 
@@ -117,22 +192,45 @@ export function PlanForm({
   };
 
   const surahAyahs = q.surah(c.start.surah)?.ayahs ?? 1;
+  const first = firstOf(c.target, c.direction);
+  const startChanged = first.surah !== c.start.surah || first.ayah !== c.start.ayah;
+
+  const targetSummary =
+    c.target.type === "quran"
+      ? "The whole Quran"
+      : c.target.type === "juz"
+        ? `Juz ${formatNumberList(c.target.juz)}`
+        : c.target.type === "surah"
+          ? surahListLabel(c.target.surahs, q)
+          : `Pages ${c.target.from}–${c.target.to}`;
+  const isPreset = !customAmount && DAILY_PRESETS.some((p) => p.lines === c.dailyNewLines);
+  const extrasSet = [
+    c.targetFinishDate && "target date",
+    c.dailyMinutesBudget && "time limit",
+    (c.weeklyReadings ?? []).length > 0 && "weekly reading",
+    c.exceptions.some((e) => e.to >= today) && "exceptions",
+    Object.keys(c.weekdayOverrides).length > 0 && "lighter days",
+  ].filter(Boolean) as string[];
 
   return (
     <div className="space-y-4">
-      <Card className="space-y-4">
-        <h2 className="font-semibold">What to memorize</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Target">
-            <select className={inputCls} value={c.target.type} onChange={(e) => setTargetType(e.target.value as Target["type"])}>
-              <option value="quran">Whole Quran</option>
-              <option value="juz">Juz</option>
-              <option value="surah">Surahs</option>
-              <option value="pages">Page range</option>
-            </select>
-          </Field>
+      <Card className="space-y-6">
+        <Question n={1} title="What do you want to memorize?">
+          <Chips
+            value={c.target.type}
+            options={[
+              { value: "juz", label: "Juz" },
+              { value: "surah", label: "Surahs" },
+              { value: "quran", label: "Whole Quran" },
+              { value: "pages", label: "Pages" },
+            ]}
+            onChange={(v) => setTargetType(v as Target["type"])}
+          />
           {c.target.type === "juz" || c.target.type === "surah" ? (
-            <Field label={c.target.type === "juz" ? "Juz numbers" : "Surah numbers"} hint="e.g. 30 or 26-30 or 67, 78-114">
+            <Field
+              label={c.target.type === "juz" ? "Which juz?" : "Which surahs? (numbers)"}
+              hint={c.target.type === "juz" ? "e.g. 30, or 29-30" : "e.g. 67, or 2, 78-114 (Al-Baqarah and Juz 30)"}
+            >
               <input className={inputCls} value={listText} onChange={(e) => onListChange(e.target.value)} inputMode="numeric" />
             </Field>
           ) : c.target.type === "pages" ? (
@@ -158,75 +256,70 @@ export function PlanForm({
                 />
               </Field>
             </div>
-          ) : (
-            <div />
-          )}
-          <Field label="Direction" hint={c.direction === "backward" ? "Surahs from last to first, e.g. An-Nas, Al-Falaq, …" : "Mushaf order, e.g. Al-Baqarah onwards"}>
-            <select
-              className={inputCls}
-              value={c.direction}
-              onChange={(e) => {
-                const direction = e.target.value as PlanConfig["direction"];
-                setC((p) => ({ ...p, direction, start: firstOf(p.target, direction) }));
-              }}
-            >
-              <option value="backward">Backward (by surah)</option>
-              <option value="forward">Forward</option>
-            </select>
-          </Field>
-          <div className="grid grid-cols-[1fr_6rem] gap-2">
-            <Field label="Start at surah">
-              <select className={inputCls} value={c.start.surah} onChange={(e) => set("start", { surah: +e.target.value, ayah: 1 })}>
-                {q.surahs.map((s) => (
-                  <option key={s.n} value={s.n}>
-                    {s.n}. {s.nameEn}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Ayah">
-              <input
-                type="number"
-                min={1}
-                max={surahAyahs}
-                className={inputCls}
-                value={c.start.ayah}
-                onChange={(e) => set("start", { ...c.start, ayah: clamp(+e.target.value, 1, surahAyahs) })}
-              />
-            </Field>
-          </div>
-        </div>
-      </Card>
+          ) : null}
+          <p className="text-sm text-muted">
+            → <span className="text-text">{targetSummary}</span>
+          </p>
+        </Question>
 
-      <Card className="space-y-4">
-        <h2 className="font-semibold">Pace</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="New lines per study day" hint={`${Math.round((c.dailyNewLines / 15) * 100) / 100} of a page (15 lines = 1 page)`}>
-            <input type="number" min={1} max={45} className={inputCls} value={c.dailyNewLines} onChange={(e) => set("dailyNewLines", clamp(+e.target.value, 1, 45))} />
-          </Field>
-          <Field label="Experience" hint="Sets the time estimates below">
-            <select
-              className={inputCls}
-              value={c.experience}
-              onChange={(e) => {
-                const experience = e.target.value as PlanConfig["experience"];
-                setC((p) => ({ ...p, experience, pace: { ...PACE_BY_EXPERIENCE[experience] } }));
-              }}
-            >
-              <option value="beginner">Beginner</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="advanced">Advanced</option>
-            </select>
-          </Field>
-          <Field label="Minutes to memorize one line">
-            <input type="number" step={0.5} min={0.5} max={20} className={inputCls} value={c.pace.minutesPerNewLine} onChange={(e) => set("pace", { ...c.pace, minutesPerNewLine: clamp(+e.target.value, 0.5, 20) })} />
-          </Field>
-          <Field label="Minutes to revise one page">
-            <input type="number" step={0.5} min={0.5} max={15} className={inputCls} value={c.pace.minutesPerRevisionPage} onChange={(e) => set("pace", { ...c.pace, minutesPerRevisionPage: clamp(+e.target.value, 0.5, 15) })} />
-          </Field>
-        </div>
-        <div>
-          <span className="mb-1 block text-sm font-medium">Study days</span>
+        <Question n={2} title="Where do you start?">
+          <Chips
+            value={c.direction}
+            options={[
+              { value: "backward", label: "From the end", hint: "An-Nas, Al-Falaq, … each surah top to bottom" },
+              { value: "forward", label: "From the beginning", hint: "Mushaf order" },
+            ]}
+            onChange={(v) => {
+              const direction = v as PlanConfig["direction"];
+              setC((p) => ({ ...p, direction, start: firstOf(p.target, direction) }));
+            }}
+          />
+          <details className="text-sm" open={startChanged}>
+            <summary className="cursor-pointer text-muted">
+              Starts at <span className="text-text">{q.surah(c.start.surah).nameEn} {c.start.ayah}</span> · change
+            </summary>
+            <div className="mt-2 grid grid-cols-[1fr_6rem] gap-2">
+              <Field label="Surah">
+                <select className={inputCls} value={c.start.surah} onChange={(e) => set("start", { surah: +e.target.value, ayah: 1 })}>
+                  {q.surahs.map((s) => (
+                    <option key={s.n} value={s.n}>
+                      {s.n}. {s.nameEn}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Ayah">
+                <input
+                  type="number"
+                  min={1}
+                  max={surahAyahs}
+                  className={inputCls}
+                  value={c.start.ayah}
+                  onChange={(e) => set("start", { ...c.start, ayah: clamp(+e.target.value, 1, surahAyahs) })}
+                />
+              </Field>
+            </div>
+            <p className="mt-1 text-xs text-muted">Use this if you&apos;re partway through, e.g. Al-Baqarah 219.</p>
+          </details>
+        </Question>
+
+        <Question n={3} title="How much new each day?">
+          <Chips
+            value={isPreset ? String(c.dailyNewLines) : "other"}
+            options={[...DAILY_PRESETS.map((p) => ({ value: String(p.lines), label: p.label })), { value: "other", label: "Other" }]}
+            onChange={(v) => {
+              setCustomAmount(v === "other");
+              if (v !== "other") set("dailyNewLines", +v);
+            }}
+          />
+          {!isPreset && (
+            <Field label="Lines per day" hint="15 lines = 1 page">
+              <input type="number" min={1} max={45} className={inputCls} value={c.dailyNewLines} onChange={(e) => set("dailyNewLines", clamp(+e.target.value, 1, 45))} />
+            </Field>
+          )}
+        </Question>
+
+        <Question n={4} title="Which days?">
           <div className="flex flex-wrap gap-1.5">
             {WEEKDAYS.map((d) => (
               <button
@@ -240,63 +333,66 @@ export function PlanForm({
               </button>
             ))}
           </div>
-        </div>
-        {c.studyWeekdays.length > 0 && (
-          <details className="text-sm">
-            <summary className="cursor-pointer text-muted">Lighter weekdays</summary>
-            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {WEEKDAYS.filter((d) => c.studyWeekdays.includes(d)).map((d) => {
-                const o = c.weekdayOverrides[d];
-                const v = !o ? "1" : o.revisionOnly ? "rev" : String(o.newMultiplier);
-                return (
-                  <Field key={d} label={WEEKDAY_LABEL[d]}>
-                    <select className={inputCls} value={OVERRIDE_OPTIONS.some((x) => x.value === v) ? v : "1"} onChange={(e) => setOverride(d, e.target.value)}>
-                      {OVERRIDE_OPTIONS.map((x) => (
-                        <option key={x.value} value={x.value}>
-                          {x.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                );
-              })}
-            </div>
-          </details>
+        </Question>
+
+        <Question n={5} title="Have you memorized before?" hint="Only used to estimate how long each day takes.">
+          <Chips
+            value={c.experience}
+            options={[
+              { value: "beginner", label: "First time" },
+              { value: "intermediate", label: "Yes, some" },
+              { value: "advanced", label: "Yes, a lot" },
+            ]}
+            onChange={(v) => {
+              const experience = v as PlanConfig["experience"];
+              setC((p) => ({ ...p, experience, pace: { ...PACE_BY_EXPERIENCE[experience] } }));
+            }}
+          />
+        </Question>
+
+        {memorized && (
+          <Question n={6} title="Already know some of it?">
+            {memorized}
+          </Question>
         )}
       </Card>
 
-      <Card className="space-y-4">
-        <h2 className="font-semibold">Revision and goals</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Sabqi window (days)" hint="Recent material revised daily">
-            <input type="number" min={1} max={30} className={inputCls} value={c.sabqiWindowDays} onChange={(e) => set("sabqiWindowDays", clamp(+e.target.value, 1, 30))} />
-          </Field>
-          <Field label="Manzil cycle (days)" hint="All older material revised once per cycle">
-            <input type="number" min={7} max={120} className={inputCls} value={c.manzilCycleDays} onChange={(e) => set("manzilCycleDays", clamp(+e.target.value, 7, 120))} />
-          </Field>
-          <Field label="Target finish date (optional)">
-            <input type="date" className={inputCls} value={c.targetFinishDate ?? ""} min={today} onChange={(e) => set("targetFinishDate", e.target.value || null)} />
-          </Field>
-          <Field label="Minutes available per study day (optional)">
-            <input
-              type="number"
-              min={5}
-              max={600}
-              className={inputCls}
-              value={c.dailyMinutesBudget ?? ""}
-              onChange={(e) => set("dailyMinutesBudget", e.target.value ? clamp(+e.target.value, 5, 600) : null)}
-            />
-          </Field>
-        </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={c.pauseNewUntilCaughtUp} onChange={(e) => set("pauseNewUntilCaughtUp", e.target.checked)} />
-          Pause new memorization until overdue revision is caught up
-        </label>
-      </Card>
+      <details className="group rounded-2xl border border-border bg-surface" open={extrasSet.length > 0 && !!current}>
+        <summary className="flex cursor-pointer items-center justify-between gap-3 p-4">
+          <span>
+            <span className="font-semibold">More options</span>
+            <span className="block text-xs text-muted">
+              {extrasSet.length ? `Set: ${extrasSet.join(", ")}` : "Target date, time limit, Friday Al-Kahf, travel and exams, revision settings"}
+            </span>
+          </span>
+          <span className="text-muted transition group-open:rotate-180" aria-hidden>
+            ▾
+          </span>
+        </summary>
+        <div className="space-y-6 border-t border-border p-4">
+          <Option title="Goal and time">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Finish by (optional)">
+                <input type="date" className={inputCls} value={c.targetFinishDate ?? ""} min={today} onChange={(e) => set("targetFinishDate", e.target.value || null)} />
+              </Field>
+              <Field label="Minutes you have a day (optional)">
+                <input
+                  type="number"
+                  min={5}
+                  max={600}
+                  className={inputCls}
+                  value={c.dailyMinutesBudget ?? ""}
+                  onChange={(e) => set("dailyMinutesBudget", e.target.value ? clamp(+e.target.value, 5, 600) : null)}
+                />
+              </Field>
+            </div>
+          </Option>
 
-      <Card className="space-y-3">
-        <h2 className="font-semibold">Exceptions</h2>
-        <p className="text-xs text-muted">Travel, exams, Ramadan, rest days… Past exceptions stay as history.</p>
+          <Option title="Weekly reading" hint="A surah you read every week, like Al-Kahf on Fridays. It shows on Today that day; it isn't memorized or rated.">
+            <WeeklyReadingsField value={c.weeklyReadings ?? []} onChange={(v) => set("weeklyReadings", v)} />
+          </Option>
+
+          <Option title="Travel, exams, Ramadan…" hint="Days that should be lighter or off. Past ones stay as history.">
         {c.exceptions.length > 0 && (
           <ul className="divide-y divide-border text-sm">
             {c.exceptions.map((e) => (
@@ -338,7 +434,70 @@ export function PlanForm({
         <Button onClick={addException} disabled={!newEx.from || !newEx.to || newEx.to < newEx.from}>
           Add exception
         </Button>
-      </Card>
+          </Option>
+
+          <Option title="Revision">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Sabqi window (days)" hint="Recent material revised daily">
+            <input type="number" min={1} max={30} className={inputCls} value={c.sabqiWindowDays} onChange={(e) => set("sabqiWindowDays", clamp(+e.target.value, 1, 30))} />
+          </Field>
+          <Field label="Manzil cycle (days)" hint="All older material revised once per cycle">
+            <input type="number" min={7} max={120} className={inputCls} value={c.manzilCycleDays} onChange={(e) => set("manzilCycleDays", clamp(+e.target.value, 7, 120))} />
+          </Field>
+          <Field label="Target finish date (optional)">
+            <input type="date" className={inputCls} value={c.targetFinishDate ?? ""} min={today} onChange={(e) => set("targetFinishDate", e.target.value || null)} />
+          </Field>
+          <Field label="Minutes available per study day (optional)">
+            <input
+              type="number"
+              min={5}
+              max={600}
+              className={inputCls}
+              value={c.dailyMinutesBudget ?? ""}
+              onChange={(e) => set("dailyMinutesBudget", e.target.value ? clamp(+e.target.value, 5, 600) : null)}
+            />
+          </Field>
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={c.pauseNewUntilCaughtUp} onChange={(e) => set("pauseNewUntilCaughtUp", e.target.checked)} />
+          Pause new memorization until overdue revision is caught up
+        </label>
+          </Option>
+
+          <Option title="Fine-tuning">
+        {c.studyWeekdays.length > 0 && (
+          <details className="text-sm">
+            <summary className="cursor-pointer font-medium">Lighter weekdays</summary>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {WEEKDAYS.filter((d) => c.studyWeekdays.includes(d)).map((d) => {
+                const o = c.weekdayOverrides[d];
+                const v = !o ? "1" : o.revisionOnly ? "rev" : String(o.newMultiplier);
+                return (
+                  <Field key={d} label={WEEKDAY_LABEL[d]}>
+                    <select className={inputCls} value={OVERRIDE_OPTIONS.some((x) => x.value === v) ? v : "1"} onChange={(e) => setOverride(d, e.target.value)}>
+                      {OVERRIDE_OPTIONS.map((x) => (
+                        <option key={x.value} value={x.value}>
+                          {x.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                );
+              })}
+            </div>
+          </details>
+        )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Minutes to memorize one line">
+                <input type="number" step={0.5} min={0.5} max={20} className={inputCls} value={c.pace.minutesPerNewLine} onChange={(e) => set("pace", { ...c.pace, minutesPerNewLine: clamp(+e.target.value, 0.5, 20) })} />
+              </Field>
+              <Field label="Minutes to revise one page">
+                <input type="number" step={0.5} min={0.5} max={15} className={inputCls} value={c.pace.minutesPerRevisionPage} onChange={(e) => set("pace", { ...c.pace, minutesPerRevisionPage: clamp(+e.target.value, 0.5, 15) })} />
+              </Field>
+            </div>
+          </Option>
+        </div>
+      </details>
 
       <Card className="space-y-3">
         <h2 className="font-semibold">{current ? "Before and after" : "What this plan looks like"}</h2>
@@ -378,4 +537,55 @@ function targetText(t: Target) {
 
 function clamp(n: number, a: number, b: number) {
   return Number.isFinite(n) ? Math.min(b, Math.max(a, n)) : a;
+}
+
+function WeeklyReadingsField({ value, onChange }: { value: WeeklyReading[]; onChange: (v: WeeklyReading[]) => void }) {
+  const [surah, setSurah] = useState(18);
+  const [day, setDay] = useState<Weekday>("fri");
+  const exists = value.some((r) => r.surah === surah && r.day === day);
+  return (
+    <div className="space-y-3">
+      {value.length > 0 && (
+        <ul className="divide-y divide-border rounded-xl border border-border">
+          {value.map((r) => (
+            <li key={`${r.day}-${r.surah}`} className="flex items-center justify-between px-3 py-2 text-sm">
+              <span>
+                {q.surah(r.surah).nameEn} · every {WEEKDAY_LABEL[r.day]}
+              </span>
+              <button
+                type="button"
+                onClick={() => onChange(value.filter((x) => x !== r))}
+                className="rounded-lg px-2 py-1 text-xs text-muted hover:bg-surface-2 hover:text-text"
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex flex-wrap items-end gap-2">
+        <Field label="Surah">
+          <select className={inputCls} value={surah} onChange={(e) => setSurah(+e.target.value)}>
+            {q.surahs.map((s) => (
+              <option key={s.n} value={s.n}>
+                {s.n}. {s.nameEn}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Day">
+          <select className={inputCls} value={day} onChange={(e) => setDay(e.target.value as Weekday)}>
+            {WEEKDAYS.map((d) => (
+              <option key={d} value={d}>
+                {WEEKDAY_LABEL[d]}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Button type="button" disabled={exists || value.length >= 14} onClick={() => onChange([...value, { surah, day }])}>
+          Add
+        </Button>
+      </div>
+    </div>
+  );
 }

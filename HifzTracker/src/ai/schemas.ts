@@ -24,20 +24,14 @@ export const PlanRequestSchema = z
         config: PlanConfigSchema.nullable(),
         /** Aggregates only: e.g. "Juz 30 memorized (37 surahs); 23 pages total". */
         memorizedSummary: z.string().max(600),
+        /** Which ayahs are memorized, as [first, last] global ayah index ranges (no dates or history). */
+        memorizedRanges: z.array(z.tuple([z.number().int().min(0).max(6235), z.number().int().min(0).max(6235)])).max(3000),
         /** Key numbers from the engine for the current plan, if any. */
         current: z.record(z.string(), z.unknown()).nullable(),
         upcomingExceptions: z.array(z.object({ id: z.string(), from: z.string(), to: z.string(), kind: z.string() })).max(60),
         nextRamadanStart: z.string().max(10).nullable(),
       })
       .strict(),
-  })
-  .strict();
-
-export const ExplainRequestSchema = z
-  .object({
-    mode: z.literal("explain"),
-    request: z.string().max(MAX_MESSAGE_CHARS),
-    facts: z.record(z.string(), z.unknown()),
   })
   .strict();
 
@@ -50,7 +44,7 @@ export const CheckinRequestSchema = z
   })
   .strict();
 
-export const AssistantRequestSchema = z.discriminatedUnion("mode", [PlanRequestSchema, ExplainRequestSchema, CheckinRequestSchema]);
+export const AssistantRequestSchema = z.discriminatedUnion("mode", [PlanRequestSchema, CheckinRequestSchema]);
 export type AssistantRequest = z.infer<typeof AssistantRequestSchema>;
 export type PlanRequest = z.infer<typeof PlanRequestSchema>;
 
@@ -61,7 +55,7 @@ export const PlanReplySchema = z
     kind: z.enum(["ask", "propose", "chat"]).describe(
       "ask = you need more info (put up to 3 short questions in `questions`); propose = you have a plan change (put it in `patch`/`markMemorized`); chat = no plan change.",
     ),
-    message: z.string().min(1).max(1200).describe("Short, calm reply to the user. Never contains Quran text or invented numbers."),
+    message: z.string().min(1).max(1500).describe("Short, calm reply. Numbers only from preview_plan results or the user's own words. Never Quran text."),
     questions: z.array(z.string().min(1).max(200)).max(3),
     patch: PlanPatchSchema.nullable(),
     markMemorized: z.array(MemorizedSelectionSchema).max(20).nullable(),
@@ -74,8 +68,13 @@ export const PlanReplySchema = z
   });
 export type PlanReply = z.infer<typeof PlanReplySchema>;
 
-export const ExplainReplySchema = z.object({ text: z.string().min(1).max(1200) }).strict();
-export type ExplainReply = z.infer<typeof ExplainReplySchema>;
+/** Input of the `preview_plan` tool: a candidate change the model wants the engine to evaluate. */
+export const PreviewToolInputSchema = z
+  .object({
+    patch: PlanPatchSchema.nullable(),
+    markMemorized: z.array(MemorizedSelectionSchema).max(20).nullable(),
+  })
+  .strict();
 
 export const CheckinReplySchema = z
   .object({
@@ -99,7 +98,6 @@ export type CheckinReply = z.infer<typeof CheckinReplySchema>;
 
 export type AssistantResponse =
   | { ok: true; mode: "plan"; reply: PlanReply }
-  | { ok: true; mode: "explain"; reply: ExplainReply; verified: boolean }
   | { ok: true; mode: "checkin"; reply: CheckinReply }
   | { ok: false; error: { code: AssistantErrorCode; message: string } };
 

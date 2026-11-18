@@ -113,17 +113,22 @@ export class QuranIndex {
     return `${this.surah(this.surahOf[i]).nameEn} ${this.ayahOf[i]}`;
   }
 
-  /** Human label for a contiguous-ish set of ayahs, e.g. "Al-Mulk 1–12". */
+  /**
+   * Human label for a contiguous-ish set of ayahs, e.g. "Al-Mulk 1–12".
+   * Surahs keep the order they appear in (so a backward portion reads
+   * "Al-Falaq 1–5, Al-Ikhlas 1–4"); ayahs within a surah are sorted.
+   */
   rangeLabel(indices: number[]): string {
     if (indices.length === 0) return "";
-    const sorted = [...indices].sort((a, b) => a - b);
-    const groups: number[][] = [];
-    for (const i of sorted) {
-      const g = groups[groups.length - 1];
-      if (g && this.surahOf[g[0]] === this.surahOf[i]) g.push(i);
-      else groups.push([i]);
+    const bySurah = new Map<number, number[]>();
+    for (const i of indices) {
+      const s = this.surahOf[i];
+      const g = bySurah.get(s);
+      if (g) g.push(i);
+      else bySurah.set(s, [i]);
     }
-    return groups
+    return [...bySurah.values()]
+      .map((g) => g.sort((x, y) => x - y))
       .map((g) => {
         const s = this.surah(this.surahOf[g[0]]).nameEn;
         const a = this.ayahOf[g[0]];
