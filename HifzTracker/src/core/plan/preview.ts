@@ -4,7 +4,7 @@
  * Pure, so it runs both in the browser and in the AI route (as the
  * `preview_plan` tool the model uses to see real numbers).
  */
-import { addDays, formatDate, WEEKDAY_LABEL, WEEKDAYS, type IsoDate } from "../dates";
+import { addDays, formatDate, WEEKDAY_LABEL, WEEKDAYS, type IsoDate, type Weekday } from "../dates";
 import { markPrior } from "../memorize";
 import { estimatePauseDays } from "../missed";
 import type { QuranIndex } from "../quran";
@@ -173,7 +173,17 @@ export function describeChanges(before: PlanConfig | null, after: PlanConfig, ma
   );
   diff("Weekly reading", (c) => {
     const r = c.weeklyReadings ?? [];
-    return r.length ? r.map((x) => `${q.surah(x.surah).nameEn} on ${WEEKDAY_LABEL[x.day]}`).join(", ") : "none";
+    if (!r.length) return "none";
+    // One entry per surah: "Al-Mulk daily", "Al-Kahf on Fri", "Al-Waqiah on Mon, Thu".
+    const bySurah = new Map<number, Weekday[]>();
+    for (const x of r) bySurah.set(x.surah, [...(bySurah.get(x.surah) ?? []), x.day]);
+    return [...bySurah]
+      .map(([surah, days]) => {
+        const name = q.surah(surah).nameEn;
+        if (days.length === 7) return `${name} daily`;
+        return `${name} on ${WEEKDAYS.filter((d) => days.includes(d)).map((d) => WEEKDAY_LABEL[d]).join(", ")}`;
+      })
+      .join(", ");
   });
   diff("New memorization paused", (c) => (c.pauseNewUntilCaughtUp ? "until revision is caught up" : "no"));
   const exKey = (c: PlanConfig) => c.exceptions.map((e) => `${e.kind} ${formatDate(e.from)}–${formatDate(e.to)}`).join("; ") || "none";

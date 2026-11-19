@@ -116,5 +116,17 @@ describe("weekly readings", () => {
     if (!base.ok || !withKahf.ok) throw new Error("preview failed");
     expect(withKahf.after.completionDate).toBe(base.after.completionDate);
     expect(withKahf.changes).toContain("Weekly reading: none → Al-Kahf on Fri");
+    const days = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+    const readings = [{ day: "fri", surah: 18 }, { day: "thu", surah: 56 }, { day: "mon", surah: 56 }, ...days.map((day) => ({ day, surah: 67 }))];
+    const daily = evaluateChange({
+      base: { ...cfg(), weeklyReadings: [{ day: "fri", surah: 18 }] },
+      hasPlan: true,
+      patch: { set: { weeklyReadings: readings as never } },
+      units: [],
+      today,
+      q,
+    });
+    if (!daily.ok) throw new Error("preview failed");
+    expect(daily.changes).toContain("Weekly reading: Al-Kahf on Fri → Al-Kahf on Fri, Al-Waqi'ah on Mon, Thu, Al-Mulk daily");
   });
 });
