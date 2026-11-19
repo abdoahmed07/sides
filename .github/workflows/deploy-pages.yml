@@ -3,7 +3,8 @@
 #   (There is no page at /sides/ itself: the projects are presented on the portfolio.)
 #   Streak habit tracker  → https://abdoahmed07.github.io/sides/streak/
 #   Kent card game        → https://abdoahmed07.github.io/sides/kent/
-#   Hifz Tracker          → https://abdoahmed07.github.io/sides/hifz/  (static build: AI chat only works locally)
+#   Hifz Tracker          → https://abdoahmed07.github.io/sides/hifz/  (static build without AI; the full app is on Vercel,
+#                           and with variable HIFZ_APP_URL set this old address sends people there)
 # One-time setup: Settings → Pages → Source: "GitHub Actions", and add repository
 # variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (Streak) and HIFZ_SUPABASE_URL and
 # HIFZ_SUPABASE_ANON_KEY (Hifz Tracker) under Settings → Secrets and variables → Actions → Variables.
@@ -67,6 +68,9 @@ jobs:
           # Its own Supabase project for sign-in and sync (table: HifzTracker/supabase/schema.sql).
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.HIFZ_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.HIFZ_SUPABASE_ANON_KEY }}
+          # Once the app is hosted on Vercel, set HIFZ_APP_URL (e.g. https://hifz-tracker.vercel.app):
+          # this old address then points people there (after they've saved their progress to an account).
+          NEXT_PUBLIC_MOVED_TO: ${{ vars.HIFZ_APP_URL }}
 
       # Ubuntu's system Python refuses pip installs, so use a managed one for NumPy.
       - uses: actions/setup-python@v5

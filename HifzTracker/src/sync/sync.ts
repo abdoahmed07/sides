@@ -219,6 +219,13 @@ export async function resolveConflict(keep: "device" | "account") {
   }
 }
 
+/** The signed-in person's access token (for the AI route), or null. */
+export async function accessToken(): Promise<string | null> {
+  if (!SYNC_ENABLED) return null;
+  const { data } = await sb().auth.getSession();
+  return data.session?.access_token ?? null;
+}
+
 /* ---------------- signing in ---------------- */
 
 export const MIN_PASSWORD = 6;

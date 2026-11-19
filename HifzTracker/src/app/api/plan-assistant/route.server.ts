@@ -1,8 +1,10 @@
 /**
  * POST /api/plan-assistant — the only server code in the app.
  *
- * Named route.server.ts so it only exists in the local (server) build; the
- * GitHub Pages static build leaves it out (see next.config.ts pageExtensions).
+ * Named route.server.ts so it only exists in the server builds (local and
+ * Vercel); the GitHub Pages static build leaves it out (see next.config.ts
+ * pageExtensions). On Vercel it needs a signed-in account and has a daily
+ * limit per account (src/ai/access.ts).
  *
  * Receives only the user's messages, the plan settings, which ayahs are
  * memorized and aggregate stats — never the day-by-day history. The model
@@ -11,6 +13,7 @@
  * before it is returned.
  */
 import { NextResponse, type NextRequest } from "next/server";
+import { checkAccess } from "@/ai/access";
 import { aiConfigured, AssistantError, callStructured, MODEL, type LocalTool } from "@/ai/client";
 import { rateLimit } from "@/ai/rate-limit";
 import {
@@ -29,6 +32,9 @@ import { allowedNumbers, type KeyNumbers } from "@/core/plan/summary";
 import { getQuran } from "@/core/quran";
 
 const MAX_BODY_BYTES = 200_000;
+
+// On Vercel: a plan conversation can take several model calls.
+export const maxDuration = 120;
 
 function fail(code: AssistantErrorCode, message: string, status: number, headers?: Record<string, string>) {
   return NextResponse.json<AssistantResponse>({ ok: false, error: { code, message } }, { status, headers });
@@ -117,6 +123,9 @@ export async function POST(req: NextRequest) {
     );
   }
   if (!aiConfigured()) return fail("not_configured", "AI is not set up. Add ANTHROPIC_API_KEY to .env.local.", 503);
+  // Last, so only well-formed requests count against the daily limit.
+  const access = await checkAccess(req.headers.get("authorization"));
+  if (!access.ok) return fail(access.code, access.message, access.status);
 
   const r = parsed.data;
   try {

@@ -37,6 +37,23 @@ One-time setup (Hifz Tracker has its own Supabase project):
 
 Supabase's built-in email sender only allows a few emails per hour; for more users, add your own SMTP in Authentication → Emails.
 
+## Hosting on Vercel (everything, including AI, for everyone)
+
+The full app (with the AI route) runs on Vercel's free Hobby plan. Every assistant message is billed to your Anthropic key, so on the hosted app the AI only works for **signed-in** people, with a **daily limit per account** (`AI_DAILY_LIMIT`, default 30). `pnpm dev` skips both unless you set `AI_REQUIRE_SIGN_IN=1`.
+
+One-time setup:
+
+1. Supabase → SQL Editor: run `supabase/ai-usage.sql` (the daily counter).
+2. vercel.com → Add New → Project → import the `sides` repo. **Root Directory: `HifzTracker`** (framework: Next.js; the build command stays `pnpm build`).
+3. Environment variables (Project → Settings → Environment Variables):
+   - `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (e.g. `claude-haiku-5-5`)
+   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - optional: `AI_DAILY_LIMIT`
+4. Deploy. Every push to `main` deploys again.
+5. Supabase → Authentication → URL Configuration: Site URL = the Vercel address; add `https://<your-app>.vercel.app/**` to Redirect URLs.
+6. Anthropic console → set a monthly spend limit.
+7. GitHub → repo variable `HIFZ_APP_URL` = the Vercel address (no trailing slash). The old Pages address then sends people with nothing saved straight there, and asks people with progress to sign in first so it comes with them.
+
 ## GitHub Pages build (no server, no AI)
 
 ```bash

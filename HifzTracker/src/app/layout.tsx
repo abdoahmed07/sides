@@ -3,6 +3,7 @@ import { Geist, Amiri_Quran } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { SyncBanner } from "@/components/Account";
+import { MovedBanner } from "@/components/Moved";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const amiriQuran = Amiri_Quran({ variable: "--font-amiri-quran", weight: "400", subsets: ["arabic"] });
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="mx-auto flex min-h-dvh max-w-2xl flex-col px-4 pb-24 pt-4 sm:pb-8 sm:pt-20">
           <Nav />
           <main className="flex-1">
+            <MovedBanner />
             <SyncBanner />
             {children}
           </main>

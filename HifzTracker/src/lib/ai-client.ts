@@ -1,7 +1,10 @@
 "use client";
 import type { AssistantRequest, AssistantResponse } from "@/ai/schemas";
+import { accessToken } from "@/sync/sync";
 
 export const AI_ENABLED = process.env.NEXT_PUBLIC_AI_ENABLED === "1";
+/** The hosted app only lets signed-in people use the assistant. */
+export const AI_NEEDS_SIGN_IN = process.env.NEXT_PUBLIC_AI_REQUIRES_SIGN_IN === "1";
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 const FRIENDLY: Record<string, string> = {
@@ -12,7 +15,8 @@ const FRIENDLY: Record<string, string> = {
   invalid_output: "The assistant gave an answer the app couldn't use, so nothing was changed. Try rephrasing, or edit by hand.",
   refused: "The assistant couldn't help with that. You can edit the plan by hand.",
   too_long: "That message is too long. Try something shorter.",
-  network: "Couldn't reach the assistant. Check that the app is running locally, or edit the plan by hand.",
+  network: "Couldn't reach the assistant. Check your internet connection, or edit the plan by hand.",
+  sign_in_required: "Sign in (Settings → Your account) to use the assistant. You can still edit the plan by hand.",
 };
 
 export async function askAssistant(req: AssistantRequest, timeoutMs = 180_000): Promise<AssistantResponse> {
@@ -20,9 +24,10 @@ export async function askAssistant(req: AssistantRequest, timeoutMs = 180_000): 
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
+    const token = await accessToken();
     const res = await fetch(`${BASE}/api/plan-assistant`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify(req),
       signal: ctrl.signal,
     });

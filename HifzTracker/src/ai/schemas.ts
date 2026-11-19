@@ -110,4 +110,6 @@ export type AssistantErrorCode =
   | "upstream_rate_limited"
   | "upstream_error"
   | "invalid_output"
-  | "refused";
+  | "refused"
+  | "sign_in_required"
+  | "daily_limit";

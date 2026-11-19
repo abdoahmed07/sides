@@ -10,10 +10,11 @@ import type { MemUnit } from "@/core/srs";
 import type { ChatMessage, PlanVersion } from "@/data/types";
 import { repo } from "@/data/dexie";
 import { MAX_MESSAGE_CHARS } from "@/ai/schemas";
-import { askAssistant } from "@/lib/ai-client";
+import { AI_NEEDS_SIGN_IN, askAssistant } from "@/lib/ai-client";
 import { acceptPreview, forecastFor, memorizedSummary, previewChange, q, ramadanHint, type Preview } from "@/lib/app";
 import { Button, Card, PrivacyNote, Spinner, inputCls } from "./ui";
 import { FeasibilityNote, PreviewTable } from "./Preview";
+import { useSyncStatus } from "./Account";
 
 type Proposal = { preview: Preview; request: string; source: PlanVersion["source"] };
 
@@ -44,6 +45,8 @@ export function PlanChat({
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [accepted, setAccepted] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
+  const sync = useSyncStatus();
+  const needsSignIn = AI_NEEDS_SIGN_IN && (sync.phase === "signed-out" || sync.phase === "off");
 
   useEffect(() => {
     let live = true;
@@ -227,32 +230,49 @@ export function PlanChat({
       )}
 
       <div ref={bottom} />
-      <form
-        className="sticky bottom-20 flex gap-2 rounded-2xl border border-border bg-surface p-2 shadow-sm sm:bottom-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          send();
-        }}
-      >
-        <textarea
-          className={`${inputCls} min-h-11 resize-none border-0 focus:ring-0`}
-          rows={2}
-          value={input}
-          maxLength={MAX_MESSAGE_CHARS}
-          placeholder="Type your message…"
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              send();
-            }
+      {needsSignIn ? (
+        <Card className="space-y-2 text-sm">
+          <p className="font-medium">Make a free account to use the assistant.</p>
+          <p className="text-muted">It keeps your progress safe and lets you use it on your phone and computer. Your progress on this device is kept.</p>
+          <Link href="/settings/#account">
+            <Button variant="primary">Create account or sign in</Button>
+          </Link>
+          <p className="text-muted">
+            Or{" "}
+            <Link href={purpose === "create" ? "/plan/?new=1" : "/plan/"} className="font-medium text-accent underline-offset-2 hover:underline">
+              set up the plan by hand
+            </Link>
+            , no account needed.
+          </p>
+        </Card>
+      ) : (
+        <form
+          className="sticky bottom-20 flex gap-2 rounded-2xl border border-border bg-surface p-2 shadow-sm sm:bottom-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            send();
           }}
-          aria-label="Message"
-        />
-        <Button type="submit" variant="primary" disabled={sending || !input.trim()}>
-          Send
-        </Button>
-      </form>
+        >
+          <textarea
+            className={`${inputCls} min-h-11 resize-none border-0 focus:ring-0`}
+            rows={2}
+            value={input}
+            maxLength={MAX_MESSAGE_CHARS}
+            placeholder="Type your message…"
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            aria-label="Message"
+          />
+          <Button type="submit" variant="primary" disabled={sending || !input.trim()}>
+            Send
+          </Button>
+        </form>
+      )}
       <div className="flex items-start justify-between gap-4">
         <PrivacyNote />
         <button onClick={clear} className="shrink-0 text-xs text-muted underline underline-offset-2">

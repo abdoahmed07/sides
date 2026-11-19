@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { addDays, formatDate } from "@/core/dates";
 import { useDayLog, useDayLogs, useMeta, usePlan, useToday, useUnits } from "@/data/hooks";
 import { ensureDayLog, extraOptions, forecastFor, q, recordExtra, updateItem } from "@/lib/app";
-import { AI_ENABLED } from "@/lib/ai-client";
+import { AI_ENABLED, AI_NEEDS_SIGN_IN } from "@/lib/ai-client";
 import type { DayItem } from "@/data/types";
 import { Button, Card, Notice, PageTitle } from "@/components/ui";
 import { DayItemRow } from "@/components/DayItemRow";
 import { AyahText, Sheet } from "@/components/AyahText";
 import { MissedDays } from "@/components/MissedDays";
-import { SignInNudge } from "@/components/Account";
+import { SignInNudge, useSyncStatus } from "@/components/Account";
 import { activeDatesOf, streaks } from "@/core/stats";
 
 /** Rough reading speed for weekly readings (looking at the mushaf). */
@@ -19,6 +19,7 @@ const READING_MINUTES_PER_PAGE = 2;
 export default function TodayPage() {
   const today = useToday();
   const plan = usePlan();
+  const sync = useSyncStatus();
   const log = useDayLog(today);
   const units = useUnits();
   const logs = useDayLogs();
@@ -142,7 +143,7 @@ export default function TodayPage() {
     );
   };
 
-  const checkinDue = AI_ENABLED && plan && today >= addDays(lastCheckin ?? plan.createdAt.slice(0, 10), 7);
+  const checkinDue = AI_ENABLED && (!AI_NEEDS_SIGN_IN || sync.email !== null) && plan && today >= addDays(lastCheckin ?? plan.createdAt.slice(0, 10), 7);
 
   return (
     <div className="space-y-4">
