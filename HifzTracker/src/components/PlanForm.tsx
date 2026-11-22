@@ -592,7 +592,7 @@ export function PlanForm({
             <SubLabel>{t("Sabqi: how long new pages are revised daily")}</SubLabel>
             <Chips
               value={String(c.sabqiWindowDays)}
-              options={SABQI_PRESETS.some((x) => +x.value === c.sabqiWindowDays) ? SABQI_PRESETS : [...SABQI_PRESETS, { value: String(c.sabqiWindowDays), label: t("Last {n} days", { n: c.sabqiWindowDays }) }]}
+              options={SABQI_PRESETS.some((x) => +x.value === c.sabqiWindowDays) ? SABQI_PRESETS : [...SABQI_PRESETS, { value: String(c.sabqiWindowDays), label: tp({ one: "Last {n} day", other: "Last {n} days" }, c.sabqiWindowDays) }]}
               onChange={(v) => set("sabqiWindowDays", Number(v))}
             />
             <SubLabel>{t("Manzil: every older page comes round once every")}</SubLabel>

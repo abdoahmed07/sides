@@ -209,7 +209,7 @@ export default function TodayPage() {
           {section(
             "sabqi",
             tx("Sabqi"),
-            t("Last {n} days", { n: config.sabqiWindowDays }),
+            tp({ one: "Last {n} day", other: "Last {n} days" }, config.sabqiWindowDays),
             t("Recite these recent pages from memory, then rate them. Each new page is revised here for {n} days, then moves to Manzil.", {
               n: Math.max(1, config.sabqiWindowDays - 1),
             }),
@@ -217,7 +217,7 @@ export default function TodayPage() {
           {section(
             "manzil",
             tx("Manzil"),
-            t("{n}-day cycle", { n: config.manzilCycleDays }),
+            tp({ one: "{n}-day cycle", other: "{n}-day cycle" }, config.manzilCycleDays),
             t("Recite these older pages from memory, check the text, then rate them."),
             round && round.total > 0 && <ManzilProgress round={round} onOpen={() => setRoundOpen(true)} />,
           )}
@@ -237,7 +237,7 @@ export default function TodayPage() {
       )}
 
       {round && (
-        <Sheet open={roundOpen} onClose={() => setRoundOpen(false)} title={t("Manzil: the last {n} days", { n: round.cycleDays })}>
+        <Sheet open={roundOpen} onClose={() => setRoundOpen(false)} title={tp({ one: "Manzil: the last {n} day", other: "Manzil: the last {n} days" }, round.cycleDays)}>
           <ManzilDetails round={round} today={today} todayPages={new Set(items.filter((i) => i.kind === "manzil" && !i.done).map((i) => i.page!))} labelOf={(p) => {
             const u = unitByPage.get(p);
             return u ? q.rangeLabel(u.ayahs) : "";
@@ -376,7 +376,9 @@ function ManzilDetails({
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted">
-        {t("Manzil brings every older page round about once every {n} days, a few pages a day. Weak and overdue pages come first.", { n: round.cycleDays })}
+        {t("Manzil brings every older page round about once every {days}, a few pages a day. Weak and overdue pages come first.", {
+          days: tp({ one: "{n} day", other: "{n} days" }, round.cycleDays),
+        })}
       </p>
       <section>
         <h3 className="text-sm font-semibold">{t("Coming up ({n})", { n: round.coming.length })}</h3>

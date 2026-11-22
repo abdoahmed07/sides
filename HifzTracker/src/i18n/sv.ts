@@ -60,11 +60,9 @@ const sv: Dict = {
   "Memorize this, then recite it from memory before you tick it.":
     "Memorera detta och recitera det sedan utantill innan du bockar av det.",
   Sabqi: "Sabqi",
-  "Last {n} days": "Senaste {n} dagarna",
   "Recite these recent pages from memory, then rate them. Each new page is revised here for {n} days, then moves to Manzil.":
     "Recitera de här senaste sidorna utantill och betygsätt dem sedan. Varje ny sida repeteras här i {n} dagar och flyttas sedan till manzil.",
   Manzil: "Manzil",
-  "{n}-day cycle": "{n}-dagarscykel",
   "Recite these older pages from memory, check the text, then rate them.":
     "Recitera de här äldre sidorna utantill, kontrollera mot texten och betygsätt dem sedan.",
   Reading: "Läsning",
@@ -77,7 +75,6 @@ const sv: Dict = {
     "I den här takten blir du klar med ditt mål runt {date}.",
   "With the current settings no new material is scheduled.":
     "Med nuvarande inställningar schemaläggs inget nytt.",
-  "Manzil: the last {n} days": "Manzil: de senaste {n} dagarna",
   "How far did you get?": "Hur långt kom du?",
   "Pick the last ayah you memorized today. Today's portion is ticked, the extra goes into revision like any new portion, and tomorrow continues after it. Your daily amount stays the same.":
     "Välj den sista versen du memorerade idag. Dagens del bockas av, det extra går in i repetitionen som vilken ny del som helst och i morgon fortsätter du efter den. Din dagliga mängd är densamma.",
@@ -97,8 +94,6 @@ const sv: Dict = {
     "Alla manzil-sidor har repeterats under den här tiden.",
   today: "idag",
   yesterday: "igår",
-  "Manzil brings every older page round about once every {n} days, a few pages a day. Weak and overdue pages come first.":
-    "Manzil tar upp varje äldre sida ungefär en gång var {n}:e dag, några sidor om dagen. Svaga och försenade sidor kommer först.",
   "Coming up ({n})": "Kommande ({n})",
   next: "nästa",
   "Nothing: every page has been revised in this time.":
@@ -765,6 +760,69 @@ const sv: Dict = {
     "Kunde inte nå servern. Kontrollera internetanslutningen och försök igen.",
   "Your account couldn't be deleted right now. Please try again later.":
     "Ditt konto kunde inte raderas just nu. Försök igen senare.",
+  "Contact us": "Kontakta oss",
+  "Need help or have an idea?": "Behöver du hjälp eller har en idé?",
+  "Questions, problems or ideas? Send a message and we'll answer by email.":
+    "Frågor, problem eller idéer? Skicka ett meddelande så svarar vi via e-post.",
+  "Send another message": "Skicka ett till meddelande",
+  "Send message": "Skicka meddelande",
+  "Something went wrong. Check your connection and try again.":
+    "Något gick fel. Kontrollera anslutningen och försök igen.",
+  "Thanks, your message was sent.": "Tack, ditt meddelande har skickats.",
+  "The guide answers the most common questions.":
+    "Guiden svarar på de vanligaste frågorna.",
+  "We'll reply to {email} as soon as we can.":
+    "Vi svarar till {email} så snart vi kan.",
+  "What can we help with?": "Vad kan vi hjälpa till med?",
+  "Your email is only used to answer you.":
+    "Din e-post används bara för att svara dig.",
+  "Your email": "Din e-post",
+  "Last {n} days": { one: "Senaste {n} dagen", other: "Senaste {n} dagarna" },
+  "{n}-day cycle": { one: "{n}-dagarscykel", other: "{n}-dagarscykel" },
+  "Manzil: the last {n} days": {
+    one: "Manzil: den senaste {n} dagen",
+    other: "Manzil: de senaste {n} dagarna",
+  },
+  "Manzil brings every older page round about once every {days}, a few pages a day. Weak and overdue pages come first.":
+    "Manzil tar upp varje äldre sida ungefär en gång på {days}, några sidor om dagen. Svaga och försenade sidor kommer först.",
+  "[Read the full privacy page](/privacy/)":
+    "[Läs hela integritetssidan](/privacy/)",
+  Privacy: "Integritet",
+  "What Hifz Tracker stores, where, and how to remove it. Last updated: November 2026.":
+    "Vad Hifz Tracker sparar, var, och hur du tar bort det. Senast uppdaterad: november 2026.",
+  "In short": "Kort sagt",
+  "Your plan and progress stay on your device. If you make an account, a copy is saved so you can use it on other devices. No ads, no tracking, nothing sold.":
+    "Din plan och dina framsteg stannar på din enhet. Skapar du ett konto sparas en kopia så att du kan använda den på andra enheter. Ingen reklam, ingen spårning, inget säljs.",
+  "Hifz Tracker is a free, independent project. Questions about your data? [Contact us](/contact/).":
+    "Hifz Tracker är ett gratis, fristående projekt. Frågor om dina data? [Kontakta oss](/contact/).",
+  "On your device": "På din enhet",
+  "Your plan, progress, ratings, history and settings are stored in your browser on this device. Without an account, they never leave it (except what you send to the assistant, see below).":
+    "Din plan, dina framsteg, betyg, historik och inställningar sparas i webbläsaren på den här enheten. Utan konto lämnar de den aldrig (förutom det du skickar till assistenten, se nedan).",
+  "If you make an account": "Om du skapar ett konto",
+  "We store your email, your password (encrypted; nobody can read it) and a copy of your plan and progress, so it can sync between your devices. This is stored with Supabase, in the EU.":
+    "Vi sparar din e-post, ditt lösenord (krypterat; ingen kan läsa det) och en kopia av din plan och dina framsteg, så att de kan synkas mellan dina enheter. Det lagras hos Supabase, inom EU.",
+  "The app only lets you read your own data. The developer has technical access to the database to keep it running, but does not look at your progress.":
+    "Appen låter dig bara läsa dina egna data. Utvecklaren har teknisk åtkomst till databasen för att hålla den igång, men tittar inte på dina framsteg.",
+  "If you use the assistant": "Om du använder assistenten",
+  "Your message, your plan settings and short totals (like “about 23 pages memorized”) are sent to Anthropic's Claude to write the reply. Your day-by-day history is not. Under Anthropic's API terms this isn't used to train their models.":
+    "Ditt meddelande, dina planinställningar och korta summeringar (som ”ungefär 23 sidor memorerade”) skickas till Anthropics Claude för att skriva svaret. Din dag-för-dag-historik gör det inte. Enligt Anthropics API-villkor används detta inte för att träna deras modeller.",
+  "To keep the assistant free, we count how many messages each account sends per day. Only the count is stored, not the messages.":
+    "För att assistenten ska kunna vara gratis räknar vi hur många meddelanden varje konto skickar per dag. Bara antalet sparas, inte meddelandena.",
+  "If you contact us": "Om du kontaktar oss",
+  "Your email and message are sent through Formspree to the developer's inbox, only to answer you.":
+    "Din e-post och ditt meddelande skickas via Formspree till utvecklarens inkorg, bara för att kunna svara dig.",
+  Hosting: "Drift",
+  "The app is hosted on Vercel. Like any website, it handles basic technical data (such as your IP address) to deliver the pages. We don't use analytics or tracking cookies.":
+    "Appen drivs på Vercel. Som alla webbplatser hanterar den grundläggande tekniska uppgifter (som din IP-adress) för att leverera sidorna. Vi använder ingen statistik eller spårningscookies.",
+  "Your choices": "Dina val",
+  "**Download a copy** of everything any time: Settings → Your data.":
+    "**Ladda ner en kopia** av allt när du vill: Inställningar → Dina data.",
+  "**Delete your progress:** Settings → Delete my progress (on this device, and in your account if you're signed in).":
+    "**Radera dina framsteg:** Inställningar → Radera mina framsteg (på den här enheten, och i ditt konto om du är inloggad).",
+  "**Delete your account:** Settings → Delete my account. This removes your login, the progress saved in it and your assistant counts.":
+    "**Radera ditt konto:** Inställningar → Radera mitt konto. Det tar bort din inloggning, framstegen som sparats i den och dina räkningar för assistenten.",
+  "For anything else, like deleting a message you sent us, [contact us](/contact/).":
+    "För allt annat, som att radera ett meddelande du skickat oss, [kontakta oss](/contact/).",
 };
 
 export default sv;

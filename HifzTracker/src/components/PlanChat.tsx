@@ -30,6 +30,8 @@ const GREETING: Record<"create" | "adjust", string> = {
   ),
 };
 const DONE_TEXT = tx("Done: the plan is updated.");
+/** A conversation left for longer than this starts over the next time. */
+const RESUME_WITHIN_MS = 2 * 60 * 60 * 1000;
 /** Messages the app wrote itself are stored in English and shown in the active language. */
 const shown = (text: string) => (text === GREETING.create || text === GREETING.adjust || text === DONE_TEXT ? t(text) : text);
 
@@ -60,7 +62,11 @@ export function PlanChat({
   useEffect(() => {
     let live = true;
     repo.getChat(chatId).then((c) => {
-      if (live) setMessages(c?.messages ?? [{ role: "assistant", text: GREETING[purpose], at: new Date().toISOString() }]);
+      if (!live) return;
+      // Pick up a conversation that's still going; otherwise start fresh (after a change was saved, or after a break).
+      const last = c?.messages[c.messages.length - 1];
+      const fresh = !c || last?.text === DONE_TEXT || Date.now() - Date.parse(c.updatedAt) > RESUME_WITHIN_MS;
+      setMessages(fresh ? [{ role: "assistant", text: GREETING[purpose], at: new Date().toISOString() }] : c.messages);
     });
     return () => {
       live = false;

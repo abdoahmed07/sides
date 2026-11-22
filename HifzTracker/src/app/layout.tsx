@@ -6,6 +6,7 @@ import { SyncBanner } from "@/components/Account";
 import { MovedBanner } from "@/components/Moved";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { LanguageStarter, languageScript } from "@/components/Language";
+import { HelpFooter } from "@/components/Contact";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const amiriQuran = Amiri_Quran({ variable: "--font-amiri-quran", weight: "400", subsets: ["arabic"] });
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <MovedBanner />
             <SyncBanner />
             {children}
+            <HelpFooter />
           </main>
         </div>
       </body>

@@ -60,11 +60,9 @@ const ar: Dict = {
   "Memorize this, then recite it from memory before you tick it.":
     "احفظ هذا، ثم سمّعه غيباً قبل أن تضع علامة الإنجاز.",
   Sabqi: "المراجعة القريبة",
-  "Last {n} days": "آخر {n} أيام",
   "Recite these recent pages from memory, then rate them. Each new page is revised here for {n} days, then moves to Manzil.":
     "سمّع هذه الصفحات القريبة غيباً، ثم قيّمها. كل صفحة جديدة تُراجَع هنا لمدة {n} أيام، ثم تنتقل إلى المراجعة البعيدة.",
   Manzil: "المراجعة البعيدة",
-  "{n}-day cycle": "دورة {n} يوماً",
   "Recite these older pages from memory, check the text, then rate them.":
     "سمّع هذه الصفحات القديمة غيباً، وتحقق من النص، ثم قيّمها.",
   Reading: "القراءة",
@@ -77,7 +75,6 @@ const ar: Dict = {
     "بهذا المعدل ستنهي هدفك حوالي {date}.",
   "With the current settings no new material is scheduled.":
     "بالإعدادات الحالية لا يوجد حفظ جديد مجدول.",
-  "Manzil: the last {n} days": "المراجعة البعيدة: آخر {n} يوماً",
   "How far did you get?": "إلى أين وصلت؟",
   "Pick the last ayah you memorized today. Today's portion is ticked, the extra goes into revision like any new portion, and tomorrow continues after it. Your daily amount stays the same.":
     "اختر آخر آية حفظتها اليوم. يُعلَّم ورد اليوم كمنجز، وتدخل الزيادة في المراجعة مثل أي حفظ جديد، ويكمل الغد من بعدها. مقدارك اليومي يبقى كما هو.",
@@ -96,8 +93,6 @@ const ar: Dict = {
     "تمت مراجعة كل صفحات المراجعة البعيدة خلال هذه المدة.",
   today: "اليوم",
   yesterday: "أمس",
-  "Manzil brings every older page round about once every {n} days, a few pages a day. Weak and overdue pages come first.":
-    "المراجعة البعيدة تمرّ على كل صفحة قديمة مرة كل {n} يوماً تقريباً، بضع صفحات يومياً. الصفحات الضعيفة والمتأخرة تأتي أولاً.",
   "Coming up ({n})": "القادم ({n})",
   next: "التالي",
   "Nothing: every page has been revised in this time.":
@@ -852,6 +847,86 @@ const ar: Dict = {
     "تعذّر الوصول إلى الخادم. تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
   "Your account couldn't be deleted right now. Please try again later.":
     "تعذّر حذف حسابك الآن. حاول مرة أخرى لاحقاً.",
+  "Contact us": "اتصل بنا",
+  "Need help or have an idea?": "تحتاج مساعدة أو لديك فكرة؟",
+  "Questions, problems or ideas? Send a message and we'll answer by email.":
+    "أسئلة أو مشاكل أو أفكار؟ أرسل رسالة وسنرد عليك عبر البريد الإلكتروني.",
+  "Send another message": "أرسل رسالة أخرى",
+  "Send message": "أرسل الرسالة",
+  "Something went wrong. Check your connection and try again.":
+    "حدث خطأ ما. تحقق من اتصالك وحاول مرة أخرى.",
+  "Thanks, your message was sent.": "شكراً، أُرسلت رسالتك.",
+  "The guide answers the most common questions.":
+    "الدليل يجيب عن أكثر الأسئلة شيوعاً.",
+  "We'll reply to {email} as soon as we can.":
+    "سنرد على {email} في أقرب وقت ممكن.",
+  "What can we help with?": "بماذا يمكننا مساعدتك؟",
+  "Your email is only used to answer you.": "يُستخدم بريدك فقط للرد عليك.",
+  "Your email": "بريدك الإلكتروني",
+  "Last {n} days": {
+    zero: "آخر {n} يوم",
+    one: "آخر يوم",
+    two: "آخر يومين",
+    few: "آخر {n} أيام",
+    many: "آخر {n} يوماً",
+    other: "آخر {n} يوم",
+  },
+  "{n}-day cycle": {
+    zero: "دورة {n} يوم",
+    one: "دورة يوم",
+    two: "دورة يومين",
+    few: "دورة {n} أيام",
+    many: "دورة {n} يوماً",
+    other: "دورة {n} يوم",
+  },
+  "Manzil: the last {n} days": {
+    zero: "المراجعة البعيدة: آخر {n} يوم",
+    one: "المراجعة البعيدة: آخر يوم",
+    two: "المراجعة البعيدة: آخر يومين",
+    few: "المراجعة البعيدة: آخر {n} أيام",
+    many: "المراجعة البعيدة: آخر {n} يوماً",
+    other: "المراجعة البعيدة: آخر {n} يوم",
+  },
+  "Manzil brings every older page round about once every {days}, a few pages a day. Weak and overdue pages come first.":
+    "المراجعة البعيدة تمرّ على كل صفحة قديمة مرة كل {days} تقريباً، بضع صفحات يومياً. الصفحات الضعيفة والمتأخرة تأتي أولاً.",
+  "[Read the full privacy page](/privacy/)":
+    "[اقرأ صفحة الخصوصية كاملة](/privacy/)",
+  Privacy: "الخصوصية",
+  "What Hifz Tracker stores, where, and how to remove it. Last updated: November 2026.":
+    "ما الذي يحفظه Hifz Tracker، وأين، وكيف تحذفه. آخر تحديث: نوفمبر 2026.",
+  "In short": "باختصار",
+  "Your plan and progress stay on your device. If you make an account, a copy is saved so you can use it on other devices. No ads, no tracking, nothing sold.":
+    "خطتك وتقدّمك يبقيان على جهازك. إن أنشأت حساباً تُحفظ نسخة لتستخدمها على أجهزة أخرى. لا إعلانات، ولا تتبّع، ولا يُباع شيء.",
+  "Hifz Tracker is a free, independent project. Questions about your data? [Contact us](/contact/).":
+    "Hifz Tracker مشروع مجاني ومستقل. أسئلة عن بياناتك؟ [اتصل بنا](/contact/).",
+  "On your device": "على جهازك",
+  "Your plan, progress, ratings, history and settings are stored in your browser on this device. Without an account, they never leave it (except what you send to the assistant, see below).":
+    "خطتك وتقدّمك وتقييماتك وسجلك وإعداداتك محفوظة في متصفحك على هذا الجهاز. بدون حساب لا تغادره أبداً (إلا ما ترسله إلى المساعد، انظر أدناه).",
+  "If you make an account": "إن أنشأت حساباً",
+  "We store your email, your password (encrypted; nobody can read it) and a copy of your plan and progress, so it can sync between your devices. This is stored with Supabase, in the EU.":
+    "نحفظ بريدك الإلكتروني وكلمة مرورك (مشفّرة؛ لا يستطيع أحد قراءتها) ونسخة من خطتك وتقدّمك لتتزامن بين أجهزتك. تُخزَّن لدى Supabase داخل الاتحاد الأوروبي.",
+  "The app only lets you read your own data. The developer has technical access to the database to keep it running, but does not look at your progress.":
+    "التطبيق لا يتيح لك إلا قراءة بياناتك أنت. لدى المطوّر وصول تقني إلى قاعدة البيانات لتشغيلها، لكنه لا يطّلع على تقدّمك.",
+  "If you use the assistant": "إن استخدمت المساعد",
+  "Your message, your plan settings and short totals (like “about 23 pages memorized”) are sent to Anthropic's Claude to write the reply. Your day-by-day history is not. Under Anthropic's API terms this isn't used to train their models.":
+    "تُرسل رسالتك وإعدادات خطتك ومجاميع مختصرة (مثل «حوالي 23 صفحة محفوظة») إلى Claude من Anthropic لكتابة الرد. أما سجلك يوماً بيوم فلا. وبموجب شروط واجهة Anthropic البرمجية لا تُستخدم هذه البيانات لتدريب نماذجهم.",
+  "To keep the assistant free, we count how many messages each account sends per day. Only the count is stored, not the messages.":
+    "لإبقاء المساعد مجانياً نحسب عدد الرسائل التي يرسلها كل حساب يومياً. يُحفظ العدد فقط، لا الرسائل.",
+  "If you contact us": "إن تواصلت معنا",
+  "Your email and message are sent through Formspree to the developer's inbox, only to answer you.":
+    "يُرسل بريدك ورسالتك عبر Formspree إلى بريد المطوّر، فقط للرد عليك.",
+  Hosting: "الاستضافة",
+  "The app is hosted on Vercel. Like any website, it handles basic technical data (such as your IP address) to deliver the pages. We don't use analytics or tracking cookies.":
+    "التطبيق مستضاف على Vercel. ومثل أي موقع، يتعامل مع بيانات تقنية أساسية (مثل عنوان IP) لعرض الصفحات. لا نستخدم أدوات إحصاء ولا ملفات تعريف ارتباط للتتبّع.",
+  "Your choices": "خياراتك",
+  "**Download a copy** of everything any time: Settings → Your data.":
+    "**نزّل نسخة** من كل شيء في أي وقت: الإعدادات ← بياناتك.",
+  "**Delete your progress:** Settings → Delete my progress (on this device, and in your account if you're signed in).":
+    "**احذف تقدّمك:** الإعدادات ← حذف تقدّمي (على هذا الجهاز، وفي حسابك إن كنت مسجّل الدخول).",
+  "**Delete your account:** Settings → Delete my account. This removes your login, the progress saved in it and your assistant counts.":
+    "**احذف حسابك:** الإعدادات ← حذف حسابي. هذا يزيل تسجيل دخولك والتقدّم المحفوظ فيه وعدّادات المساعد.",
+  "For anything else, like deleting a message you sent us, [contact us](/contact/).":
+    "لأي شيء آخر، مثل حذف رسالة أرسلتها إلينا، [اتصل بنا](/contact/).",
 };
 
 export default ar;

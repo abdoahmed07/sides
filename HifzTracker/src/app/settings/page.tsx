@@ -221,6 +221,9 @@ export default function SettingsPage() {
               </li>
             )}
             <li>{t("No ads, no tracking, nothing sold. The AI never writes your schedule or any Quran text: the app computes the plan and you approve.")}</li>
+            <li>
+              <Rich text={t("[Read the full privacy page](/privacy/)")} />
+            </li>
           </ul>
         </details>
 
