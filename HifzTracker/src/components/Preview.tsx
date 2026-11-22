@@ -1,13 +1,18 @@
 "use client";
 import { formatDate } from "@/core/dates";
 import type { KeyNumbers } from "@/core/plan/summary";
+import { pagesLabel } from "@/core/stats";
 
 type Row = { label: string; get: (k: KeyNumbers) => string };
 
 const fmtDate = (d: string | null) => (d ? formatDate(d) : "—");
 const pages = (n: number) => `~${n} page${n === 1 ? "" : "s"}`;
 const ROWS: Row[] = [
-  { label: "Already memorized", get: (k) => (k.memorizedPages === undefined ? "—" : k.memorizedPages === 0 ? "Nothing yet" : pages(k.memorizedPages)) },
+  {
+    label: "Already memorized",
+    get: (k) =>
+      k.memorizedPages === undefined ? "—" : k.memorizedPages === 0 && !k.memorizedPartPages ? "Nothing yet" : pagesLabel(k.memorizedPages, k.memorizedPartPages),
+  },
   { label: "Left to memorize", get: (k) => (k.done ? "Nothing" : pages(k.remainingPages)) },
   { label: "New per study day", get: (k) => `${k.dailyNewLines} lines (${k.dailyNewPages} p)` },
   { label: "Study days", get: (k) => `${k.studyDaysPerWeek}/week` },

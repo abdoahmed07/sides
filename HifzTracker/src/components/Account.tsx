@@ -57,13 +57,13 @@ export function SyncBanner() {
             <Button disabled={busy} onClick={() => choose("account")} className="h-auto flex-col items-start whitespace-normal py-2 text-left">
               <span>Keep my account&apos;s</span>
               <span className="text-xs font-normal text-muted">
-                {remote.days} days done · ~{remote.pages} pages · saved {ago(remote.updatedAt)}
+                {remote.days} days done · {remote.pages} pages · saved {ago(remote.updatedAt)}
               </span>
             </Button>
             <Button disabled={busy} onClick={() => choose("device")} className="h-auto flex-col items-start whitespace-normal py-2 text-left">
               <span>Keep this device&apos;s</span>
               <span className="text-xs font-normal text-muted">
-                {local.days} days done · ~{local.pages} pages
+                {local.days} days done · {local.pages} pages
               </span>
             </Button>
           </div>

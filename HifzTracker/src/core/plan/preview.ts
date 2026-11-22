@@ -43,7 +43,9 @@ export function forecastFor(config: PlanConfig, units: MemUnit[], q: QuranIndex,
 /** Key numbers plus, when a target date is set, the daily amount that finishes exactly by it. */
 export function numbersFor(config: PlanConfig, units: MemUnit[], q: QuranIndex, today: IsoDate): KeyNumbers {
   const k = keyNumbers(config, forecastFor(config, units, q, today));
-  k.memorizedPages = totals(units, q).pagesEquivalent;
+  const t = totals(units, q);
+  k.memorizedPages = t.fullPages;
+  k.memorizedPartPages = t.partialPages;
   if (config.targetFinishDate && !k.done) {
     k.linesToFinishByTarget = requiredLinesForTarget({ config, q, memorized: memorizedArray(units, q), today });
   }

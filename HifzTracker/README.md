@@ -37,6 +37,12 @@ One-time setup (Hifz Tracker has its own Supabase project):
 
 Supabase's built-in email sender only allows a few emails per hour; for more users, add your own SMTP in Authentication → Emails.
 
+## Install as an app
+
+The app can be installed from the browser (no app store): iPhone → Share → **Add to Home Screen**; Android/Chrome → **Install app**. Settings shows the right steps for each device. Installed, it opens full screen and works offline: `public/sw.js` keeps a copy of the pages and built files (network first for pages, so updates arrive when online), and `src/app/manifest.ts` gives the name, colours and icons. The worker is off during `pnpm dev`.
+
+The logo is the ۞ Rub el Hizb with a progress ring. `python3 scripts/make-icons.py` redraws every icon (needs Pillow).
+
 ## Hosting on Vercel (everything, including AI, for everyone)
 
 The full app (with the AI route) runs on Vercel's free Hobby plan. Every assistant message is billed to your Anthropic key, so on the hosted app the AI only works for **signed-in** people, with a **daily limit per account** (`AI_DAILY_LIMIT`, default 30). `pnpm dev` skips both unless you set `AI_REQUIRE_SIGN_IN=1`.

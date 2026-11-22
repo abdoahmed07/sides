@@ -12,6 +12,7 @@ import { AyahText, Sheet } from "@/components/AyahText";
 import { MissedDays } from "@/components/MissedDays";
 import { SignInNudge, useSyncStatus } from "@/components/Account";
 import { activeDatesOf, streaks } from "@/core/stats";
+import { manzilRound, sabqiDay, type ManzilRound } from "@/core/schedule/revision-info";
 
 /** Rough reading speed for weekly readings (looking at the mushaf). */
 const READING_MINUTES_PER_PAGE = 2;
@@ -27,6 +28,7 @@ export default function TodayPage() {
   const [open, setOpen] = useState<DayItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [extraOpen, setExtraOpen] = useState(false);
+  const [roundOpen, setRoundOpen] = useState(false);
 
   useEffect(() => {
     if (plan) ensureDayLog(today);
@@ -35,6 +37,7 @@ export default function TodayPage() {
   const forecast = useMemo(() => (plan && units ? forecastFor(plan.config, units, today) : null), [plan, units, today]);
   const streak = useMemo(() => (logs ? streaks(plan?.config ?? null, activeDatesOf(logs), today) : null), [logs, plan, today]);
 
+  const round = useMemo(() => (plan && units ? manzilRound(plan.config, units, q, today) : null), [plan, units, today]);
   const extra = useMemo(() => (plan && units && log ? extraOptions(plan.config, units, log) : []), [plan, units, log]);
 
   if (plan === undefined) return null;
@@ -64,7 +67,12 @@ export default function TodayPage() {
     }
     if (i.kind === "sabaq") return { title: q.rangeLabel(i.ayahs ?? []), detail: `${i.lines} lines · page ${q.pageOf[i.ayahs![0]]}` };
     const u = unitByPage.get(i.page!);
-    return { title: u ? q.rangeLabel(u.ayahs) : `Page ${i.page}`, detail: `Page ${i.page} · ${i.lines} lines` };
+    let detail = `Page ${i.page} · ${i.lines} lines`;
+    if (i.kind === "sabqi" && u) {
+      const d = sabqiDay(u, config.sabqiWindowDays, today);
+      detail += d.day >= d.of ? " · last day in sabqi" : ` · day ${d.day} of ${d.of}`;
+    }
+    return { title: u ? q.rangeLabel(u.ayahs) : `Page ${i.page}`, detail };
   };
   const textOf = (i: DayItem) => {
     if (i.kind === "reading") {
@@ -83,7 +91,7 @@ export default function TodayPage() {
     }
   };
 
-  const section = (kind: DayItem["kind"], label: string, blurb: string, hint: string) => {
+  const section = (kind: DayItem["kind"], label: string, blurb: string, hint: string, info?: React.ReactNode) => {
     const list = items.filter((i) => i.kind === kind);
     if (kind === "reading" && !list.length) return null;
     return (
@@ -103,6 +111,7 @@ export default function TodayPage() {
             </>
           )}
         </p>
+        {info}
         {list.length === 0 ? (
           <p className="mt-2 text-sm text-muted">
             {kind === "sabaq" ? (log?.note ?? "Nothing new today.") : kind === "sabqi" ? "Nothing recent to revise." : "No older pages due today."}
@@ -184,8 +193,19 @@ export default function TodayPage() {
       {items.length > 0 && (
         <>
           {section("sabaq", "Sabaq", "New", "Memorize this, then recite it from memory before you tick it.")}
-          {section("sabqi", "Sabqi", `Last ${config.sabqiWindowDays} days`, "Recite these recent pages from memory, then rate them.")}
-          {section("manzil", "Manzil", `${config.manzilCycleDays}-day cycle`, "Recite these older pages from memory, check the text, then rate them.")}
+          {section(
+            "sabqi",
+            "Sabqi",
+            `Last ${config.sabqiWindowDays} days`,
+            `Recite these recent pages from memory, then rate them. Each new page is revised here for ${Math.max(1, config.sabqiWindowDays - 1)} days, then moves to Manzil.`,
+          )}
+          {section(
+            "manzil",
+            "Manzil",
+            `${config.manzilCycleDays}-day cycle`,
+            "Recite these older pages from memory, check the text, then rate them.",
+            round && round.total > 0 && <ManzilProgress round={round} onOpen={() => setRoundOpen(true)} />,
+          )}
           {section("reading", "Reading", "Weekly", "Read from the mushaf; it doesn't count as revision. Tick it when you're done.")}
         </>
       )}
@@ -199,6 +219,15 @@ export default function TodayPage() {
               : "With the current settings no new material is scheduled."}
           {streak && streak.current > 0 && ` Streak: ${streak.current} day${streak.current === 1 ? "" : "s"}.`}
         </p>
+      )}
+
+      {round && (
+        <Sheet open={roundOpen} onClose={() => setRoundOpen(false)} title={`Manzil: the last ${round.cycleDays} days`}>
+          <ManzilDetails round={round} today={today} todayPages={new Set(items.filter((i) => i.kind === "manzil" && !i.done).map((i) => i.page!))} labelOf={(p) => {
+            const u = unitByPage.get(p);
+            return u ? q.rangeLabel(u.ayahs) : "";
+          }} />
+        </Sheet>
       )}
 
       <Sheet open={extraOpen} onClose={() => setExtraOpen(false)} title="How far did you get?">
@@ -273,6 +302,79 @@ function Welcome() {
           </p>
         )}
       </Card>
+    </div>
+  );
+}
+
+/** How far the manzil round has come (on the Manzil card). */
+function ManzilProgress({ round, onOpen }: { round: ManzilRound; onOpen: () => void }) {
+  const done = round.revised.length;
+  const pct = Math.round((done / round.total) * 100);
+  return (
+    <button onClick={onOpen} className="mt-3 block w-full rounded-xl bg-surface-2 p-3 text-left hover:ring-1 hover:ring-border">
+      <span className="flex items-baseline justify-between gap-3 text-sm">
+        <span>
+          Last {round.cycleDays} days:{" "}
+          <b>
+            {done} of {round.total}
+          </b>{" "}
+          page{round.total === 1 ? "" : "s"} revised
+        </span>
+        <span className="shrink-0 text-xs font-medium text-accent">Details</span>
+      </span>
+      <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-border" aria-hidden>
+        <span className="block h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+      </span>
+      <span className="mt-1.5 block text-xs text-muted">
+        {round.coming.length
+          ? `${round.coming.length} still to come, about ${round.pagesPerDay === 0.5 ? "half a page" : `${round.pagesPerDay} page${round.pagesPerDay === 1 ? "" : "s"}`} a day.`
+          : "Every manzil page has been revised in this time."}
+      </span>
+    </button>
+  );
+}
+
+function ManzilDetails({
+  round,
+  today,
+  todayPages,
+  labelOf,
+}: {
+  round: ManzilRound;
+  today: string;
+  todayPages: Set<number>;
+  labelOf: (page: number) => string;
+}) {
+  const when = (d: string) => (d === today ? "today" : d === addDays(today, -1) ? "yesterday" : formatDate(d, { day: "numeric", month: "short" }));
+  const row = (page: number, right: string, key: string) => (
+    <li key={key} className="flex items-baseline justify-between gap-3 py-2 text-sm">
+      <span className="min-w-0">
+        <span className="font-medium">Page {page}</span> <span className="text-muted">· {labelOf(page)}</span>
+      </span>
+      <span className="shrink-0 text-xs text-muted">{right}</span>
+    </li>
+  );
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-muted">
+        Manzil brings every older page round about once every {round.cycleDays} days, a few pages a day. Weak and overdue pages come first.
+      </p>
+      <section>
+        <h3 className="text-sm font-semibold">Coming up ({round.coming.length})</h3>
+        {round.coming.length ? (
+          <ol className="divide-y divide-border">{round.coming.map((p, k) => row(p, todayPages.has(p) ? "today" : k === 0 ? "next" : "", `c${p}`))}</ol>
+        ) : (
+          <p className="mt-1 text-sm text-muted">Nothing: every page has been revised in this time.</p>
+        )}
+      </section>
+      <section>
+        <h3 className="text-sm font-semibold">Revised ({round.revised.length})</h3>
+        {round.revised.length ? (
+          <ol className="divide-y divide-border">{round.revised.map((r) => row(r.page, when(r.date), `r${r.page}`))}</ol>
+        ) : (
+          <p className="mt-1 text-sm text-muted">Nothing yet.</p>
+        )}
+      </section>
     </div>
   );
 }

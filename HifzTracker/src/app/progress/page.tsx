@@ -51,7 +51,11 @@ export default function ProgressPage() {
       <PageTitle title="Progress" />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Tile label="Pages memorized" value={`${data.totals.pagesEquivalent}`} sub="of 604" />
+        <Tile
+          label="Pages memorized"
+          value={`${data.totals.fullPages}`}
+          sub={data.totals.partialPages ? `of 604 · +part of ${data.totals.partialPages}` : "of 604"}
+        />
         <Tile label="Ayahs" value={`${data.totals.ayahs}`} sub="of 6236" />
         <Tile label="Streak" value={`${data.streak.current}`} sub={`longest ${data.streak.longest}`} />
         <Tile

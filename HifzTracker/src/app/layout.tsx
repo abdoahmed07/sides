@@ -4,6 +4,7 @@ import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { SyncBanner } from "@/components/Account";
 import { MovedBanner } from "@/components/Moved";
+import { ServiceWorker } from "@/components/ServiceWorker";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const amiriQuran = Amiri_Quran({ variable: "--font-amiri-quran", weight: "400", subsets: ["arabic"] });
@@ -11,6 +12,9 @@ const amiriQuran = Amiri_Quran({ variable: "--font-amiri-quran", weight: "400", 
 export const metadata: Metadata = {
   title: "Hifz Tracker",
   description: "Plan, memorize and revise the Quran at a sustainable pace.",
+  applicationName: "Hifz Tracker",
+  // iPhone: "Add to Home Screen" opens it full screen, named "Hifz".
+  appleWebApp: { capable: true, title: "Hifz", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
@@ -32,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-full">
+        <ServiceWorker />
         <div className="mx-auto flex min-h-dvh max-w-2xl flex-col px-4 pb-24 pt-4 sm:pb-8 sm:pt-20">
           <Nav />
           <main className="flex-1">

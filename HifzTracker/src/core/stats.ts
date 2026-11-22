@@ -62,7 +62,22 @@ export function totals(units: MemUnit[], q: QuranIndex) {
     if (u.ayahs.length >= q.ayahsOnPage(u.page)) fullPages++;
     lines += q.linesOf(u.ayahs);
   }
-  return { ayahs, fullPages, pagesEquivalent: Math.round((lines / 15) * 10) / 10, pagesTouched: units.length };
+  return {
+    ayahs,
+    fullPages,
+    /** Pages started but not finished. */
+    partialPages: units.length - fullPages,
+    /** Lines ÷ 15: for time estimates only. Short pages (1 and 2) count as less than a page, so don't show it as a page count. */
+    pagesEquivalent: Math.round((lines / 15) * 10) / 10,
+    pagesTouched: units.length,
+  };
+}
+
+/** Pages as people count them: "43 pages", "1 page", "43 pages + part of 1 more", "part of 2 pages". */
+export function pagesLabel(full: number, partial = 0): string {
+  const p = (n: number) => `${n} page${n === 1 ? "" : "s"}`;
+  if (full === 0) return partial ? `part of ${p(partial)}` : "0 pages";
+  return partial ? `${p(full)} + part of ${partial} more` : p(full);
 }
 
 export function juzProgress(units: MemUnit[], q: QuranIndex) {
@@ -137,7 +152,7 @@ export function weeklySummary(
     ratings,
     overduePages,
     weakPages,
-    memorizedPages: totals(units, q).pagesEquivalent,
+    memorizedPages: totals(units, q).fullPages,
     currentStreak: s.current,
   };
 }

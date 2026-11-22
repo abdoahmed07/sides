@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { ISODate } from '../lib/dates';
 import type { CheckinStatus } from '../lib/streak';
-import { supabase } from '../lib/supabase';
 import type { Checkin, Habit, HabitInput } from '../lib/types';
+import type { Backend } from './backend';
 
 /**
  * Client data layer. Check-ins are optimistic: a tap updates the screen at once,
@@ -23,6 +23,8 @@ interface PendingOp {
 type LoadState = 'loading' | 'ready' | 'error';
 
 interface DataContextValue {
+  /** 'account': synced through Supabase. 'device': kept in this browser only. */
+  mode: Backend['kind'];
   loadState: LoadState;
   habits: Habit[];
   activeHabits: Habit[];
@@ -42,7 +44,6 @@ const DataContext = createContext<DataContextValue | null>(null);
 
 const key = (habitId: string, date: ISODate) => `${habitId}|${date}`;
 const storageKey = (userId: string) => `streak.pending.${userId}`;
-const PAGE = 1000;
 
 function loadPending(userId: string): Map<string, PendingOp> {
   try {
@@ -101,13 +102,16 @@ export function clearSnapshot(userId: string) {
   }
 }
 
-function db() {
-  if (!supabase) throw new Error('Supabase is not configured');
-  return supabase;
+interface ProviderProps {
+  userId: string;
+  backend: Backend;
+  children: ReactNode;
 }
 
-export function DataProvider({ userId, children }: { userId: string; children: ReactNode }) {
-  const [snapshot] = useState(() => loadSnapshot(userId));
+export function DataProvider({ userId, backend, children }: ProviderProps) {
+  // A device backend already lives on the device, so it needs no cached copy.
+  const cached = backend.kind === 'account';
+  const [snapshot] = useState(() => (cached ? loadSnapshot(userId) : null));
   const [loadState, setLoadState] = useState<LoadState>(snapshot ? 'ready' : 'loading');
   const [habits, setHabits] = useState<Habit[]>(snapshot?.habits ?? []);
   const [server, setServer] = useState<Map<string, Checkin>>(
@@ -131,40 +135,22 @@ export function DataProvider({ userId, children }: { userId: string; children: R
 
   const refresh = useCallback(async () => {
     try {
-      const { data: h, error: he } = await db()
-        .from('habits')
-        .select('*')
-        .order('sort_order')
-        .order('created_at');
-      if (he) throw he;
-
-      const rows: Checkin[] = [];
-      for (let from = 0; ; from += PAGE) {
-        const { data, error } = await db()
-          .from('checkins')
-          .select('id, habit_id, date, status, note')
-          .order('date')
-          .range(from, from + PAGE - 1);
-        if (error) throw error;
-        rows.push(...(data as Checkin[]));
-        if (!data || data.length < PAGE) break;
-      }
-
-      setHabits(h as Habit[]);
+      const { habits: h, checkins: rows } = await backend.load();
+      setHabits(h);
       setServer(new Map(rows.map((c) => [key(c.habit_id, c.date), c])));
       setLoadState('ready');
     } catch (e) {
       console.error(e);
       setLoadState((s) => (s === 'ready' ? s : 'error'));
     }
-  }, []);
+  }, [backend]);
 
   // Keep the on-device snapshot current with the latest server data.
   useEffect(() => {
-    if (loadState !== 'ready') return;
+    if (!cached || loadState !== 'ready') return;
     const id = window.setTimeout(() => saveSnapshot(userId, { habits, checkins: [...server.values()] }), 300);
     return () => window.clearTimeout(id);
-  }, [userId, loadState, habits, server]);
+  }, [cached, userId, loadState, habits, server]);
 
   const flush = useCallback(
     async (k: string) => {
@@ -174,21 +160,15 @@ export function DataProvider({ userId, children }: { userId: string; children: R
       inFlight.current.add(k);
       try {
         if (op.status === null) {
-          const { error } = await db().from('checkins').delete().eq('habit_id', op.habit_id).eq('date', op.date);
-          if (error) throw error;
+          await backend.removeCheckin(op.habit_id, op.date);
           setServer((m) => {
             const next = new Map(m);
             next.delete(k);
             return next;
           });
         } else {
-          const { data, error } = await db()
-            .from('checkins')
-            .upsert({ habit_id: op.habit_id, date: op.date, status: op.status, note: op.note }, { onConflict: 'habit_id,date' })
-            .select('id, habit_id, date, status, note')
-            .single();
-          if (error) throw error;
-          setServer((m) => new Map(m).set(k, data as Checkin));
+          const saved = await backend.saveCheckin({ habit_id: op.habit_id, date: op.date, status: op.status, note: op.note });
+          setServer((m) => new Map(m).set(k, saved));
         }
         updatePending((m) => {
           if (m.get(k)?.seq === op.seq) m.delete(k);
@@ -205,7 +185,7 @@ export function DataProvider({ userId, children }: { userId: string; children: R
         if (cur && cur.seq !== op.seq && !cur.failed) void flush(k);
       }
     },
-    [updatePending],
+    [backend, updatePending],
   );
 
   const setCheckin = useCallback(
@@ -269,31 +249,34 @@ export function DataProvider({ userId, children }: { userId: string; children: R
   const createHabit = useCallback(
     async (input: HabitInput) => {
       const sort_order = habits.reduce((max, h) => Math.max(max, h.sort_order), -1) + 1;
-      const { data, error } = await db().from('habits').insert({ ...input, sort_order }).select('*').single();
-      if (error) throw error;
-      setHabits((hs) => [...hs, data as Habit]);
-      return data as Habit;
+      const created = await backend.createHabit({ ...input, sort_order });
+      setHabits((hs) => [...hs, created]);
+      return created;
     },
-    [habits],
+    [backend, habits],
   );
 
-  const updateHabit = useCallback(async (id: string, patch: Partial<HabitInput>) => {
-    const { data, error } = await db().from('habits').update(patch).eq('id', id).select('*').single();
-    if (error) throw error;
-    setHabits((hs) => hs.map((h) => (h.id === id ? (data as Habit) : h)));
-  }, []);
+  const updateHabit = useCallback(
+    async (id: string, patch: Partial<HabitInput>) => {
+      const updated = await backend.updateHabit(id, patch);
+      setHabits((hs) => hs.map((h) => (h.id === id ? updated : h)));
+    },
+    [backend],
+  );
 
-  const archiveHabit = useCallback(async (id: string) => {
-    const archived_at = new Date().toISOString();
-    const { error } = await db().from('habits').update({ archived_at }).eq('id', id);
-    if (error) throw error;
-    setHabits((hs) => hs.map((h) => (h.id === id ? { ...h, archived_at } : h)));
-  }, []);
+  const archiveHabit = useCallback(
+    async (id: string) => {
+      const updated = await backend.updateHabit(id, { archived_at: new Date().toISOString() });
+      setHabits((hs) => hs.map((h) => (h.id === id ? updated : h)));
+    },
+    [backend],
+  );
 
   let failedCount = 0;
   for (const op of pending.values()) if (op.failed) failedCount += 1;
 
   const value: DataContextValue = {
+    mode: backend.kind,
     loadState,
     habits,
     activeHabits,

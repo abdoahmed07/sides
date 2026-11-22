@@ -74,15 +74,17 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[88dvh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-surface p-5 shadow-xl sm:rounded-3xl"
+        className="flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl bg-surface shadow-xl sm:rounded-3xl"
       >
-        <div className="mb-3 flex items-center justify-between">
+        {/* Stays put while the text scrolls. */}
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-3">
           <h2 className="font-semibold">{title}</h2>
-          <button onClick={onClose} className="rounded-lg px-2 py-1 text-sm text-muted hover:bg-surface-2" aria-label="Close">
+          <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm font-medium text-muted hover:bg-surface-2" aria-label="Close">
             Close
           </button>
         </div>
-        {children}
+        {/* Extra room at the bottom on phones, so the last lines can scroll above the browser's toolbar. */}
+        <div className="overflow-y-auto overscroll-contain px-5 pb-28 pt-4 sm:pb-6">{children}</div>
       </div>
     </div>
   );

@@ -29,6 +29,8 @@ export type KeyNumbers = {
   linesToFinishByTarget?: number | null;
   /** Pages already memorized (anywhere, not only in the target). */
   memorizedPages?: number;
+  /** Pages started but not finished (shown next to memorizedPages). */
+  memorizedPartPages?: number;
 };
 
 export function keyNumbers(config: PlanConfig, f: Forecast): KeyNumbers {

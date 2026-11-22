@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { IsoDate } from "@/core/dates";
 import type { MemorizedSelection } from "@/core/plan/schema";
 import type { MemUnit } from "@/core/srs";
-import { totals } from "@/core/stats";
+import { pagesLabel, totals } from "@/core/stats";
 import { markMemorized, q, unmarkMemorized } from "@/lib/app";
 import { parseNumberList } from "./PlanForm";
 import { Button, Card, Field, inputCls } from "./ui";
@@ -58,7 +58,7 @@ export function MemorizedEditor({
     }
   };
 
-  const status = units.length ? `You know about ${t.pagesEquivalent} pages so far.` : "Nothing marked yet.";
+  const status = units.length ? `You know ${pagesLabel(t.fullPages, t.partialPages)} so far.` : "Nothing marked yet.";
   const body = (
     <>
       <div className="grid gap-2 sm:grid-cols-[10rem_1fr]">

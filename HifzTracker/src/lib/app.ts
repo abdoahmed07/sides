@@ -16,7 +16,7 @@ import { buildSequence, continuation, selectionIndices, type ContinuationStep } 
 import { getQuran } from "@/core/quran";
 import { buildDay, memorizedFromUnits, unitLines } from "@/core/schedule/day";
 import { applyRating, type MemUnit, type Strength } from "@/core/srs";
-import { totals } from "@/core/stats";
+import { pagesLabel, totals } from "@/core/stats";
 import { repo } from "@/data/dexie";
 import type { DayItem, DayLog, PlanVersion } from "@/data/types";
 
@@ -319,7 +319,7 @@ export function memorizedSummary(units: MemUnit[]): string {
     if (all) fullJuz.push(j);
   }
   return (
-    `About ${t.pagesEquivalent} pages memorized (${t.ayahs} ayahs). ` +
+    `${pagesLabel(t.fullPages, t.partialPages)} memorized (${t.ayahs} ayahs). ` +
     (fullJuz.length ? `Complete juz: ${fullJuz.join(", ")}. ` : "") +
     (fullSurahs.length ? `Complete surahs (numbers): ${compressRanges(fullSurahs.map(Number))}.` : "")
   ).slice(0, 600);

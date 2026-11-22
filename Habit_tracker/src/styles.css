@@ -123,12 +123,48 @@ code {
   margin-top: 24px;
 }
 
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.device-option {
+  gap: 8px;
+}
+
+.device-option .hint {
+  text-align: center;
+}
+
+.center-screen > .device-option:nth-child(3) {
+  margin-top: 24px;
+}
+
 .eyebrow {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--accent);
+}
+
+.eyebrow-note {
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
 }
 
 .screen-title {

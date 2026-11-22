@@ -7,6 +7,7 @@ import { usePlan } from "@/data/hooks";
 import { AI_ENABLED } from "@/lib/ai-client";
 import { Button, Card, Notice, PageTitle } from "@/components/ui";
 import { AccountCard, useSyncStatus } from "@/components/Account";
+import { InstallCard } from "@/components/InstallCard";
 
 type Theme = "system" | "light" | "dark";
 
@@ -84,6 +85,7 @@ export default function SettingsPage() {
       {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
 
       <AccountCard />
+      <InstallCard />
 
       <Card className="space-y-2">
         <h2 className="font-semibold">Plan</h2>

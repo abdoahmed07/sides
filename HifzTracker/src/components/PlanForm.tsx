@@ -142,8 +142,8 @@ export function PlanForm({
   const validation = PlanConfigSchema.safeParse(c);
   const numbers = useMemo(() => {
     if (!validation.success) return null;
-    const memorizedPages = totals(units, q).pagesEquivalent;
-    const withPages = (k: KeyNumbers): KeyNumbers => ({ ...k, memorizedPages });
+    const t = totals(units, q);
+    const withPages = (k: KeyNumbers): KeyNumbers => ({ ...k, memorizedPages: t.fullPages, memorizedPartPages: t.partialPages });
     return {
       before: current ? withPages(keyNumbers(current, forecastFor(current, units, today))) : null,
       after: withPages(keyNumbers(c, forecastFor(c, units, today))),

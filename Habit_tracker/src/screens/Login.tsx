@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { APP_NAME } from '../config';
+import { setDeviceMode } from '../lib/mode';
 import { supabase } from '../lib/supabase';
 
 type Mode = 'signin' | 'signup';
 
-export function Login() {
+export function Login({ accountsAvailable }: { accountsAvailable: boolean }) {
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,6 +37,32 @@ export function Login() {
     } finally {
       setBusy(false);
     }
+  }
+
+  const deviceOption = (
+    <div className="stack device-option">
+      <button
+        className={`btn ${accountsAvailable ? '' : 'btn-primary'}`}
+        type="button"
+        onClick={() => setDeviceMode(true)}
+      >
+        {accountsAvailable ? 'Use without an account' : 'Start'}
+      </button>
+      <p className="hint">
+        Your habits are saved in this browser only and won’t sync to other devices. Add {APP_NAME} to your home screen
+        so they’re kept safe.
+      </p>
+    </div>
+  );
+
+  if (!accountsAvailable) {
+    return (
+      <main className="center-screen">
+        <h1 className="app-name">{APP_NAME}</h1>
+        <p className="muted">Small steps, every day.</p>
+        {deviceOption}
+      </main>
+    );
   }
 
   return (
@@ -86,6 +113,11 @@ export function Login() {
           {mode === 'signin' ? 'New here? Create an account' : 'Have an account? Sign in'}
         </button>
       </form>
+
+      <p className="divider" aria-hidden="true">
+        <span>or</span>
+      </p>
+      {deviceOption}
     </main>
   );
 }

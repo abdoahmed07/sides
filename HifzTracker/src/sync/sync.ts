@@ -92,7 +92,7 @@ const hasData = (b: Backup) => b.planVersions.length > 0 || b.units.length > 0 |
 function summarize(b: Backup, updatedAt: string | null): Summary {
   return {
     days: b.dayLogs.filter((l) => (l.items as { done?: boolean }[]).some((i) => i?.done)).length,
-    pages: totals(b.units as MemUnit[], getQuran()).pagesEquivalent,
+    pages: totals(b.units as MemUnit[], getQuran()).fullPages,
     updatedAt,
   };
 }

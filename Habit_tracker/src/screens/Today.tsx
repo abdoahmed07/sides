@@ -2,12 +2,13 @@ import { APP_NAME, SUGGESTED_HABITS } from '../config';
 import { HabitCard } from '../components/HabitCard';
 import { clearSnapshot, useData } from '../data/store';
 import { formatLongDate } from '../lib/dates';
+import { setDeviceMode } from '../lib/mode';
 import { href } from '../lib/router';
 import { supabase } from '../lib/supabase';
 import { useToday } from '../lib/useToday';
 
 export function Today() {
-  const { loadState, activeHabits, checkinsByHabit, refresh, failedCount, syncingCount } = useData();
+  const { mode, loadState, activeHabits, checkinsByHabit, refresh, failedCount, syncingCount } = useData();
   const today = useToday();
 
   async function signOut() {
@@ -20,16 +21,33 @@ export function Today() {
     await supabase?.auth.signOut();
   }
 
+  function switchToAccount() {
+    if (window.confirm('Switch to signing in with an account? Your habits on this device stay here, and you can come back to them by choosing “Use without an account”.')) {
+      setDeviceMode(false);
+    }
+  }
+
   return (
     <section className="screen">
       <header className="today-header">
         <div>
-          <p className="eyebrow">{APP_NAME}</p>
+          <p className="eyebrow">
+            {APP_NAME}
+            {mode === 'device' && <span className="eyebrow-note"> · on this device</span>}
+          </p>
           <h1 className="screen-title">{formatLongDate(today)}</h1>
         </div>
-        <button className="btn btn-quiet btn-small" onClick={signOut}>
-          Sign out
-        </button>
+        {mode === 'account' ? (
+          <button className="btn btn-quiet btn-small" onClick={signOut}>
+            Sign out
+          </button>
+        ) : (
+          supabase && (
+            <button className="btn btn-quiet btn-small" onClick={switchToAccount}>
+              Use an account
+            </button>
+          )
+        )}
       </header>
 
       {loadState === 'loading' && (

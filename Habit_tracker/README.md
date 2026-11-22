@@ -6,7 +6,23 @@ installable as a PWA. "Streak" is a placeholder name: change `APP_NAME` in `src/
 Build-order steps 1–9 of the version 1 spec are built, plus the guided "new habit" chat.
 Step 10 (a week of real use) is yours: see [the checklist](#step-10-a-week-of-real-use) below.
 
-## Setup
+## Using it without an account
+
+The sign-in screen has **Use without an account**. Habits are then kept in that browser only, the
+Today header says "on this device", and nothing syncs between phone and laptop. If the site is built
+without Supabase keys, that is the only option: the screen shows a single **Start** button.
+
+- Data lives under the `streak.device.v1` key in the browser's storage, separate from any account.
+- "Use an account" on Today switches back to sign-in; the on-device habits stay and come back when
+  you choose no-account mode again. There is no move between the two yet.
+- Browsers can clear a site's storage. Safari, for example, removes it after about a week without a
+  visit unless the site is added to the home screen, so install it on the phone. The app also asks the
+  browser to keep the storage (best effort).
+
+To run the live site with no accounts at all, delete the `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` repository variables and re-run the Pages workflow.
+
+## Setup (accounts)
 
 1. **Supabase project.** Create a free project at supabase.com.
    - SQL Editor → paste and run [`supabase/schema.sql`](supabase/schema.sql).
@@ -25,8 +41,9 @@ Step 10 (a week of real use) is yours: see [the checklist](#step-10-a-week-of-re
 
 ## Deploy (GitHub Pages)
 
-The workflow `.github/workflows/deploy-streak.yml` (at the root of the Sides repo) tests, builds and
-publishes `Habit_tracker/` on every push to `main` that touches `Habit_tracker/`. One-time setup in the GitHub repo:
+The shared workflow `.github/workflows/deploy-pages.yml` (at the root of the Sides repo) tests and
+builds `Habit_tracker/` with the other apps and publishes it at `https://abdoahmed07.github.io/sides/streak/`
+on every push to `main` that touches `Habit_tracker/`. One-time setup in the GitHub repo:
 
 - Settings → Pages → Source: **GitHub Actions**.
 - Settings → Secrets and variables → Actions → **Variables**: add `VITE_SUPABASE_URL` and
@@ -58,6 +75,7 @@ npm test
 | Streak maths | `src/lib/streak.ts` |
 | New-habit questions | `src/lib/habitFlow.ts` |
 | Data, optimistic sync, offline copy | `src/data/store.tsx` |
+| Where data is kept: Supabase or this device | `src/data/backend.ts` (one `Backend` interface, two implementations) |
 | Screens | `src/screens/` (Today, Overview, HabitDetail, NewHabitChat, HabitForm, Login) |
 | PWA manifest and service worker | `vite.config.ts`, icons in `public/` (from `public/icon.svg` via `npx pwa-assets-generator`) |
 

@@ -1,7 +1,8 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useState } from 'react';
-import { APP_NAME } from './config';
+import { DEVICE_USER_ID, deviceBackend, supabaseBackend } from './data/backend';
 import { DataProvider } from './data/store';
+import { useDeviceMode } from './lib/mode';
 import { supabase } from './lib/supabase';
 import { useRoute } from './lib/router';
 import { Shell } from './components/Shell';
@@ -12,8 +13,13 @@ import { Overview } from './screens/Overview';
 import { Login } from './screens/Login';
 import { Today } from './screens/Today';
 
+// Built once: the store depends on the backend's identity.
+const device = deviceBackend();
+const account = supabase ? supabaseBackend(supabase) : null;
+
 export function App() {
-  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const deviceMode = useDeviceMode();
+  const [session, setSession] = useState<Session | null | undefined>(supabase ? undefined : null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -22,23 +28,24 @@ export function App() {
     return () => data.subscription.unsubscribe();
   }, []);
 
-  if (!supabase) {
+  useEffect(() => {
+    // Keep the browser from clearing on-device habits when it is short on space.
+    if (deviceMode) void navigator.storage?.persist?.().catch(() => undefined);
+  }, [deviceMode]);
+
+  if (deviceMode) {
     return (
-      <main className="center-screen">
-        <h1 className="app-name">{APP_NAME}</h1>
-        <p className="muted">
-          Supabase is not configured. Copy <code>.env.example</code> to <code>.env.local</code> and add your project URL
-          and anon key.
-        </p>
-      </main>
+      <DataProvider key="device" userId={DEVICE_USER_ID} backend={device}>
+        <Routes />
+      </DataProvider>
     );
   }
 
   if (session === undefined) return <main className="center-screen" aria-busy="true" />;
-  if (!session) return <Login />;
+  if (!session || !account) return <Login accountsAvailable={!!account} />;
 
   return (
-    <DataProvider key={session.user.id} userId={session.user.id}>
+    <DataProvider key={session.user.id} userId={session.user.id} backend={account}>
       <Routes />
     </DataProvider>
   );
