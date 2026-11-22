@@ -1,13 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Amiri_Quran } from "next/font/google";
+import { Geist, Amiri_Quran, Noto_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { SyncBanner } from "@/components/Account";
 import { MovedBanner } from "@/components/Moved";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import { LanguageStarter, languageScript } from "@/components/Language";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const amiriQuran = Amiri_Quran({ variable: "--font-amiri-quran", weight: "400", subsets: ["arabic"] });
+// The interface in Arabic (Geist has no Arabic letters). The Quran text keeps Amiri Quran.
+const notoArabic = Noto_Sans_Arabic({ variable: "--font-noto-arabic", subsets: ["arabic"] });
 
 export const metadata: Metadata = {
   title: "Hifz Tracker",
@@ -31,12 +34,14 @@ const themeScript = `(function(){try{var t=localStorage.getItem('hifz:theme')||'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${amiriQuran.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang="en" className={`${geistSans.variable} ${amiriQuran.variable} ${notoArabic.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: languageScript }} />
       </head>
       <body className="min-h-full">
         <ServiceWorker />
+        <LanguageStarter />
         <div className="mx-auto flex min-h-dvh max-w-2xl flex-col px-4 pb-24 pt-4 sm:pb-8 sm:pt-20">
           <Nav />
           <main className="flex-1">

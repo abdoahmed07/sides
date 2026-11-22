@@ -2,6 +2,9 @@
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { formatDate } from "@/core/dates";
+import { t, tp } from "@/i18n";
+import { useLang } from "@/i18n/react";
+import { Rich } from "./Language";
 import {
   MIN_PASSWORD,
   resolveConflict,
@@ -21,15 +24,16 @@ import { Button, Card, Field, inputCls, Notice, Spinner } from "./ui";
 const SERVER_STATUS: SyncStatus = { phase: SYNC_ENABLED ? "loading" : "off", email: null, lastSyncedAt: null, message: null, conflict: null, recovering: false };
 
 export function useSyncStatus(): SyncStatus {
+  useLang();
   return useSyncExternalStore(syncStore.subscribe, syncStore.get, () => SERVER_STATUS);
 }
 
 function ago(iso: string | null): string {
-  if (!iso) return "not yet";
+  if (!iso) return t("not yet");
   const s = Math.round((Date.now() - Date.parse(iso)) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.round(s / 60)} min ago`;
-  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  if (s < 60) return t("just now");
+  if (s < 3600) return t("{n} min ago", { n: Math.round(s / 60) });
+  if (s < 86400) return t("{n} h ago", { n: Math.round(s / 3600) });
   return formatDate(iso.slice(0, 10));
 }
 
@@ -51,19 +55,20 @@ export function SyncBanner() {
     return (
       <div className="mb-4">
         <Notice tone="warn">
-          <p className="font-medium">This device and your account have different progress. Which one should we keep?</p>
-          <p className="mt-1 text-muted">The other one is replaced. If unsure, keep the one with more days.</p>
+          <p className="font-medium">{t("This device and your account have different progress. Which one should we keep?")}</p>
+          <p className="mt-1 text-muted">{t("The other one is replaced. If unsure, keep the one with more days.")}</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <Button disabled={busy} onClick={() => choose("account")} className="h-auto flex-col items-start whitespace-normal py-2 text-left">
-              <span>Keep my account&apos;s</span>
+            <Button disabled={busy} onClick={() => choose("account")} className="h-auto flex-col items-start whitespace-normal py-2 text-start">
+              <span>{t("Keep my account's")}</span>
               <span className="text-xs font-normal text-muted">
-                {remote.days} days done · {remote.pages} pages · saved {ago(remote.updatedAt)}
+                {tp({ one: "{n} day done", other: "{n} days done" }, remote.days)} · {tp({ one: "{n} page", other: "{n} pages" }, remote.pages)} ·{" "}
+                {t("saved {when}", { when: ago(remote.updatedAt) })}
               </span>
             </Button>
-            <Button disabled={busy} onClick={() => choose("device")} className="h-auto flex-col items-start whitespace-normal py-2 text-left">
-              <span>Keep this device&apos;s</span>
+            <Button disabled={busy} onClick={() => choose("device")} className="h-auto flex-col items-start whitespace-normal py-2 text-start">
+              <span>{t("Keep this device's")}</span>
               <span className="text-xs font-normal text-muted">
-                {local.days} days done · {local.pages} pages
+                {tp({ one: "{n} day done", other: "{n} days done" }, local.days)} · {tp({ one: "{n} page", other: "{n} pages" }, local.pages)}
               </span>
             </Button>
           </div>
@@ -77,7 +82,7 @@ export function SyncBanner() {
         <Notice tone="danger">
           {s.message}{" "}
           <button className="font-medium underline underline-offset-2" onClick={() => void syncNow()}>
-            Try again
+            {t("Try again")}
           </button>
         </Notice>
       </div>
@@ -119,28 +124,28 @@ export function AccountCard() {
   const passwordOk = password.length >= MIN_PASSWORD;
 
   const emailField = (
-    <Field label="Email">
+    <Field label={t("Email")}>
       <input type="email" required autoComplete="email" className={inputCls} value={email} onChange={(e) => setEmail(e.target.value)} />
     </Field>
   );
   const passwordField = (isNew: boolean) => (
-    <Field label={isNew ? `Password (at least ${MIN_PASSWORD} characters)` : "Password"}>
+    <Field label={isNew ? t("Password (at least {n} characters)", { n: MIN_PASSWORD }) : t("Password")}>
       <div className="relative">
         <input
           type={showPassword ? "text" : "password"}
           required
           minLength={isNew ? MIN_PASSWORD : undefined}
           autoComplete={isNew ? "new-password" : "current-password"}
-          className={`${inputCls} pr-16`}
+          className={`${inputCls} pe-16`}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
         <button
           type="button"
-          className="absolute inset-y-0 right-0 px-3 text-xs text-muted hover:text-text"
+          className="absolute inset-y-0 end-0 px-3 text-xs text-muted hover:text-text"
           onClick={() => setShowPassword((v) => !v)}
         >
-          {showPassword ? "Hide" : "Show"}
+          {showPassword ? t("Hide") : t("Show")}
         </button>
       </div>
     </Field>
@@ -155,7 +160,7 @@ export function AccountCard() {
   if (s.phase === "loading") {
     body = (
       <p className="flex items-center gap-2 text-sm text-muted">
-        <Spinner /> Checking…
+        <Spinner /> {t("Checking…")}
       </p>
     );
   } else if (signedIn && s.recovering) {
@@ -172,11 +177,11 @@ export function AccountCard() {
         }}
       >
         <p className="text-sm">
-          Choose a new password for <b>{s.email}</b>.
+          <Rich text={t("Choose a new password for **{email}**.", { email: s.email ?? "" })} />
         </p>
         {passwordField(true)}
         <Button type="submit" variant="primary" disabled={busy || !passwordOk}>
-          {busy ? <Spinner /> : "Save new password"}
+          {busy ? <Spinner /> : t("Save new password")}
         </Button>
       </form>
     );
@@ -184,28 +189,28 @@ export function AccountCard() {
     body = (
       <>
         <p className="text-sm">
-          Signed in as <b>{s.email}</b>
+          <Rich text={t("Signed in as **{email}**", { email: s.email ?? "" })} />
         </p>
         <p className="flex items-center gap-2 text-sm text-muted">
           {s.phase === "syncing" ? (
             <>
-              <Spinner /> Syncing…
+              <Spinner /> {t("Syncing…")}
             </>
           ) : s.phase === "offline" ? (
             s.message
           ) : s.phase === "conflict" ? (
-            "Waiting for you to choose which progress to keep (see the top of the page)."
+            t("Waiting for you to choose which progress to keep (see the top of the page).")
           ) : (
-            <>Everything is saved to your account. Last synced {ago(s.lastSyncedAt)}.</>
+            t("Everything is saved to your account. Last synced {when}.", { when: ago(s.lastSyncedAt) })
           )}
         </p>
-        <p className="text-xs text-muted">To use it on another device, open Hifz Tracker there and sign in with the same email and password.</p>
+        <p className="text-xs text-muted">{t("To use it on another device, open Hifz Tracker there and sign in with the same email and password.")}</p>
         <div className="flex flex-wrap gap-2">
           <Button disabled={s.phase === "syncing"} onClick={() => void syncNow()}>
-            Sync now
+            {t("Sync now")}
           </Button>
           <Button variant="ghost" onClick={() => void signOut()}>
-            Sign out
+            {t("Sign out")}
           </Button>
         </div>
       </>
@@ -214,9 +219,13 @@ export function AccountCard() {
     body = (
       <div className="space-y-3">
         <p className="text-sm">
-          Almost done. We sent an email to <b>{email.trim()}</b>. Open it on <b>any device</b> (your phone is fine) and tap the link to confirm.
+          <Rich
+            text={t("Almost done. We sent an email to **{email}**. Open it on **any device** (your phone is fine) and tap the link to confirm.", {
+              email: email.trim(),
+            })}
+          />
         </p>
-        <p className="text-sm">Then come back here and press Sign in.</p>
+        <p className="text-sm">{t("Then come back here and press Sign in.")}</p>
         <Button
           variant="primary"
           disabled={busy}
@@ -227,20 +236,26 @@ export function AccountCard() {
             })
           }
         >
-          {busy ? <Spinner /> : "I've confirmed, sign me in"}
+          {busy ? <Spinner /> : t("I've confirmed, sign me in")}
         </Button>
-        <p className="text-xs text-muted">No email? Check your spam folder. {linkBtn("Change email", "signup")}</p>
+        <p className="text-xs text-muted">
+          {t("No email? Check your spam folder.")} {linkBtn(t("Change email"), "signup")}
+        </p>
       </div>
     );
   } else if (mode === "reset-sent") {
     body = (
       <div className="space-y-3">
         <p className="text-sm">
-          If there&apos;s an account for <b>{email.trim()}</b>, we sent it a link. Open the link <b>on the device where you want to sign in</b>, and
-          you&apos;ll be asked for a new password.
+          <Rich
+            text={t(
+              "If there's an account for **{email}**, we sent it a link. Open the link **on the device where you want to sign in**, and you'll be asked for a new password.",
+              { email: email.trim() },
+            )}
+          />
         </p>
-        <p className="text-sm">Opened it on another device? That&apos;s fine: set the new password there, then sign in here with it.</p>
-        <p className="text-sm">{linkBtn("Back to sign in", "signin")}</p>
+        <p className="text-sm">{t("Opened it on another device? That's fine: set the new password there, then sign in here with it.")}</p>
+        <p className="text-sm">{linkBtn(t("Back to sign in"), "signin")}</p>
       </div>
     );
   } else if (mode === "forgot") {
@@ -256,13 +271,13 @@ export function AccountCard() {
           });
         }}
       >
-        <p className="text-sm">Enter your email and we&apos;ll send you a link to choose a new password.</p>
+        <p className="text-sm">{t("Enter your email and we'll send you a link to choose a new password.")}</p>
         {emailField}
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" variant="primary" disabled={busy || !emailOk}>
-            {busy ? <Spinner /> : "Send link"}
+            {busy ? <Spinner /> : t("Send link")}
           </Button>
-          <span className="text-sm">{linkBtn("Back to sign in", "signin")}</span>
+          <span className="text-sm">{linkBtn(t("Back to sign in"), "signin")}</span>
         </div>
       </form>
     );
@@ -296,7 +311,7 @@ export function AccountCard() {
               className={`flex-1 rounded-md px-3 py-1.5 font-medium ${mode === m ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
               onClick={() => go(m)}
             >
-              {m === "signup" ? "Create account" : "I have an account"}
+              {m === "signup" ? t("Create account") : t("I have an account")}
             </button>
           ))}
         </div>
@@ -304,11 +319,11 @@ export function AccountCard() {
         {passwordField(isNew)}
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" variant="primary" disabled={busy || !emailOk || (isNew ? !passwordOk : !password)}>
-            {busy ? <Spinner /> : isNew ? "Create account" : "Sign in"}
+            {busy ? <Spinner /> : isNew ? t("Create account") : t("Sign in")}
           </Button>
-          {!isNew && <span className="text-sm">{linkBtn("Forgot password?", "forgot")}</span>}
+          {!isNew && <span className="text-sm">{linkBtn(t("Forgot password?"), "forgot")}</span>}
         </div>
-        {isNew && <p className="text-xs text-muted">Your progress on this device is kept and saved to the new account.</p>}
+        {isNew && <p className="text-xs text-muted">{t("Your progress on this device is kept and saved to the new account.")}</p>}
       </form>
     );
   }
@@ -317,9 +332,9 @@ export function AccountCard() {
     <Card className="space-y-3">
       <div id="account" className="scroll-mt-20">
         <span id="sign-in" className="block scroll-mt-20" />
-        <h2 className="font-semibold">Your account</h2>
+        <h2 className="font-semibold">{t("Your account")}</h2>
         {!signedIn && s.phase !== "loading" && (
-          <p className="text-sm text-muted">Make an account to keep your progress safe and use it on your phone and computer.</p>
+          <p className="text-sm text-muted">{t("Make an account to keep your progress safe and use it on your phone and computer.")}</p>
         )}
       </div>
       {body}
@@ -342,22 +357,18 @@ export function SignInNudge({ newUser = false }: { newUser?: boolean }) {
   if (newUser)
     return (
       <p className="text-sm text-muted">
-        Already using Hifz Tracker on another device?{" "}
-        <Link href="/settings/#sign-in" className="font-medium text-accent underline-offset-2 hover:underline">
-          Sign in
-        </Link>{" "}
-        to bring your progress here.
+        <Rich text={t("Already using Hifz Tracker on another device? [Sign in](/settings/#sign-in) to bring your progress here.")} />
       </p>
     );
   if (hidden) return null;
   return (
     <Notice>
-      <b>Keep your progress safe.</b> Make a free account to save it to your account and use it on your phone and computer.{" "}
+      <Rich text={t("**Keep your progress safe.** Make a free account to save it and use it on your phone and computer.")} />{" "}
       <Link href="/settings/#account" className="font-medium text-accent underline underline-offset-2">
-        Create account
+        {t("Create account")}
       </Link>
       <button
-        className="ml-3 text-muted underline-offset-2 hover:underline"
+        className="ms-3 text-muted underline-offset-2 hover:underline"
         onClick={() => {
           try {
             localStorage.setItem("hifz.nudge.dismissed", "1");
@@ -367,7 +378,7 @@ export function SignInNudge({ newUser = false }: { newUser?: boolean }) {
           setHidden(true);
         }}
       >
-        Not now
+        {t("Not now")}
       </button>
     </Notice>
   );

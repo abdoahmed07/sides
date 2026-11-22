@@ -30,6 +30,8 @@ export const PlanRequestSchema = z
         current: z.record(z.string(), z.unknown()).nullable(),
         upcomingExceptions: z.array(z.object({ id: z.string(), from: z.string(), to: z.string(), kind: z.string() })).max(60),
         nextRamadanStart: z.string().max(10).nullable(),
+        /** The app's language; the reply is written in it. */
+        language: z.enum(["en", "sv", "ar"]).optional(),
       })
       .strict(),
   })
@@ -41,6 +43,7 @@ export const CheckinRequestSchema = z
     today: z.string().max(10),
     config: PlanConfigSchema,
     summary: z.record(z.string(), z.unknown()),
+    language: z.enum(["en", "sv", "ar"]).optional(),
   })
   .strict();
 

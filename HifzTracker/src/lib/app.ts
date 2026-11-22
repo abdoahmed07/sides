@@ -19,6 +19,16 @@ import { applyRating, type MemUnit, type Strength } from "@/core/srs";
 import { pagesLabel, totals } from "@/core/stats";
 import { repo } from "@/data/dexie";
 import type { DayItem, DayLog, PlanVersion } from "@/data/types";
+import { t, tx } from "@/i18n";
+
+/** A saved plan-version note in the active language (notes are stored in English). */
+export function planNoteLabel(note: string): string {
+  const reverted = note.match(/^Reverted to version (\d+)$/);
+  if (reverted) return t("Reverted to version {n}", { n: reverted[1] });
+  const edited = note.match(/^Edited suggestion: (.*)$/);
+  if (edited) return t("Edited suggestion: {note}", { note: t(edited[1]) });
+  return t(note);
+}
 
 export const q = getQuran();
 
@@ -155,7 +165,7 @@ async function ensureDayLogInner(date: IsoDate): Promise<DayLog | null> {
   if (config.pauseNewUntilCaughtUp && buildDay(config, q, units, date).overdueLines === 0) {
     config = { ...config, pauseNewUntilCaughtUp: false };
     const r = await repo.commit({
-      plan: { config, createdAt: new Date().toISOString(), source: "catchup", note: "Revision caught up: new memorization resumes" },
+      plan: { config, createdAt: new Date().toISOString(), source: "catchup", note: tx("Revision caught up: new memorization resumes") },
     });
     planVersionId = r.planVersionId ?? plan.id;
   }

@@ -1,7 +1,9 @@
 "use client";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { repo } from "@/data/dexie";
+import { t } from "@/i18n";
+import { useLang } from "@/i18n/react";
+import { Rich } from "./Language";
 import { Notice } from "./ui";
 import { useSyncStatus } from "./Account";
 
@@ -22,6 +24,7 @@ function newAddress() {
 export function MovedBanner() {
   const s = useSyncStatus();
   const [hasData, setHasData] = useState<boolean | null>(null);
+  useLang();
 
   useEffect(() => {
     if (!MOVED_TO) return;
@@ -47,18 +50,18 @@ export function MovedBanner() {
   return (
     <div className="mb-4">
       <Notice tone="warn">
-        <p className="font-medium">Hifz Tracker has moved to {link}, with the AI assistant for everyone.</p>
+        <p className="font-medium">
+          {t("Hifz Tracker has moved to a new address, with the AI assistant for everyone:")} {link}
+        </p>
         {saved ? (
-          <p className="mt-1">
-            Your progress is saved to your account. Open the new address and sign in with the same email and password.
-          </p>
+          <p className="mt-1">{t("Your progress is saved to your account. Open the new address and sign in with the same email and password.")}</p>
         ) : (
           <p className="mt-1">
-            To take your progress with you, first{" "}
-            <Link href="/settings/#account" className="font-medium text-accent underline underline-offset-2">
-              create an account or sign in here
-            </Link>{" "}
-            so it&apos;s saved. Then open the new address and sign in there with the same email and password.
+            <Rich
+              text={t(
+                "To take your progress with you, first [create an account or sign in here](/settings/#account) so it's saved. Then open the new address and sign in there with the same email and password.",
+              )}
+            />
           </p>
         )}
       </Notice>

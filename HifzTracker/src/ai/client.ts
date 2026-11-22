@@ -69,10 +69,13 @@ export async function callStructured<S extends z.ZodTypeAny>(opts: {
   check?: (value: z.infer<S>) => string | null;
   maxTokens?: number;
   effort?: "low" | "medium" | "high";
+  /** The person's language: Arabic replies may use Arabic script (but never Quran text). */
+  language?: "en" | "sv" | "ar";
 }): Promise<z.infer<S>> {
   const effort = opts.effort ?? "medium";
   const anthropic = getClient();
-  const system = `${getSystemPrompt()}\n\n# Current mode\n\n${opts.modeNote}`;
+  const lang = { en: "English", sv: "Swedish", ar: "Arabic" }[opts.language ?? "en"];
+  const system = `${getSystemPrompt()}\n\n# Current mode\n\n${opts.modeNote}\n\nReply language: ${lang}.`;
   const tools = (opts.tools ?? []).map((t) => ({ name: t.name, description: t.description, input_schema: toInputSchema(t.schema) }));
   const messages: BetaMessageParam[] = [...opts.messages];
   let useFormat = true;
@@ -138,7 +141,7 @@ export async function callStructured<S extends z.ZodTypeAny>(opts: {
     }
 
     const text = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
-    const v = validateOutput(text, opts.schema);
+    const v = await validateOutput(text, opts.schema, { arabic: opts.language === "ar" });
     const problem = v.ok ? opts.check?.(v.value) ?? null : v.error;
     if (v.ok && !problem) return v.value;
     lastError = problem ?? "invalid";

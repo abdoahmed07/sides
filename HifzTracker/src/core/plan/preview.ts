@@ -4,7 +4,7 @@
  * Pure, so it runs both in the browser and in the AI route (as the
  * `preview_plan` tool the model uses to see real numbers).
  */
-import { addDays, formatDate, WEEKDAY_LABEL, WEEKDAYS, type IsoDate, type Weekday } from "../dates";
+import { addDays, formatDate, weekdayLabel, WEEKDAYS, type IsoDate, type Weekday } from "../dates";
 import { markPrior } from "../memorize";
 import { estimatePauseDays } from "../missed";
 import type { QuranIndex } from "../quran";
@@ -16,6 +16,9 @@ import { applyPatch } from "./patch";
 import { EXCEPTION_DEFAULTS, type MemorizedSelection, type PlanConfig, type PlanPatch, type WeeklyReading } from "./schema";
 import { buildSequence, selectionIndices } from "./sequence";
 import { alternativeFacts, keyNumbers, type KeyNumbers } from "./summary";
+import { isRtl, t, tp, tx } from "@/i18n";
+
+const EXPERIENCE_LABEL: Record<string, string> = { beginner: tx("First time"), intermediate: tx("Yes, some"), advanced: tx("Yes, a lot") };
 
 export function memorizedArray(units: MemUnit[], q: QuranIndex): Uint8Array {
   const m = new Uint8Array(q.count);
@@ -111,33 +114,37 @@ export function surahListLabel(surahs: number[], q: QuranIndex): string {
     if (last && n === last[1] + 1) last[1] = n;
     else runs.push([n, n]);
   }
-  const name = (n: number) => q.surah(n).nameEn;
+  const name = (n: number) => q.surahName(n);
   const parts: string[] = [];
   const run = (a: number, b: number) => {
-    if (b - a >= 2) parts.push(`${name(a)} to ${name(b)}`);
+    if (b - a >= 2) parts.push(t("{from} to {to}", { from: name(a), to: name(b) }));
     else for (let n = a; n <= b; n++) parts.push(name(n));
   };
   for (const [a, b] of runs) {
     if (a <= 78 && b === 114) {
       if (a < 78) run(a, 77);
-      parts.push("Juz 30");
+      parts.push(t("Juz {n}", { n: 30 }));
     } else run(a, b);
   }
   return parts.join(", ");
 }
 
 function targetLabel(c: PlanConfig, q: QuranIndex): string {
-  const t = c.target;
-  const startName = `${q.surah(c.start.surah).nameEn} ${c.start.ayah}`;
+  const tg = c.target;
+  const startName = `${q.surahName(c.start.surah)} ${c.start.ayah}`;
   const what =
-    t.type === "quran"
-      ? "the whole Quran"
-      : t.type === "juz"
-        ? `Juz ${t.juz.join(", ")}`
-        : t.type === "surah"
-          ? surahListLabel(t.surahs, q)
-          : `pages ${t.from}–${t.to}`;
-  return `${what}, starting at ${startName} (${c.direction})`;
+    tg.type === "quran"
+      ? t("the whole Quran")
+      : tg.type === "juz"
+        ? t("Juz {n}", { n: tg.juz.join(", ") })
+        : tg.type === "surah"
+          ? surahListLabel(tg.surahs, q)
+          : t("pages {from}–{to}", { from: tg.from, to: tg.to });
+  return t("{what}, starting at {start} ({direction})", {
+    what,
+    start: startName,
+    direction: c.direction === "backward" ? t("from the end") : t("from the beginning"),
+  });
 }
 
 function selectionLabel(s: MemorizedSelection, q: QuranIndex): string {
@@ -145,11 +152,11 @@ function selectionLabel(s: MemorizedSelection, q: QuranIndex): string {
     case "surah":
       return surahListLabel(s.surahs, q);
     case "juz":
-      return `Juz ${s.juz.join(", ")}`;
+      return t("Juz {n}", { n: s.juz.join(", ") });
     case "pages":
-      return `pages ${s.from}–${s.to}`;
+      return t("pages {from}–{to}", { from: s.from, to: s.to });
     case "ayahs":
-      return `${q.surah(s.surah).nameEn} ${s.from}–${s.to}`;
+      return `${q.surahName(s.surah)} ${s.from}–${s.to}`;
   }
 }
 
@@ -157,31 +164,32 @@ function selectionLabel(s: MemorizedSelection, q: QuranIndex): string {
 export function describeChanges(before: PlanConfig | null, after: PlanConfig, marked: MemorizedSelection[], q: QuranIndex): string[] {
   const out: string[] = [];
   const days = (c: PlanConfig) =>
-    c.studyWeekdays.length === 7 ? "every day" : WEEKDAYS.filter((d) => c.studyWeekdays.includes(d)).map((d) => WEEKDAY_LABEL[d]).join(", ");
+    c.studyWeekdays.length === 7 ? t("every day") : WEEKDAYS.filter((d) => c.studyWeekdays.includes(d)).map((d) => weekdayLabel(d)).join(", ");
   const diff = (label: string, get: (c: PlanConfig) => string) => {
     const a = get(after);
-    if (!before) out.push(`${label}: ${a}`);
-    else if (get(before) !== a) out.push(`${label}: ${get(before)} → ${a}`);
+    if (!before) out.push(`${t(label)}: ${a}`);
+    else if (get(before) !== a) out.push(`${t(label)}: ${get(before)} ${isRtl() ? "←" : "→"} ${a}`);
   };
-  diff("Memorize", (c) => targetLabel(c, q));
-  diff("New per study day", (c) => `${c.dailyNewLines} lines`);
-  diff("Study days", days);
-  diff("Target date", (c) => (c.targetFinishDate ? formatDate(c.targetFinishDate) : "none"));
-  diff("Time available", (c) => (c.dailyMinutesBudget ? `${c.dailyMinutesBudget} min/day` : "not set"));
-  diff("Sabqi window", (c) => `${c.sabqiWindowDays} days`);
-  diff("Manzil cycle", (c) => `${c.manzilCycleDays} days`);
-  diff("Experience", (c) => c.experience);
-  diff("Lighter weekdays", (c) =>
+  const none = t("none");
+  diff(tx("Memorize"), (c) => targetLabel(c, q));
+  diff(tx("New per study day"), (c) => tp({ one: "{n} line", other: "{n} lines" }, c.dailyNewLines));
+  diff(tx("Study days"), days);
+  diff(tx("Target date"), (c) => (c.targetFinishDate ? formatDate(c.targetFinishDate) : none));
+  diff(tx("Time available"), (c) => (c.dailyMinutesBudget ? t("{n} min/day", { n: c.dailyMinutesBudget }) : t("not set")));
+  diff(tx("Sabqi window"), (c) => tp({ one: "{n} day", other: "{n} days" }, c.sabqiWindowDays));
+  diff(tx("Manzil cycle"), (c) => tp({ one: "{n} day", other: "{n} days" }, c.manzilCycleDays));
+  diff(tx("Experience"), (c) => t(EXPERIENCE_LABEL[c.experience] ?? c.experience));
+  diff(tx("Lighter weekdays"), (c) =>
     Object.entries(c.weekdayOverrides)
-      .map(([d, o]) => `${WEEKDAY_LABEL[d as keyof typeof WEEKDAY_LABEL]} ${o?.revisionOnly ? "revision only" : `×${o?.newMultiplier}`}`)
-      .join(", ") || "none",
+      .map(([d, o]) => `${weekdayLabel(d as Weekday)} ${o?.revisionOnly ? t("revision only") : `×${o?.newMultiplier}`}`)
+      .join(", ") || none,
   );
-  diff("Weekly reading", (c) => readingsLabel(c.weeklyReadings ?? [], q) || "none");
-  diff("New memorization paused", (c) => (c.pauseNewUntilCaughtUp ? "until revision is caught up" : "no"));
+  diff(tx("Weekly reading"), (c) => readingsLabel(c.weeklyReadings ?? [], q) || none);
+  diff(tx("New memorization paused"), (c) => (c.pauseNewUntilCaughtUp ? t("until revision is caught up") : t("no")));
   const exKey = (c: PlanConfig) =>
-    c.exceptions.map((e) => `${EXCEPTION_DEFAULTS[e.kind].label} ${formatDate(e.from)}${e.to !== e.from ? `–${formatDate(e.to)}` : ""}`).join("; ") || "none";
-  diff("Travel, exams, Ramadan", exKey);
-  for (const s of marked) out.push(`Mark as already memorized: ${selectionLabel(s, q)}`);
+    c.exceptions.map((e) => `${t(EXCEPTION_DEFAULTS[e.kind].label)} ${formatDate(e.from)}${e.to !== e.from ? `–${formatDate(e.to)}` : ""}`).join("; ") || none;
+  diff(tx("Travel, exams, Ramadan"), exKey);
+  for (const s of marked) out.push(t("Mark as already memorized: {what}", { what: selectionLabel(s, q) }));
   return out;
 }
 
@@ -220,9 +228,9 @@ export function readingsLabel(r: WeeklyReading[], q: QuranIndex): string {
   for (const x of r) bySurah.set(x.surah, [...(bySurah.get(x.surah) ?? []), x.day]);
   return [...bySurah]
     .map(([surah, days]) => {
-      const name = q.surah(surah).nameEn;
-      if (days.length === 7) return `${name} daily`;
-      return `${name} on ${WEEKDAYS.filter((d) => days.includes(d)).map((d) => WEEKDAY_LABEL[d]).join(", ")}`;
+      const name = q.surahName(surah);
+      if (days.length === 7) return t("{surah} daily", { surah: name });
+      return t("{surah} on {days}", { surah: name, days: WEEKDAYS.filter((d) => days.includes(d)).map((d) => weekdayLabel(d)).join(", ") });
     })
     .join(", ");
 }

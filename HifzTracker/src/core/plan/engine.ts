@@ -10,6 +10,7 @@ import { addDays, diffDays, weekdayOf, WEEKDAYS, type IsoDate, type Weekday } fr
 import type { QuranIndex } from "../quran";
 import { EXCEPTION_DEFAULTS, type DateException, type PlanConfig, type PlanPatch, type RevisionLevel } from "./schema";
 import { buildSequence, takePortion } from "./sequence";
+import { t } from "@/i18n";
 
 export const MAX_FORECAST_DAYS = 365 * 25;
 const REVISION_FACTOR: Record<RevisionLevel, number> = { normal: 1, light: 0.5, none: 0, extra: 2 };
@@ -244,27 +245,27 @@ export function alternatives(input: ForecastInput): Alternative[] {
   if (base.meetsTarget === true && base.completionDate && config.targetFinishDate && diffDays(base.completionDate, config.targetFinishDate) > 7) {
     const lines = requiredLinesForTarget(input);
     if (lines && lines < config.dailyNewLines) {
-      add("finish-on-date", "Spread it out to finish by your date", { set: { dailyNewLines: lines } }, withLines(config, lines));
+      add("finish-on-date", t("Spread it out to finish by your date"), { set: { dailyNewLines: lines } }, withLines(config, lines));
     }
   }
 
   const budgetLines = maxLinesWithinBudget(input);
   if (base.withinBudget === false && budgetLines) {
     const c = withLines(config, budgetLines);
-    add("fit-time", `Keep your ${config.dailyMinutesBudget} minutes a day`, { set: { dailyNewLines: budgetLines } }, c);
+    add("fit-time", t("Keep your {n} minutes a day", { n: config.dailyMinutesBudget ?? 0 }), { set: { dailyNewLines: budgetLines } }, c);
   }
 
   const needLines = requiredLinesForTarget(input);
   if (base.meetsTarget === false && needLines && needLines !== config.dailyNewLines) {
     const c = withLines(config, needLines);
-    add("meet-deadline", "Keep your deadline", { set: { dailyNewLines: needLines } }, c);
+    add("meet-deadline", t("Keep your deadline"), { set: { dailyNewLines: needLines } }, c);
   }
 
   if (base.meetsTarget === false && config.studyWeekdays.length < 7) {
     const all: Weekday[] = [...WEEKDAYS];
     const c = { ...config, studyWeekdays: all };
     const lines = budgetLines ? Math.min(config.dailyNewLines, budgetLines) : config.dailyNewLines;
-    add("every-day", "Study every day", { set: { studyWeekdays: all, dailyNewLines: lines } }, withLines(c, lines));
+    add("every-day", t("Study every day"), { set: { studyWeekdays: all, dailyNewLines: lines } }, withLines(c, lines));
   }
 
   // A realistic deadline: what the budget-respecting pace actually reaches.
@@ -273,7 +274,7 @@ export function alternatives(input: ForecastInput): Alternative[] {
     const f = forecast({ ...input, config: withLines(config, lines) });
     if (f.completionDate) {
       const c = { ...withLines(config, lines), targetFinishDate: f.completionDate };
-      add("move-deadline", "Move the deadline", { set: { dailyNewLines: lines, targetFinishDate: f.completionDate } }, c);
+      add("move-deadline", t("Move the deadline"), { set: { dailyNewLines: lines, targetFinishDate: f.completionDate } }, c);
     }
   }
 

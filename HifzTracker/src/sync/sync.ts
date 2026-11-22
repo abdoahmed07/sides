@@ -14,6 +14,7 @@ import { repo } from "@/data/dexie";
 import { BackupSchema, type Backup } from "@/data/types";
 import { clearDirty, clearDirtyIf, dirtyToken, isDirty, onLocalChange, withoutTracking } from "./changes";
 import { decideSync } from "./decide";
+import { t } from "@/i18n";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -100,9 +101,9 @@ function summarize(b: Backup, updatedAt: string | null): Summary {
 function friendly(e: unknown): { phase: SyncStatus["phase"]; message: string } {
   const msg = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : String(e);
   if (typeof navigator !== "undefined" && !navigator.onLine)
-    return { phase: "offline", message: "You're offline. Everything is saved on this device and will sync when you're back online." };
-  if (/fetch|network/i.test(msg)) return { phase: "offline", message: "Couldn't reach the server. Your progress is saved on this device; it will sync later." };
-  return { phase: "error", message: `Sync problem: ${msg}` };
+    return { phase: "offline", message: t("You're offline. Everything is saved on this device and will sync when you're back online.") };
+  if (/fetch|network/i.test(msg)) return { phase: "offline", message: t("Couldn't reach the server. Your progress is saved on this device; it will sync later.") };
+  return { phase: "error", message: t("Sync problem: {detail}", { detail: msg }) };
 }
 
 /* ---------------- syncing ---------------- */
@@ -190,7 +191,7 @@ async function download(uid: string) {
   const { data, error } = await sb().from(TABLE).select("rev, data").eq("user_id", uid).single();
   if (error) throw error;
   const parsed = BackupSchema.safeParse(data.data);
-  if (!parsed.success) throw new Error("the saved data in your account couldn't be read");
+  if (!parsed.success) throw new Error(t("the saved data in your account couldn't be read"));
   await withoutTracking(() => repo.importAll(parsed.data));
   clearDirty();
   saveState({ userId: uid, lastRev: data.rev, lastSyncedAt: new Date().toISOString() });
@@ -234,12 +235,12 @@ const settingsUrl = () => `${location.origin}${process.env.NEXT_PUBLIC_BASE_PATH
 
 function authError(e: { message: string; code?: string }): string {
   const m = e.message;
-  if (e.code === "invalid_credentials" || /invalid login credentials/i.test(m)) return "Wrong email or password.";
+  if (e.code === "invalid_credentials" || /invalid login credentials/i.test(m)) return t("Wrong email or password.");
   if (e.code === "email_not_confirmed" || /not confirmed/i.test(m))
-    return "Your email isn't confirmed yet. Open the email we sent you (on any device), tap the link, then press Sign in here again.";
-  if (e.code === "weak_password" || /password should be/i.test(m)) return `Choose a longer password (at least ${MIN_PASSWORD} characters).`;
-  if (e.code === "over_email_send_rate_limit" || /rate limit|too many/i.test(m)) return "Too many emails were sent just now. Wait a few minutes and try again.";
-  if (/fetch|network/i.test(m)) return "Couldn't reach the server. Check your internet connection.";
+    return t("Your email isn't confirmed yet. Open the email we sent you (on any device), tap the link, then press Sign in here again.");
+  if (e.code === "weak_password" || /password should be/i.test(m)) return t("Choose a longer password (at least {n} characters).", { n: MIN_PASSWORD });
+  if (e.code === "over_email_send_rate_limit" || /rate limit|too many/i.test(m)) return t("Too many emails were sent just now. Wait a few minutes and try again.");
+  if (/fetch|network/i.test(m)) return t("Couldn't reach the server. Check your internet connection.");
   return m;
 }
 
@@ -252,7 +253,7 @@ export async function signUp(email: string, password: string): Promise<SignUpRes
   if (data.session) return { error: null, needsConfirm: false }; // confirmation is turned off
   // Supabase hides whether the email is taken: an existing account comes back with no identities.
   if (data.user && data.user.identities?.length === 0)
-    return { error: "There's already an account with this email. Sign in instead (or use “Forgot password?”).", needsConfirm: false };
+    return { error: t("There's already an account with this email. Sign in instead (or use “Forgot password?”)."), needsConfirm: false };
   return { error: null, needsConfirm: true };
 }
 
@@ -283,8 +284,8 @@ export async function deleteAccount(): Promise<string | null> {
   if (error) {
     console.error("hifz_delete_account failed:", error.message);
     return /fetch|network/i.test(error.message)
-      ? "Couldn't reach the server. Check your internet connection and try again."
-      : "Your account couldn't be deleted right now. Please try again later.";
+      ? t("Couldn't reach the server. Check your internet connection and try again.")
+      : t("Your account couldn't be deleted right now. Please try again later.");
   }
   await signOut();
   return null;

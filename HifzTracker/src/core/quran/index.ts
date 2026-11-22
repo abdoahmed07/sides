@@ -4,6 +4,7 @@
  * Mushaf, so an ayah sits on exactly one page between startLine and endLine.
  */
 import layoutJson from "../../../data/quran-layout.json";
+import { getLang } from "@/i18n";
 
 export type SurahInfo = { n: number; name: string; nameEn: string; ayahs: number; revelation: string };
 export type LayoutRow = [surah: number, ayah: number, juz: number, page: number, startLine: number, endLine: number];
@@ -86,6 +87,12 @@ export class QuranIndex {
     return [this.pageOf[this.juzFirst[juz]], this.pageOf[this.juzLast[juz]]];
   }
 
+  /** Surah name in the active language: Arabic script in Arabic, transliterated otherwise. */
+  surahName(n: number): string {
+    const s = this.surah(n);
+    return getLang() === "ar" ? s.name : s.nameEn;
+  }
+
   ayahsOnPage(page: number): number {
     return this.pageLast[page] - this.pageFirst[page] + 1;
   }
@@ -110,7 +117,7 @@ export class QuranIndex {
   }
 
   label(i: number): string {
-    return `${this.surah(this.surahOf[i]).nameEn} ${this.ayahOf[i]}`;
+    return `${this.surahName(this.surahOf[i])} ${this.ayahOf[i]}`;
   }
 
   /**
@@ -130,7 +137,7 @@ export class QuranIndex {
     return [...bySurah.values()]
       .map((g) => g.sort((x, y) => x - y))
       .map((g) => {
-        const s = this.surah(this.surahOf[g[0]]).nameEn;
+        const s = this.surahName(this.surahOf[g[0]]);
         const a = this.ayahOf[g[0]];
         const b = this.ayahOf[g[g.length - 1]];
         return a === b ? `${s} ${a}` : `${s} ${a}–${b}`;

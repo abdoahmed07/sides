@@ -12,6 +12,9 @@ import { AyahText, Sheet } from "@/components/AyahText";
 import { MissedDays } from "@/components/MissedDays";
 import { SignInNudge, useSyncStatus } from "@/components/Account";
 import { activeDatesOf, streaks } from "@/core/stats";
+import { t, tp, tx } from "@/i18n";
+import { useLang } from "@/i18n/react";
+import { Rich } from "@/components/Language";
 import { manzilRound, sabqiDay, type ManzilRound } from "@/core/schedule/revision-info";
 
 /** Rough reading speed for weekly readings (looking at the mushaf). */
@@ -29,6 +32,7 @@ export default function TodayPage() {
   const [busy, setBusy] = useState(false);
   const [extraOpen, setExtraOpen] = useState(false);
   const [roundOpen, setRoundOpen] = useState(false);
+  useLang();
 
   useEffect(() => {
     if (plan) ensureDayLog(today);
@@ -63,16 +67,20 @@ export default function TodayPage() {
   const describe = (i: DayItem) => {
     if (i.kind === "reading") {
       const s = q.surah(i.surah!);
-      return { title: s.nameEn, detail: `whole surah · about ${Math.max(1, Math.round(i.lines / 15))} pages` };
+      return {
+        title: q.surahName(s.n),
+        detail: t("whole surah · about {pages}", { pages: tp({ one: "{n} page", other: "{n} pages" }, Math.max(1, Math.round(i.lines / 15))) }),
+      };
     }
-    if (i.kind === "sabaq") return { title: q.rangeLabel(i.ayahs ?? []), detail: `${i.lines} lines · page ${q.pageOf[i.ayahs![0]]}` };
+    const lines = tp({ one: "{n} line", other: "{n} lines" }, i.lines);
+    if (i.kind === "sabaq") return { title: q.rangeLabel(i.ayahs ?? []), detail: `${lines} · ${t("page {n}", { n: q.pageOf[i.ayahs![0]] })}` };
     const u = unitByPage.get(i.page!);
-    let detail = `Page ${i.page} · ${i.lines} lines`;
+    let detail = `${t("Page {n}", { n: i.page! })} · ${lines}`;
     if (i.kind === "sabqi" && u) {
       const d = sabqiDay(u, config.sabqiWindowDays, today);
-      detail += d.day >= d.of ? " · last day in sabqi" : ` · day ${d.day} of ${d.of}`;
+      detail += " · " + (d.day >= d.of ? t("last day in sabqi") : t("day {day} of {of}", { day: d.day, of: d.of }));
     }
-    return { title: u ? q.rangeLabel(u.ayahs) : `Page ${i.page}`, detail };
+    return { title: u ? q.rangeLabel(u.ayahs) : t("Page {n}", { n: i.page! }), detail };
   };
   const textOf = (i: DayItem) => {
     if (i.kind === "reading") {
@@ -97,7 +105,7 @@ export default function TodayPage() {
     return (
       <Card>
         <div className="flex items-baseline justify-between">
-          <h2 className="font-semibold">{label}</h2>
+          <h2 className="font-semibold">{t(label)}</h2>
           <span className="text-xs text-muted">{blurb}</span>
         </div>
         <p className="mt-0.5 text-xs text-muted">
@@ -106,7 +114,7 @@ export default function TodayPage() {
             <>
               {" "}
               <Link href={`/guide/#${kind === "sabaq" ? "memorize" : "revise"}`} className="text-accent underline-offset-2 hover:underline">
-                How?
+                {t("How?")}
               </Link>
             </>
           )}
@@ -114,11 +122,11 @@ export default function TodayPage() {
         {info}
         {list.length === 0 ? (
           <p className="mt-2 text-sm text-muted">
-            {kind === "sabaq" ? (log?.note ?? "Nothing new today.") : kind === "sabqi" ? "Nothing recent to revise." : "No older pages due today."}
+            {kind === "sabaq" ? t(log?.note ?? "Nothing new today.") : kind === "sabqi" ? t("Nothing recent to revise.") : t("No older pages due today.")}
           </p>
         ) : (
           <>
-            {kind === "sabaq" && log?.note && <p className="mt-2 text-sm text-warn">{log.note}</p>}
+            {kind === "sabaq" && log?.note && <p className="mt-2 text-sm text-warn">{t(log.note)}</p>}
             <ul className="divide-y divide-border">
               {list.map((i) => {
                 const d = describe(i);
@@ -143,7 +151,7 @@ export default function TodayPage() {
                 disabled={busy}
                 className="mt-1 text-sm text-accent underline-offset-2 hover:underline disabled:opacity-50"
               >
-                I memorized further
+                {t("I memorized further")}
               </button>
             )}
           </>
@@ -157,16 +165,16 @@ export default function TodayPage() {
   return (
     <div className="space-y-4">
       <PageTitle
-        title="Today"
+        title={t("Today")}
         subtitle={
           <>
             {formatDate(today, { weekday: "long", day: "numeric", month: "long" })}
-            {items.length > 0 && ` · about ${minutes} min · ${doneCount}/${items.length} done`}
+            {items.length > 0 && ` · ${t("about {n} min", { n: minutes })} · ${t("{done}/{total} done", { done: doneCount, total: items.length })}`}
           </>
         }
         action={
           <Link href="/adjust/">
-            <Button variant="secondary">Adjust plan</Button>
+            <Button variant="secondary">{t("Adjust plan")}</Button>
           </Link>
         }
       />
@@ -177,52 +185,59 @@ export default function TodayPage() {
 
       {checkinDue && (
         <Notice>
-          Your weekly check-in is ready.{" "}
+          {t("Your weekly check-in is ready.")}{" "}
           <Link href="/checkin/" className="font-medium text-accent underline underline-offset-2">
-            Review the week
+            {t("Review the week")}
           </Link>
         </Notice>
       )}
 
       {log && items.length === 0 && (
         <Card>
-          <p className="text-sm text-muted">{log.note ?? "Nothing is scheduled today. Rest well."}</p>
+          <p className="text-sm text-muted">{t(log.note ?? "Nothing is scheduled today. Rest well.")}</p>
         </Card>
       )}
 
       {items.length > 0 && (
         <>
-          {section("sabaq", "Sabaq", "New", "Memorize this, then recite it from memory before you tick it.")}
+          {section(
+            "sabaq",
+            tx("Sabaq"),
+            t("New"),
+            t("Memorize this, then recite it from memory before you tick it."),
+          )}
           {section(
             "sabqi",
-            "Sabqi",
-            `Last ${config.sabqiWindowDays} days`,
-            `Recite these recent pages from memory, then rate them. Each new page is revised here for ${Math.max(1, config.sabqiWindowDays - 1)} days, then moves to Manzil.`,
+            tx("Sabqi"),
+            t("Last {n} days", { n: config.sabqiWindowDays }),
+            t("Recite these recent pages from memory, then rate them. Each new page is revised here for {n} days, then moves to Manzil.", {
+              n: Math.max(1, config.sabqiWindowDays - 1),
+            }),
           )}
           {section(
             "manzil",
-            "Manzil",
-            `${config.manzilCycleDays}-day cycle`,
-            "Recite these older pages from memory, check the text, then rate them.",
+            tx("Manzil"),
+            t("{n}-day cycle", { n: config.manzilCycleDays }),
+            t("Recite these older pages from memory, check the text, then rate them."),
             round && round.total > 0 && <ManzilProgress round={round} onOpen={() => setRoundOpen(true)} />,
           )}
-          {section("reading", "Reading", "Weekly", "Read from the mushaf; it doesn't count as revision. Tick it when you're done.")}
+          {section("reading", tx("Reading"), t("Weekly"), t("Read from the mushaf; it doesn't count as revision. Tick it when you're done."))}
         </>
       )}
 
       {forecast && (
         <p className="px-1 text-xs leading-relaxed text-muted">
           {forecast.done
-            ? "Everything in your target is memorized. Revision continues every day."
+            ? t("Everything in your target is memorized. Revision continues every day.")
             : forecast.completionDate
-              ? `At this pace you'll finish your target around ${formatDate(forecast.completionDate)}.`
-              : "With the current settings no new material is scheduled."}
-          {streak && streak.current > 0 && ` Streak: ${streak.current} day${streak.current === 1 ? "" : "s"}.`}
+              ? t("At this pace you'll finish your target around {date}.", { date: formatDate(forecast.completionDate) })
+              : t("With the current settings no new material is scheduled.")}
+          {streak && streak.current > 0 && " " + tp({ one: "Streak: {n} day.", other: "Streak: {n} days." }, streak.current)}
         </p>
       )}
 
       {round && (
-        <Sheet open={roundOpen} onClose={() => setRoundOpen(false)} title={`Manzil: the last ${round.cycleDays} days`}>
+        <Sheet open={roundOpen} onClose={() => setRoundOpen(false)} title={t("Manzil: the last {n} days", { n: round.cycleDays })}>
           <ManzilDetails round={round} today={today} todayPages={new Set(items.filter((i) => i.kind === "manzil" && !i.done).map((i) => i.page!))} labelOf={(p) => {
             const u = unitByPage.get(p);
             return u ? q.rangeLabel(u.ayahs) : "";
@@ -230,10 +245,11 @@ export default function TodayPage() {
         </Sheet>
       )}
 
-      <Sheet open={extraOpen} onClose={() => setExtraOpen(false)} title="How far did you get?">
+      <Sheet open={extraOpen} onClose={() => setExtraOpen(false)} title={t("How far did you get?")}>
         <p className="mb-3 text-sm text-muted">
-          Pick the last ayah you memorized today. Today&apos;s portion is ticked, the extra goes into revision like any new portion, and
-          tomorrow continues after it. Your daily amount stays the same.
+          {t(
+            "Pick the last ayah you memorized today. Today's portion is ticked, the extra goes into revision like any new portion, and tomorrow continues after it. Your daily amount stays the same.",
+          )}
         </p>
         <ul className="divide-y divide-border rounded-xl border border-border">
           {extra.map((step) => (
@@ -246,13 +262,13 @@ export default function TodayPage() {
                     setExtraOpen(false);
                   })
                 }
-                className="flex w-full items-baseline justify-between px-3 py-2.5 text-left text-sm hover:bg-surface-2 disabled:opacity-50"
+                className="flex w-full items-baseline justify-between px-3 py-2.5 text-start text-sm hover:bg-surface-2 disabled:opacity-50"
               >
                 <span>
-                  {q.surah(q.surahOf[step.index]).nameEn} {q.ayahOf[step.index]}
+                  {q.surahName(q.surahOf[step.index])} {q.ayahOf[step.index]}
                 </span>
                 <span className="text-xs text-muted">
-                  +{step.lines} line{step.lines === 1 ? "" : "s"} · page {q.pageOf[step.index]}
+                  +{tp({ one: "{n} line", other: "{n} lines" }, step.lines)} · {t("page {n}", { n: q.pageOf[step.index] })}
                 </span>
               </button>
             </li>
@@ -268,37 +284,36 @@ export default function TodayPage() {
 }
 
 function Welcome() {
+  useLang();
   return (
     <div className="space-y-4 pt-6">
-      <PageTitle title="Assalamu alaikum" subtitle="Let's set up a memorization plan that fits your life." />
+      <PageTitle title={t("Assalamu alaikum")} subtitle={t("Let's set up a memorization plan that fits your life.")} />
       <Card className="space-y-3">
         <p className="text-sm leading-relaxed text-muted">
-          Each study day has three parts: <b className="text-text">sabaq</b> (new material), <b className="text-text">sabqi</b> (what
-          you learned in the last week) and <b className="text-text">manzil</b> (a rotating slice of everything older). The plan adapts as
-          you go.{" "}
-          <Link href="/guide/" className="text-accent underline-offset-2 hover:underline">
-            Read the guide
-          </Link>
+          <Rich
+            text={t(
+              "Each study day has three parts: **sabaq** (new material), **sabqi** (what you learned in the last week) and **manzil** (a rotating slice of everything older). The plan adapts as you go. [Read the guide](/guide/)",
+            )}
+          />
         </p>
         <div className="flex flex-col gap-2 sm:flex-row">
           {AI_ENABLED && (
             <Link href="/onboarding/" className="flex-1">
               <Button variant="primary" className="w-full">
-                Describe your goal
+                {t("Describe your goal")}
               </Button>
             </Link>
           )}
           <Link href="/plan/?new=1" className="flex-1">
             <Button variant={AI_ENABLED ? "secondary" : "primary"} className="w-full">
-              Set it up by hand
+              {t("Set it up by hand")}
             </Button>
           </Link>
         </div>
         <SignInNudge newUser />
         {!AI_ENABLED && (
           <p className="text-xs text-muted">
-            AI planning is available when you run the app on your computer. Everything else works here. You can also import a backup in
-            Settings.
+            {t("AI planning is available when you run the app on your computer. Everything else works here. You can also import a backup in Settings.")}
           </p>
         )}
       </Card>
@@ -311,24 +326,28 @@ function ManzilProgress({ round, onOpen }: { round: ManzilRound; onOpen: () => v
   const done = round.revised.length;
   const pct = Math.round((done / round.total) * 100);
   return (
-    <button onClick={onOpen} className="mt-3 block w-full rounded-xl bg-surface-2 p-3 text-left hover:ring-1 hover:ring-border">
+    <button onClick={onOpen} className="mt-3 block w-full rounded-xl bg-surface-2 p-3 text-start hover:ring-1 hover:ring-border">
       <span className="flex items-baseline justify-between gap-3 text-sm">
         <span>
-          Last {round.cycleDays} days:{" "}
-          <b>
-            {done} of {round.total}
-          </b>{" "}
-          page{round.total === 1 ? "" : "s"} revised
+          <Rich
+            text={tp({ one: "Last {days} days: **{done} of {n}** page revised", other: "Last {days} days: **{done} of {n}** pages revised" }, round.total, {
+              days: round.cycleDays,
+              done,
+            })}
+          />
         </span>
-        <span className="shrink-0 text-xs font-medium text-accent">Details</span>
+        <span className="shrink-0 text-xs font-medium text-accent">{t("Details")}</span>
       </span>
       <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-border" aria-hidden>
         <span className="block h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
       </span>
       <span className="mt-1.5 block text-xs text-muted">
         {round.coming.length
-          ? `${round.coming.length} still to come, about ${round.pagesPerDay === 0.5 ? "half a page" : `${round.pagesPerDay} page${round.pagesPerDay === 1 ? "" : "s"}`} a day.`
-          : "Every manzil page has been revised in this time."}
+          ? t("{n} still to come, about {pace} a day.", {
+              n: round.coming.length,
+              pace: round.pagesPerDay === 0.5 ? t("half a page") : tp({ one: "{n} page", other: "{n} pages" }, round.pagesPerDay),
+            })
+          : t("Every manzil page has been revised in this time.")}
       </span>
     </button>
   );
@@ -345,11 +364,11 @@ function ManzilDetails({
   todayPages: Set<number>;
   labelOf: (page: number) => string;
 }) {
-  const when = (d: string) => (d === today ? "today" : d === addDays(today, -1) ? "yesterday" : formatDate(d, { day: "numeric", month: "short" }));
+  const when = (d: string) => (d === today ? t("today") : d === addDays(today, -1) ? t("yesterday") : formatDate(d, { day: "numeric", month: "short" }));
   const row = (page: number, right: string, key: string) => (
     <li key={key} className="flex items-baseline justify-between gap-3 py-2 text-sm">
       <span className="min-w-0">
-        <span className="font-medium">Page {page}</span> <span className="text-muted">· {labelOf(page)}</span>
+        <span className="font-medium">{t("Page {n}", { n: page })}</span> <span className="text-muted">· {labelOf(page)}</span>
       </span>
       <span className="shrink-0 text-xs text-muted">{right}</span>
     </li>
@@ -357,22 +376,22 @@ function ManzilDetails({
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted">
-        Manzil brings every older page round about once every {round.cycleDays} days, a few pages a day. Weak and overdue pages come first.
+        {t("Manzil brings every older page round about once every {n} days, a few pages a day. Weak and overdue pages come first.", { n: round.cycleDays })}
       </p>
       <section>
-        <h3 className="text-sm font-semibold">Coming up ({round.coming.length})</h3>
+        <h3 className="text-sm font-semibold">{t("Coming up ({n})", { n: round.coming.length })}</h3>
         {round.coming.length ? (
-          <ol className="divide-y divide-border">{round.coming.map((p, k) => row(p, todayPages.has(p) ? "today" : k === 0 ? "next" : "", `c${p}`))}</ol>
+          <ol className="divide-y divide-border">{round.coming.map((p, k) => row(p, todayPages.has(p) ? t("today") : k === 0 ? t("next") : "", `c${p}`))}</ol>
         ) : (
-          <p className="mt-1 text-sm text-muted">Nothing: every page has been revised in this time.</p>
+          <p className="mt-1 text-sm text-muted">{t("Nothing: every page has been revised in this time.")}</p>
         )}
       </section>
       <section>
-        <h3 className="text-sm font-semibold">Revised ({round.revised.length})</h3>
+        <h3 className="text-sm font-semibold">{t("Revised ({n})", { n: round.revised.length })}</h3>
         {round.revised.length ? (
           <ol className="divide-y divide-border">{round.revised.map((r) => row(r.page, when(r.date), `r${r.page}`))}</ol>
         ) : (
-          <p className="mt-1 text-sm text-muted">Nothing yet.</p>
+          <p className="mt-1 text-sm text-muted">{t("Nothing yet.")}</p>
         )}
       </section>
     </div>

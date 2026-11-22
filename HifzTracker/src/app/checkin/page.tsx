@@ -1,5 +1,4 @@
 "use client";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { weeklySummary } from "@/core/stats";
@@ -10,10 +9,14 @@ import { AI_ENABLED, askAssistant } from "@/lib/ai-client";
 import { acceptPreview, previewChange, q } from "@/lib/app";
 import type { PlanConfig, PlanPatch } from "@/core/plan/schema";
 import type { MemUnit } from "@/core/srs";
+import { getLang, t } from "@/i18n";
+import { useLang } from "@/i18n/react";
+import { Rich } from "@/components/Language";
 import { Button, Card, Notice, PageTitle, PrivacyNote, Spinner } from "@/components/ui";
 import { PreviewTable } from "@/components/Preview";
 
 export default function CheckinPage() {
+  useLang();
   const today = useToday();
   const plan = usePlan();
   const units = useUnits();
@@ -29,12 +32,12 @@ export default function CheckinPage() {
   const current = checkins?.find((c) => c.date === today) ?? null;
 
   if (plan === undefined || !summary) return null;
-  if (!plan) return <Card>No plan yet.</Card>;
+  if (!plan) return <Card>{t("No plan yet.")}</Card>;
 
   const run = async () => {
     setLoading(true);
     setError(null);
-    const r = await askAssistant({ mode: "checkin", today, config: plan.config, summary });
+    const r = await askAssistant({ mode: "checkin", today, config: plan.config, summary, language: getLang() });
     setLoading(false);
     if (!r.ok) return setError(r.error.message);
     if (r.mode !== "checkin") return;
@@ -61,36 +64,32 @@ export default function CheckinPage() {
 
   return (
     <div className="space-y-4">
-      <PageTitle title="Weekly check-in" subtitle="A look at the last 7 days, with up to 3 suggestions you can take or leave." />
+      <PageTitle title={t("Weekly check-in")} subtitle={t("A look at the last 7 days, with up to 3 suggestions you can take or leave.")} />
       <Card>
-        <h2 className="mb-2 font-semibold">This week</h2>
+        <h2 className="mb-2 font-semibold">{t("This week")}</h2>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
-          <Stat label="Active days" value={`${summary.activeDays}/${summary.scheduledDays}`} />
-          <Stat label="Items done" value={`${summary.completionRate}%`} />
-          <Stat label="Streak" value={`${summary.currentStreak}`} />
-          <Stat label="Strong / okay / weak" value={`${summary.ratings.strong} / ${summary.ratings.okay} / ${summary.ratings.weak}`} />
-          <Stat label="Overdue pages" value={`${summary.overduePages}`} />
-          <Stat label="Weak pages" value={`${summary.weakPages}`} />
+          <Stat label={t("Active days")} value={`${summary.activeDays}/${summary.scheduledDays}`} />
+          <Stat label={t("Items done")} value={`${summary.completionRate}%`} />
+          <Stat label={t("Streak")} value={`${summary.currentStreak}`} />
+          <Stat label={t("Strong / okay / weak")} value={`${summary.ratings.strong} / ${summary.ratings.okay} / ${summary.ratings.weak}`} />
+          <Stat label={t("Overdue pages")} value={`${summary.overduePages}`} />
+          <Stat label={t("Weak pages")} value={`${summary.weakPages}`} />
         </dl>
       </Card>
 
       {!AI_ENABLED ? (
         <Notice>
-          Check-in suggestions come from the AI, which works when the app runs locally. You can always{" "}
-          <Link href="/plan/" className="underline">
-            adjust the plan by hand
-          </Link>
-          .
+          <Rich text={t("Check-in suggestions come from the AI, which works when the app runs locally. You can always [adjust the plan by hand](/plan/).")} />
         </Notice>
       ) : !current ? (
         <div className="space-y-2">
           <Button variant="primary" onClick={run} disabled={loading}>
             {loading ? (
               <>
-                <Spinner /> Asking…
+                <Spinner /> {t("Asking…")}
               </>
             ) : (
-              "Get suggestions"
+              t("Get suggestions")
             )}
           </Button>
           {error && <p className="rounded-xl bg-danger-soft px-3 py-2 text-sm">{error}</p>}
@@ -101,7 +100,7 @@ export default function CheckinPage() {
           <Card>
             <p className="text-sm leading-relaxed">{current.message}</p>
           </Card>
-          {current.suggestions.length === 0 && <p className="text-sm text-muted">No changes suggested. Keep going.</p>}
+          {current.suggestions.length === 0 && <p className="text-sm text-muted">{t("No changes suggested. Keep going.")}</p>}
           {current.suggestions.map((s) => (
             <SuggestionCard
               key={s.id}
@@ -141,12 +140,13 @@ function SuggestionCard({
   onStatus: (st: CheckinSuggestion["status"]) => Promise<void>;
 }) {
   const router = useRouter();
+  useLang();
   const preview = previewChange({ base: config, hasPlan: true, patch: s.patch as PlanPatch, units, today });
   return (
     <Card className="space-y-2">
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-medium">{s.title}</h3>
-        {s.status !== "pending" && <span className="text-xs text-muted">{s.status === "accepted" ? "Accepted" : "Dismissed"}</span>}
+        {s.status !== "pending" && <span className="text-xs text-muted">{s.status === "accepted" ? t("Accepted") : t("Dismissed")}</span>}
       </div>
       <p className="text-sm text-muted">{s.reason}</p>
       {s.status === "pending" &&
@@ -161,7 +161,7 @@ function SuggestionCard({
                   await onStatus("accepted");
                 }}
               >
-                Accept
+                {t("Accept")}
               </Button>
               <Button
                 onClick={async () => {
@@ -169,15 +169,15 @@ function SuggestionCard({
                   router.push("/plan/");
                 }}
               >
-                Edit
+                {t("Edit")}
               </Button>
               <Button variant="ghost" onClick={() => onStatus("dismissed")}>
-                Dismiss
+                {t("Dismiss")}
               </Button>
             </div>
           </>
         ) : (
-          <p className="text-sm text-danger">This suggestion no longer fits your plan ({preview.errors[0]}).</p>
+          <p className="text-sm text-danger">{t("This suggestion no longer fits your plan ({reason}).", { reason: preview.errors[0] })}</p>
         ))}
     </Card>
   );

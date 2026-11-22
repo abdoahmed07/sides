@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { q } from "@/lib/app";
+import { t } from "@/i18n";
+import { useLang } from "@/i18n/react";
 
 let textCache: Promise<string[]> | null = null;
 /** The full Uthmani text is a separate chunk, loaded only when first needed. */
@@ -14,11 +16,12 @@ const toArabicDigits = (n: number) => String(n).replace(/\d/g, (d) => "٠١٢٣�
 export function AyahText({ indices }: { indices: number[] }) {
   const [text, setText] = useState<string[] | null>(null);
   const [error, setError] = useState(false);
+  const lang = useLang();
   useEffect(() => {
     loadText().then(setText, () => setError(true));
   }, []);
-  if (error) return <p className="text-sm text-danger">Could not load the text.</p>;
-  if (!text) return <p className="text-sm text-muted">Loading text…</p>;
+  if (error) return <p className="text-sm text-danger">{t("Could not load the text.")}</p>;
+  if (!text) return <p className="text-sm text-muted">{t("Loading text…")}</p>;
   const sorted = [...indices].sort((a, b) => a - b);
   // Group by surah so each surah gets its own heading.
   const groups: number[][] = [];
@@ -35,9 +38,9 @@ export function AyahText({ indices }: { indices: number[] }) {
           <div key={g[0]}>
             <p className="mb-1 flex items-baseline justify-between text-xs text-muted">
               <span>
-                {s.nameEn} · page {q.pageOf[g[0]]}
+                {q.surahName(s.n)} · {t("page {n}", { n: q.pageOf[g[0]] })}
               </span>
-              <span className="quran text-base leading-normal">{s.name}</span>
+              {lang !== "ar" && <span className="quran text-base leading-normal">{s.name}</span>}
             </p>
             <p className="quran" lang="ar">
               {g.map((i) => (
@@ -79,8 +82,8 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
         {/* Stays put while the text scrolls. */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-3">
           <h2 className="font-semibold">{title}</h2>
-          <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm font-medium text-muted hover:bg-surface-2" aria-label="Close">
-            Close
+          <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm font-medium text-muted hover:bg-surface-2" aria-label={t("Close")}>
+            {t("Close")}
           </button>
         </div>
         {/* Extra room at the bottom on phones, so the last lines can scroll above the browser's toolbar. */}

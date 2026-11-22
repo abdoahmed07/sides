@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { isIsoDate, WEEKDAYS } from "../dates";
 import { SURAH_AYAH_COUNTS } from "../quran";
+import { tx } from "@/i18n";
 
 export const IsoDateSchema = z.string().refine(isIsoDate, "Must be a real date in YYYY-MM-DD format");
 export const WeekdaySchema = z.enum(WEEKDAYS);
@@ -35,12 +36,12 @@ export type RevisionLevel = z.infer<typeof RevisionLevelSchema>;
 
 /** Defaults per exception kind (used when the exception does not override them). */
 export const EXCEPTION_DEFAULTS: Record<z.infer<typeof ExceptionKindSchema>, { newMultiplier: number; revision: RevisionLevel; label: string }> = {
-  travel: { newMultiplier: 0, revision: "light", label: "Travel" },
-  exams: { newMultiplier: 0.5, revision: "light", label: "Exams" },
-  ramadan: { newMultiplier: 0.5, revision: "normal", label: "Ramadan" },
-  rest: { newMultiplier: 0, revision: "none", label: "Rest" },
-  light: { newMultiplier: 0.5, revision: "normal", label: "Lighter day" },
-  catchup: { newMultiplier: 0, revision: "extra", label: "Catch-up" },
+  travel: { newMultiplier: 0, revision: "light", label: tx("Travel") },
+  exams: { newMultiplier: 0.5, revision: "light", label: tx("Exams") },
+  ramadan: { newMultiplier: 0.5, revision: "normal", label: tx("Ramadan") },
+  rest: { newMultiplier: 0, revision: "none", label: tx("Rest") },
+  light: { newMultiplier: 0.5, revision: "normal", label: tx("Lighter day") },
+  catchup: { newMultiplier: 0, revision: "extra", label: tx("Catch-up") },
 };
 
 const ExceptionBody = {

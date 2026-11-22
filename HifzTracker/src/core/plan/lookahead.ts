@@ -5,6 +5,7 @@
  */
 import type { QuranIndex } from "../quran";
 import { NEVER } from "./engine";
+import { t, tp } from "@/i18n";
 
 /**
  * Day (0 = today) on which each page becomes fully memorized: -1 = already,
@@ -28,10 +29,10 @@ export function pagesBy(doneDays: Int32Array, day: number): number {
 
 /** "tomorrow", "in 5 days", "in 3 weeks", "in 4 months", "in 2.5 years". */
 export function inWords(days: number): string {
-  if (days <= 1) return "tomorrow";
-  if (days < 14) return `in ${days} days`;
-  if (days < 60) return `in ${Math.round(days / 7)} weeks`;
+  if (days <= 1) return t("tomorrow");
+  if (days < 14) return tp({ one: "in {n} day", other: "in {n} days" }, days);
+  if (days < 60) return tp({ one: "in {n} week", other: "in {n} weeks" }, Math.round(days / 7));
   const months = Math.round(days / 30.44);
-  if (months < 18) return `in ${months} months`;
-  return `in ${Math.round((days / 365.25) * 2) / 2} years`;
+  if (months < 18) return tp({ one: "in {n} month", other: "in {n} months" }, months);
+  return tp({ one: "in {n} year", other: "in {n} years" }, Math.round((days / 365.25) * 2) / 2);
 }

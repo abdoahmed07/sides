@@ -2,6 +2,8 @@
  * Calendar-date helpers on ISO "YYYY-MM-DD" strings. All math is done in UTC
  * so daylight-saving changes never shift a day. Pure; safe on server and client.
  */
+import { locale } from "@/i18n";
+
 export type IsoDate = string;
 
 export const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
@@ -55,7 +57,13 @@ export function maxDate(a: IsoDate, b: IsoDate): IsoDate {
 }
 
 export function formatDate(d: IsoDate, opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" }): string {
-  return new Date(toMs(d)).toLocaleDateString("en-GB", { ...opts, timeZone: "UTC" });
+  return new Date(toMs(d)).toLocaleDateString(locale(), { ...opts, timeZone: "UTC" });
+}
+
+/** Short weekday name in the active language ("Mon", "mån", "الاثنين"). */
+export function weekdayLabel(d: Weekday): string {
+  // 2026-11-01 is a Sunday.
+  return new Date(toMs("2026-11-01") + WEEKDAYS.indexOf(d) * DAY_MS).toLocaleDateString(locale(), { weekday: "short", timeZone: "UTC" });
 }
 
 /**

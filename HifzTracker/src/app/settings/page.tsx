@@ -9,6 +9,9 @@ import { Button, Card, Notice, PageTitle } from "@/components/ui";
 import { AccountCard, useSyncStatus } from "@/components/Account";
 import { deleteAccount } from "@/sync/sync";
 import { InstallCard } from "@/components/InstallCard";
+import { LanguagePicker, Rich } from "@/components/Language";
+import { t, tx } from "@/i18n";
+import { useLang } from "@/i18n/react";
 
 type Theme = "system" | "light" | "dark";
 
@@ -35,17 +38,17 @@ function applyTheme(t: Theme) {
 }
 
 const THEMES: { value: Theme; label: string }[] = [
-  { value: "system", label: "Same as phone" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
+  { value: "system", label: tx("Same as phone") },
+  { value: "light", label: tx("Light") },
+  { value: "dark", label: tx("Dark") },
 ];
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <Card className="space-y-3">
       <div>
-        <h2 className="font-semibold">{title}</h2>
-        {hint && <p className="text-sm text-muted">{hint}</p>}
+        <h2 className="font-semibold">{t(title)}</h2>
+        {hint && <p className="text-sm text-muted">{t(hint)}</p>}
       </div>
       {children}
     </Card>
@@ -62,6 +65,7 @@ export default function SettingsPage() {
   const [confirming, setConfirming] = useState<"data" | "account" | null>(null);
   const [busy, setBusy] = useState(false);
   const file = useRef<HTMLInputElement>(null);
+  useLang();
 
   // Setup details for whoever runs the app; regular users never see this.
   useEffect(() => {
@@ -85,13 +89,16 @@ export default function SettingsPage() {
   const importData = async (f: File) => {
     try {
       const parsed = BackupSchema.safeParse(JSON.parse(await f.text()));
-      if (!parsed.success) throw new Error("This file isn't a Hifz Tracker backup.");
-      const where = signedIn ? "on this device and in your account" : "on this device";
-      if (!confirm(`Replace everything ${where} with this backup from ${parsed.data.exportedAt.slice(0, 10)}? This can't be undone.`)) return;
+      if (!parsed.success) throw new Error(t("This file isn't a Hifz Tracker backup."));
+      const date = parsed.data.exportedAt.slice(0, 10);
+      const ask = signedIn
+        ? t("Replace everything on this device and in your account with this backup from {date}? This can't be undone.", { date })
+        : t("Replace everything on this device with this backup from {date}? This can't be undone.", { date });
+      if (!confirm(ask)) return;
       await repo.importAll(parsed.data);
-      setMsg({ tone: "info", text: `Restored your backup from ${parsed.data.exportedAt.slice(0, 10)}.` });
+      setMsg({ tone: "info", text: t("Restored your backup from {date}.", { date }) });
     } catch (e) {
-      setMsg({ tone: "danger", text: e instanceof SyntaxError ? "This file isn't a Hifz Tracker backup." : (e as Error).message });
+      setMsg({ tone: "danger", text: e instanceof SyntaxError ? t("This file isn't a Hifz Tracker backup.") : (e as Error).message });
     }
   };
 
@@ -100,7 +107,7 @@ export default function SettingsPage() {
     try {
       await repo.clearAll();
       setConfirming(null);
-      setMsg({ tone: "info", text: signedIn ? "Your plan and progress were deleted here and in your account." : "Your plan and progress were deleted." });
+      setMsg({ tone: "info", text: signedIn ? t("Your plan and progress were deleted here and in your account.") : t("Your plan and progress were deleted.") });
     } finally {
       setBusy(false);
     }
@@ -112,7 +119,7 @@ export default function SettingsPage() {
       const err = await deleteAccount();
       if (err) return setMsg({ tone: "danger", text: err });
       setConfirming(null);
-      setMsg({ tone: "info", text: "Your account and everything saved in it were deleted. This device still has its own copy." });
+      setMsg({ tone: "info", text: t("Your account and everything saved in it were deleted. This device still has its own copy.") });
     } finally {
       setBusy(false);
     }
@@ -120,66 +127,63 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-4">
-      <PageTitle title="Settings" />
+      <PageTitle title={t("Settings")} />
       {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
 
       <AccountCard />
       <InstallCard />
 
-      <Section title="Your plan" hint="What you memorize, how much a day, which days, revision, travel and history.">
+      <Section title={tx("Your plan")} hint={tx("What you memorize, how much a day, which days, revision, travel and history.")}>
         <div className="flex flex-wrap gap-2">
           <Link href="/plan/">
-            <Button>{plan ? "Edit plan" : "Set up a plan"}</Button>
+            <Button>{plan ? t("Edit plan") : t("Set up a plan")}</Button>
           </Link>
           {plan && AI_ENABLED && (
             <Link href="/adjust/">
-              <Button>Change it with the assistant</Button>
+              <Button>{t("Change it with the assistant")}</Button>
             </Link>
           )}
           {plan && AI_ENABLED && (
             <Link href="/checkin/">
-              <Button variant="ghost">Weekly check-in</Button>
+              <Button variant="ghost">{t("Weekly check-in")}</Button>
             </Link>
           )}
         </div>
       </Section>
 
-      <Section title="Appearance">
-        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Theme">
-          {THEMES.map((t) => (
+      <Section title={tx("Language and appearance")}>
+        <LanguagePicker />
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t("Theme")}>
+          {THEMES.map((th) => (
             <button
-              key={t.value}
+              key={th.value}
               role="radio"
-              aria-checked={theme === t.value}
-              onClick={() => applyTheme(t.value)}
-              className={`rounded-full border px-3.5 py-1.5 text-sm ${theme === t.value ? "border-accent bg-accent text-accent-text" : "border-border text-muted hover:border-accent hover:text-text"}`}
+              aria-checked={theme === th.value}
+              onClick={() => applyTheme(th.value)}
+              className={`rounded-full border px-3.5 py-1.5 text-sm ${theme === th.value ? "border-accent bg-accent text-accent-text" : "border-border text-muted hover:border-accent hover:text-text"}`}
             >
-              {t.label}
+              {t(th.label)}
             </button>
           ))}
         </div>
       </Section>
 
-      <Section title="Your data">
+      <Section title={tx("Your data")}>
         <p className="text-sm">
           {signedIn ? (
-            <>
-              ✓ Saved on this device <b>and in your account</b>, so you can use it on other devices too.
-            </>
+            <Rich text={t("✓ Saved on this device **and in your account**, so you can use it on other devices too.")} />
           ) : (
-            <>
-              Saved <b>only in this browser</b>. If you clear your browser data or lose this phone, it&apos;s gone.{" "}
-              <a href="#account" className="font-medium text-accent underline-offset-2 hover:underline">
-                Make an account
-              </a>{" "}
-              to keep it safe, or download a copy now and then.
-            </>
+            <Rich
+              text={t(
+                "Saved **only in this browser**. If you clear your browser data or lose this phone, it's gone. [Make an account](#account) to keep it safe, or download a copy now and then.",
+              )}
+            />
           )}
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={exportData}>Download a copy</Button>
+          <Button onClick={exportData}>{t("Download a copy")}</Button>
           <Button variant="ghost" onClick={() => file.current?.click()}>
-            Restore from a copy
+            {t("Restore from a copy")}
           </Button>
           <input
             ref={file}
@@ -195,38 +199,50 @@ export default function SettingsPage() {
         </div>
 
         <details className="group rounded-xl bg-surface-2 px-3 py-2 text-sm">
-          <summary className="cursor-pointer font-medium">What&apos;s stored where</summary>
-          <ul className="mt-2 list-disc space-y-1.5 pl-5 leading-relaxed text-muted">
+          <summary className="cursor-pointer font-medium">{t("What's stored where")}</summary>
+          <ul className="mt-2 list-disc space-y-1.5 ps-5 leading-relaxed text-muted">
             <li>
-              <b className="text-text">On this device:</b> your plan, progress, ratings and history.
+              <Rich text={t("**On this device:** your plan, progress, ratings and history.")} />
             </li>
             <li>
-              <b className="text-text">In your account</b> (only if you make one): your email, and a copy of that same data so it syncs between
-              devices. Only you can read it.
+              <Rich
+                text={t(
+                  "**In your account** (only if you make one): your email, and a copy of that same data so it syncs between devices. Only you can read it.",
+                )}
+              />
             </li>
             {AI_ENABLED && (
               <li>
-                <b className="text-text">When you use the assistant:</b> your message, your plan settings and short totals (like &ldquo;about 23 pages
-                memorized&rdquo;) are sent to the AI (Anthropic&apos;s Claude) to answer. Not your day-by-day history.
+                <Rich
+                  text={t(
+                    "**When you use the assistant:** your message, your plan settings and short totals (like “about 23 pages memorized”) are sent to the AI (Anthropic's Claude) to answer. Not your day-by-day history.",
+                  )}
+                />
               </li>
             )}
-            <li>No ads, no tracking, nothing sold. The AI never writes your schedule or any Quran text: the app computes the plan and you approve.</li>
+            <li>{t("No ads, no tracking, nothing sold. The AI never writes your schedule or any Quran text: the app computes the plan and you approve.")}</li>
           </ul>
         </details>
 
         <div className="space-y-2 border-t border-border pt-3">
           {confirming === "data" ? (
             <ConfirmBox
-              text={`This deletes your plan, progress and history ${signedIn ? "on this device and in your account" : "on this device"}. It can't be undone. Download a copy first if you might want it back.`}
-              action="Yes, delete my progress"
+              text={
+                signedIn
+                  ? t("This deletes your plan, progress and history on this device and in your account. It can't be undone. Download a copy first if you might want it back.")
+                  : t("This deletes your plan, progress and history on this device. It can't be undone. Download a copy first if you might want it back.")
+              }
+              action={t("Yes, delete my progress")}
               busy={busy}
               onConfirm={deleteData}
               onCancel={() => setConfirming(null)}
             />
           ) : confirming === "account" ? (
             <ConfirmBox
-              text="This deletes your account and the progress saved in it, on every device. This device keeps its own copy, without an account. It can't be undone."
-              action="Yes, delete my account"
+              text={t(
+                "This deletes your account and the progress saved in it, on every device. This device keeps its own copy, without an account. It can't be undone.",
+              )}
+              action={t("Yes, delete my account")}
               busy={busy}
               onConfirm={removeAccount}
               onCancel={() => setConfirming(null)}
@@ -234,11 +250,11 @@ export default function SettingsPage() {
           ) : (
             <div className="flex flex-wrap gap-2">
               <Button variant="danger" onClick={() => setConfirming("data")}>
-                Delete my progress
+                {t("Delete my progress")}
               </Button>
               {signedIn && (
                 <Button variant="danger" onClick={() => setConfirming("account")}>
-                  Delete my account
+                  {t("Delete my account")}
                 </Button>
               )}
             </div>
@@ -247,7 +263,7 @@ export default function SettingsPage() {
       </Section>
 
       <section className="space-y-1 px-1 text-xs text-muted">
-        <p>Quran text: Uthmani script from the Quran.com API (v4), Madinah Mushaf page layout.</p>
+        <p>{t("Quran text: Uthmani script from the Quran.com API (v4), Madinah Mushaf page layout.")}</p>
         {aiStatus && <p>Assistant (only shown while developing): {aiStatus}</p>}
       </section>
     </div>
@@ -260,10 +276,10 @@ function ConfirmBox({ text, action, busy, onConfirm, onCancel }: { text: string;
       <p className="text-sm">{text}</p>
       <div className="flex flex-wrap gap-2">
         <Button variant="danger" disabled={busy} onClick={onConfirm}>
-          {busy ? "Deleting…" : action}
+          {busy ? t("Deleting…") : action}
         </Button>
         <Button variant="ghost" disabled={busy} onClick={onCancel}>
-          Keep it
+          {t("Keep it")}
         </Button>
       </div>
     </div>

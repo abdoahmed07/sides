@@ -17,36 +17,36 @@ const valid = {
 };
 
 describe("plan replies", () => {
-  it("accepts a valid proposal", () => {
-    const r = validateOutput(JSON.stringify(valid), PlanReplySchema);
+  it("accepts a valid proposal", async () => {
+    const r = await validateOutput(JSON.stringify(valid), PlanReplySchema);
     expect(r.ok).toBe(true);
   });
 
-  it("accepts a follow-up question with no patch", () => {
-    const r = validateOutput(
+  it("accepts a follow-up question with no patch", async () => {
+    const r = await validateOutput(
       JSON.stringify({ kind: "ask", message: "A couple of quick questions.", questions: ["Where would you like to start?", "How many minutes a day?"], patch: null, markMemorized: null }),
       PlanReplySchema,
     );
     expect(r.ok).toBe(true);
   });
 
-  it("tolerates a fenced JSON block", () => {
-    expect(validateOutput("```json\n" + JSON.stringify(valid) + "\n```", PlanReplySchema).ok).toBe(true);
+  it("tolerates a fenced JSON block", async () => {
+    expect((await validateOutput("```json\n" + JSON.stringify(valid) + "\n```", PlanReplySchema)).ok).toBe(true);
   });
 
-  it("rejects non-JSON and truncated output", () => {
-    expect(validateOutput("Sure! Here's your plan…", PlanReplySchema).ok).toBe(false);
-    expect(validateOutput(JSON.stringify(valid).slice(0, 80), PlanReplySchema).ok).toBe(false);
+  it("rejects non-JSON and truncated output", async () => {
+    expect((await validateOutput("Sure! Here's your plan…", PlanReplySchema)).ok).toBe(false);
+    expect((await validateOutput(JSON.stringify(valid).slice(0, 80), PlanReplySchema)).ok).toBe(false);
   });
 
-  it("rejects more than 3 follow-up questions", () => {
-    const r = validateOutput(JSON.stringify({ ...valid, kind: "ask", questions: ["a", "b", "c", "d"], patch: null }), PlanReplySchema);
+  it("rejects more than 3 follow-up questions", async () => {
+    const r = await validateOutput(JSON.stringify({ ...valid, kind: "ask", questions: ["a", "b", "c", "d"], patch: null }), PlanReplySchema);
     expect(r.ok).toBe(false);
   });
 
-  it("rejects 'ask' without questions and 'propose' without a change", () => {
-    expect(validateOutput(JSON.stringify({ ...valid, kind: "ask", questions: [], patch: null, markMemorized: null }), PlanReplySchema).ok).toBe(false);
-    expect(validateOutput(JSON.stringify({ ...valid, patch: null, markMemorized: null }), PlanReplySchema).ok).toBe(false);
+  it("rejects 'ask' without questions and 'propose' without a change", async () => {
+    expect((await validateOutput(JSON.stringify({ ...valid, kind: "ask", questions: [], patch: null, markMemorized: null }), PlanReplySchema)).ok).toBe(false);
+    expect((await validateOutput(JSON.stringify({ ...valid, patch: null, markMemorized: null }), PlanReplySchema)).ok).toBe(false);
   });
 
   it.each([
@@ -63,19 +63,19 @@ describe("plan replies", () => {
     ["too many exceptions", { addExceptions: Array.from({ length: 11 }, () => ({ from: TODAY, to: TODAY, kind: "rest" })) }],
     ["exception longer than a year", { addExceptions: [{ from: "2026-12-01", to: "2028-12-01", kind: "travel" }] }],
     ["unknown exception kind", { addExceptions: [{ from: TODAY, to: TODAY, kind: "party" }] }],
-  ])("rejects malicious / out-of-range patch: %s", (_, patch) => {
-    const r = validateOutput(JSON.stringify({ ...valid, patch }), PlanReplySchema);
+  ])("rejects malicious / out-of-range patch: %s", async (_, patch) => {
+    const r = await validateOutput(JSON.stringify({ ...valid, patch }), PlanReplySchema);
     expect(r.ok).toBe(false);
   });
 
-  it("rejects any Arabic script (the AI must never output Quran text)", () => {
+  it("rejects any Arabic script (the AI must never output Quran text)", async () => {
     const withQuran = { ...valid, message: "Start with قُلْ أَعُوذُ بِرَبِّ ٱلنَّاسِ today." };
-    expect(validateOutput(JSON.stringify(withQuran), PlanReplySchema).ok).toBe(false);
+    expect((await validateOutput(JSON.stringify(withQuran), PlanReplySchema)).ok).toBe(false);
     expect(containsArabic("Al-Mulk")).toBe(false);
   });
 
-  it("rejects overly long messages", () => {
-    expect(validateOutput(JSON.stringify({ ...valid, message: "x".repeat(5000) }), PlanReplySchema).ok).toBe(false);
+  it("rejects overly long messages", async () => {
+    expect((await validateOutput(JSON.stringify({ ...valid, message: "x".repeat(5000) }), PlanReplySchema)).ok).toBe(false);
   });
 });
 
@@ -83,26 +83,26 @@ describe("explanations may only use engine numbers", () => {
   const facts = { after: { dailyNewLines: 7, completionDate: "2027-08-14", typicalMinutes: 32, studyDaysPerWeek: 6 } };
   const allowed = allowedNumbers(facts);
 
-  it("passes when every number comes from the facts", () => {
+  it("passes when every number comes from the facts", async () => {
     const text = "You'll learn 7 lines a day on 6 days a week, about 32 minutes, finishing around 14 August 2027.";
     expect(unapprovedNumbers(text, allowed)).toEqual([]);
   });
 
-  it("flags invented numbers", () => {
+  it("flags invented numbers", async () => {
     expect(unapprovedNumbers("This takes about 45 minutes and finishes in 90 days.", allowed)).toEqual(["45", "90"]);
   });
 
-  it("tool input and check-in schemas validate shape and limits", () => {
+  it("tool input and check-in schemas validate shape and limits", async () => {
     expect(PreviewToolInputSchema.safeParse({ patch: { set: { dailyNewLines: 5 } }, markMemorized: null }).success).toBe(true);
     expect(PreviewToolInputSchema.safeParse({ patch: { set: { dailyNewLines: 99 } }, markMemorized: null }).success).toBe(false);
-    expect(validateOutput(JSON.stringify({ message: "Well done.", suggestions: [] }), CheckinReplySchema).ok).toBe(true);
+    expect((await validateOutput(JSON.stringify({ message: "Well done.", suggestions: [] }), CheckinReplySchema)).ok).toBe(true);
     const four = Array.from({ length: 4 }, () => ({ title: "t", reason: "r", patch: { set: { dailyNewLines: 3 } } }));
-    expect(validateOutput(JSON.stringify({ message: "m", suggestions: four }), CheckinReplySchema).ok).toBe(false);
+    expect((await validateOutput(JSON.stringify({ message: "m", suggestions: four }), CheckinReplySchema)).ok).toBe(false);
   });
 });
 
 describe("request validation and rate limiting", () => {
-  it("rejects over-long user messages", () => {
+  it("rejects over-long user messages", async () => {
     const req = {
       mode: "plan",
       purpose: "create",
@@ -114,10 +114,42 @@ describe("request validation and rate limiting", () => {
     expect(AssistantRequestSchema.safeParse(req).success).toBe(true);
   });
 
-  it("limits requests per window", () => {
+  it("limits requests per window", async () => {
     const t = 1_000_000;
     for (let k = 0; k < 3; k++) expect(rateLimit("test-ip", 3, 1000, t + k).ok).toBe(true);
     expect(rateLimit("test-ip", 3, 1000, t + 5).ok).toBe(false);
     expect(rateLimit("test-ip", 3, 1000, t + 2000).ok).toBe(true);
+  });
+});
+
+describe("Arabic replies", () => {
+  const reply = (message: string) => JSON.stringify({ kind: "chat", message, questions: [], patch: null, markMemorized: null });
+
+  it("are allowed in Arabic, but never in English or Swedish", async () => {
+    const msg = "خطتك جاهزة: 15 سطراً كل يوم، وستنتهي حوالي 19 ديسمبر. سورة الملك من ضمنها.";
+    expect((await validateOutput(reply(msg), PlanReplySchema, { arabic: true })).ok).toBe(true);
+    expect((await validateOutput(reply(msg), PlanReplySchema)).ok).toBe(false);
+  });
+
+  it("reject Quran text, vowelled or not", async () => {
+    const vowelled = "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ";
+    const plain = "اقرأ معي: تبارك الذي بيده الملك وهو على كل شيء قدير";
+    expect((await validateOutput(reply(vowelled), PlanReplySchema, { arabic: true })).ok).toBe(false);
+    expect((await validateOutput(reply(plain), PlanReplySchema, { arabic: true })).ok).toBe(false);
+  });
+
+  it("accept everyday Arabic with a few marks, like every Arabic text in the app", async () => {
+    const { looksLikeQuran } = await import("../src/ai/validate");
+    const { default: ar } = await import("../src/i18n/ar");
+    const prose = "حسناً، سأضع لك خطة لحفظ جزء عمّ: صفحة واحدة يومياً تقريباً، من السبت إلى الخميس. ستنتهي غالباً بعد شهر تقريباً.";
+    expect(await looksLikeQuran(prose)).toBe(false);
+    const flagged: string[] = [];
+    for (const v of Object.values(ar)) for (const s of typeof v === "string" ? [v] : Object.values(v)) if (await looksLikeQuran(s)) flagged.push(s);
+    expect(flagged).toEqual([]);
+  });
+
+  it("count Arabic-Indic digits in the numbers check", () => {
+    expect(unapprovedNumbers("ستحفظ ١٥ سطراً", new Set(["15"]))).toEqual([]);
+    expect(unapprovedNumbers("ستحفظ ٢٠ سطراً", new Set(["15"]))).toEqual(["20"]);
   });
 });

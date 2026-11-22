@@ -12,6 +12,7 @@ import { dayIntensity, type DayIntensity } from "../plan/engine";
 import type { PlanConfig, RevisionLevel } from "../plan/schema";
 import { buildSequence, takePortion } from "../plan/sequence";
 import type { MemUnit } from "../srs";
+import { tx } from "@/i18n";
 
 export type DayPlan = {
   date: IsoDate;
@@ -80,18 +81,18 @@ export function buildDay(config: PlanConfig, q: QuranIndex, units: MemUnit[], da
   let quota = Math.round(config.dailyNewLines * intensity.newMultiplier);
   let sabaqNote: string | null = null;
   if (intensity.exception && intensity.newMultiplier < 1) {
-    sabaqNote = intensity.newMultiplier === 0 ? "No new material today (plan exception)." : "Lighter new portion today (plan exception).";
+    sabaqNote = intensity.newMultiplier === 0 ? tx("No new material today (plan exception).") : tx("Lighter new portion today (plan exception).");
   }
   const backlogUnit = Math.max(15, manzilQuotaLines);
   if (quota > 0 && config.pauseNewUntilCaughtUp && overdueLines > 0) {
     quota = 0;
-    sabaqNote = "New memorization is paused until overdue revision is caught up.";
+    sabaqNote = tx("New memorization is paused until overdue revision is caught up.");
   } else if (quota > 0 && overdueLines > 4 * backlogUnit) {
     quota = 0;
-    sabaqNote = "Revision is far behind, so today is revision only.";
+    sabaqNote = tx("Revision is far behind, so today is revision only.");
   } else if (quota > 0 && overdueLines > 2 * backlogUnit) {
     quota = Math.max(1, Math.floor(quota / 2));
-    sabaqNote = "Revision is behind, so today's new portion is halved.";
+    sabaqNote = tx("Revision is behind, so today's new portion is halved.");
   }
 
   let sabaq: DayPlan["sabaq"] = null;

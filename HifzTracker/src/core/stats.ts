@@ -7,6 +7,7 @@ import { dayIntensity } from "./plan/engine";
 import type { PlanConfig } from "./plan/schema";
 import { TOTAL_PAGES, type QuranIndex } from "./quran";
 import { unitStatus, type MemUnit, type Strength } from "./srs";
+import { t, tp } from "@/i18n";
 
 /**
  * A streak counts consecutive scheduled days with at least one completed item.
@@ -75,9 +76,9 @@ export function totals(units: MemUnit[], q: QuranIndex) {
 
 /** Pages as people count them: "43 pages", "1 page", "43 pages + part of 1 more", "part of 2 pages". */
 export function pagesLabel(full: number, partial = 0): string {
-  const p = (n: number) => `${n} page${n === 1 ? "" : "s"}`;
-  if (full === 0) return partial ? `part of ${p(partial)}` : "0 pages";
-  return partial ? `${p(full)} + part of ${partial} more` : p(full);
+  if (full === 0) return partial ? tp({ one: "part of {n} page", other: "part of {n} pages" }, partial) : t("0 pages");
+  const pages = tp({ one: "{n} page", other: "{n} pages" }, full);
+  return partial ? t("{pages} + part of {n} more", { pages, n: partial }) : pages;
 }
 
 export function juzProgress(units: MemUnit[], q: QuranIndex) {

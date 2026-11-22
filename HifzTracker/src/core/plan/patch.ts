@@ -5,6 +5,7 @@
  * the past are clipped to today.
  */
 import type { IsoDate } from "../dates";
+import { tx } from "@/i18n";
 import {
   PlanConfigSchema,
   PlanPatchSchema,
@@ -135,5 +136,5 @@ function defaultId(): string {
 
 /** Convenience: a one-day catch-up exception for `date`. */
 export function catchUpPatch(date: IsoDate): PlanPatch {
-  return { addExceptions: [{ from: date, to: date, kind: "catchup", note: "Catch-up day" }] };
+  return { addExceptions: [{ from: date, to: date, kind: "catchup", note: tx("Catch-up day") }] };
 }

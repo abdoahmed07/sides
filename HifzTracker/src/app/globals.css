@@ -65,7 +65,7 @@
   --color-warn-soft: var(--warn-soft);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-geist-sans), var(--font-noto-arabic), ui-sans-serif, system-ui, sans-serif;
   --font-quran: var(--font-amiri-quran), "Amiri Quran", serif;
 }
 
@@ -101,4 +101,14 @@ select,
 textarea {
   color: var(--text);
   background: var(--surface);
+}
+
+/* Hidden for a moment while a saved non-English language is applied (no flash of English). */
+html.i18n-pending body {
+  visibility: hidden;
+}
+/* Arabic interface text: a font made for it, a little taller lines. */
+html[lang="ar"] body {
+  font-family: var(--font-noto-arabic), var(--font-geist-sans), system-ui, sans-serif;
+  line-height: 1.65;
 }

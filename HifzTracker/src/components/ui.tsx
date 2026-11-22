@@ -1,5 +1,7 @@
 "use client";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { t } from "@/i18n";
+import { useLang } from "@/i18n/react";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <section className={`rounded-2xl border border-border bg-surface p-4 ${className}`}>{children}</section>;
@@ -61,10 +63,12 @@ export function Spinner() {
 }
 
 export function PrivacyNote() {
+  useLang();
   return (
     <p className="text-xs leading-relaxed text-muted">
-      Privacy: only what you type here plus aggregate numbers (e.g. pages memorized, completion rate) are sent to the AI. Your
-      daily history, ratings per page and notes stay on this device.
+      {t(
+        "Privacy: only what you type here plus aggregate numbers (e.g. pages memorized, completion rate) are sent to the AI. Your daily history and ratings per page are not.",
+      )}
     </p>
   );
 }

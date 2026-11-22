@@ -9,6 +9,7 @@
 import { addDays, diffDays, type IsoDate } from "./dates";
 import { dayIntensity } from "./plan/engine";
 import type { PlanConfig, PlanPatch } from "./plan/schema";
+import { tx } from "@/i18n";
 
 export type MissedInfo = { missedDays: IsoDate[]; since: IsoDate | null };
 
@@ -50,7 +51,7 @@ export function missedChoicePatch(choice: MissedChoice, today: IsoDate): PlanPat
     case "shift":
       return null; // nothing to change; the forecast moves on its own
     case "catchup":
-      return { addExceptions: [{ from: today, to: today, kind: "catchup", note: "Catch-up after missed days" }] };
+      return { addExceptions: [{ from: today, to: today, kind: "catchup", note: tx("Catch-up after missed days") }] };
     case "pause":
       return { set: { pauseNewUntilCaughtUp: true } };
   }

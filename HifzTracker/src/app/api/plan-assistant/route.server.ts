@@ -144,6 +144,7 @@ export async function POST(req: NextRequest) {
         schema: PlanReplySchema,
         messages: turns,
         tools: planTools(r, seen),
+        language: r.context.language,
         modeNote:
           r.purpose === "create"
             ? "Plan mode, creating a new plan. The context's `config` is the default starting point; your patch is applied on top of it."
@@ -169,6 +170,7 @@ export async function POST(req: NextRequest) {
         },
       ],
       modeNote: "Check-in mode.",
+      language: r.language,
     });
     return NextResponse.json<AssistantResponse>({ ok: true, mode: "checkin", reply });
   } catch (err) {
