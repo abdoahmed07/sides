@@ -274,6 +274,22 @@ export async function setNewPassword(password: string): Promise<string | null> {
   return null;
 }
 
+/**
+ * Deletes the account and everything saved in it (supabase/delete-account.sql),
+ * then signs out here. This device keeps its own copy.
+ */
+export async function deleteAccount(): Promise<string | null> {
+  const { error } = await sb().rpc("hifz_delete_account");
+  if (error) {
+    console.error("hifz_delete_account failed:", error.message);
+    return /fetch|network/i.test(error.message)
+      ? "Couldn't reach the server. Check your internet connection and try again."
+      : "Your account couldn't be deleted right now. Please try again later.";
+  }
+  await signOut();
+  return null;
+}
+
 /** Signs out on this device only. The data stays here and in the account. */
 export async function signOut() {
   await sb().auth.signOut({ scope: "local" });

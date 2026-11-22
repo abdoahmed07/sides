@@ -29,7 +29,7 @@ How it works: the whole local database is stored as one private row per account 
 
 One-time setup (Hifz Tracker has its own Supabase project):
 
-1. Supabase → SQL Editor: run `supabase/schema.sql`.
+1. Supabase → SQL Editor: run `supabase/schema.sql`, then `supabase/delete-account.sql` (lets people delete their own account in Settings).
 2. Authentication → Sign In / Providers → Email: keep it enabled, with **Confirm email** on. New accounts get one confirmation email; the link can be opened on any device, then the person signs in with their password anywhere. "Forgot password?" sends a reset link.
 3. Authentication → URL Configuration: Site URL `https://abdoahmed07.github.io/sides/hifz/`; Redirect URLs `http://localhost:3000/**`, `http://localhost:3100/**` and `https://abdoahmed07.github.io/sides/hifz/**`.
 4. Locally: put the project URL and anon key (Project Settings → API) in `.env.local` as `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, then restart `pnpm dev`.

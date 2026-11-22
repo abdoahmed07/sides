@@ -7,6 +7,7 @@ import { usePlan } from "@/data/hooks";
 import { AI_ENABLED } from "@/lib/ai-client";
 import { Button, Card, Notice, PageTitle } from "@/components/ui";
 import { AccountCard, useSyncStatus } from "@/components/Account";
+import { deleteAccount } from "@/sync/sync";
 import { InstallCard } from "@/components/InstallCard";
 
 type Theme = "system" | "light" | "dark";
@@ -33,6 +34,24 @@ function applyTheme(t: Theme) {
   themeListeners.forEach((l) => l());
 }
 
+const THEMES: { value: Theme; label: string }[] = [
+  { value: "system", label: "Same as phone" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
+
+function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <Card className="space-y-3">
+      <div>
+        <h2 className="font-semibold">{title}</h2>
+        {hint && <p className="text-sm text-muted">{hint}</p>}
+      </div>
+      {children}
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const plan = usePlan();
   const sync = useSyncStatus();
@@ -40,10 +59,13 @@ export default function SettingsPage() {
   const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "system" as Theme);
   const [msg, setMsg] = useState<{ tone: "info" | "danger"; text: string } | null>(null);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<"data" | "account" | null>(null);
+  const [busy, setBusy] = useState(false);
   const file = useRef<HTMLInputElement>(null);
 
+  // Setup details for whoever runs the app; regular users never see this.
   useEffect(() => {
-    if (AI_ENABLED)
+    if (AI_ENABLED && process.env.NODE_ENV !== "production")
       fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/plan-assistant`)
         .then((r) => r.json())
         .then((j) => setAiStatus(j.configured ? `Connected (model: ${j.model})` : "No API key: add ANTHROPIC_API_KEY to .env.local"))
@@ -63,20 +85,37 @@ export default function SettingsPage() {
   const importData = async (f: File) => {
     try {
       const parsed = BackupSchema.safeParse(JSON.parse(await f.text()));
-      if (!parsed.success) throw new Error("This file isn't a valid Hifz Tracker backup.");
-      if (!confirm("Replace everything on this device with the backup? This can't be undone (export first if unsure).")) return;
+      if (!parsed.success) throw new Error("This file isn't a Hifz Tracker backup.");
+      const where = signedIn ? "on this device and in your account" : "on this device";
+      if (!confirm(`Replace everything ${where} with this backup from ${parsed.data.exportedAt.slice(0, 10)}? This can't be undone.`)) return;
       await repo.importAll(parsed.data);
-      setMsg({ tone: "info", text: `Imported backup from ${parsed.data.exportedAt.slice(0, 10)}.` });
+      setMsg({ tone: "info", text: `Restored your backup from ${parsed.data.exportedAt.slice(0, 10)}.` });
     } catch (e) {
-      setMsg({ tone: "danger", text: (e as Error).message });
+      setMsg({ tone: "danger", text: e instanceof SyntaxError ? "This file isn't a Hifz Tracker backup." : (e as Error).message });
     }
   };
 
-  const reset = async () => {
-    const where = signedIn ? "on this device and in your account" : "on this device";
-    if (!confirm(`Delete all plans, progress and history ${where}? Export a backup first if you might need it.`)) return;
-    await repo.clearAll();
-    setMsg({ tone: "info", text: "All data deleted." });
+  const deleteData = async () => {
+    setBusy(true);
+    try {
+      await repo.clearAll();
+      setConfirming(null);
+      setMsg({ tone: "info", text: signedIn ? "Your plan and progress were deleted here and in your account." : "Your plan and progress were deleted." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeAccount = async () => {
+    setBusy(true);
+    try {
+      const err = await deleteAccount();
+      if (err) return setMsg({ tone: "danger", text: err });
+      setConfirming(null);
+      setMsg({ tone: "info", text: "Your account and everything saved in it were deleted. This device still has its own copy." });
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -87,16 +126,14 @@ export default function SettingsPage() {
       <AccountCard />
       <InstallCard />
 
-      <Card className="space-y-2">
-        <h2 className="font-semibold">Plan</h2>
-        <p className="text-sm text-muted">Target, daily amount, study days, revision windows, exceptions and history.</p>
+      <Section title="Your plan" hint="What you memorize, how much a day, which days, revision, travel and history.">
         <div className="flex flex-wrap gap-2">
           <Link href="/plan/">
-            <Button>Edit plan</Button>
+            <Button>{plan ? "Edit plan" : "Set up a plan"}</Button>
           </Link>
           {plan && AI_ENABLED && (
             <Link href="/adjust/">
-              <Button>Adjust with AI</Button>
+              <Button>Change it with the assistant</Button>
             </Link>
           )}
           {plan && AI_ENABLED && (
@@ -105,35 +142,45 @@ export default function SettingsPage() {
             </Link>
           )}
         </div>
-      </Card>
+      </Section>
 
-      <Card className="space-y-2">
-        <h2 className="font-semibold">Appearance</h2>
-        <div className="flex gap-1.5" role="radiogroup" aria-label="Theme">
-          {(["system", "light", "dark"] as Theme[]).map((t) => (
+      <Section title="Appearance">
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Theme">
+          {THEMES.map((t) => (
             <button
-              key={t}
+              key={t.value}
               role="radio"
-              aria-checked={theme === t}
-              onClick={() => applyTheme(t)}
-              className={`rounded-full border px-3 py-1.5 text-sm capitalize ${theme === t ? "border-accent bg-accent text-accent-text" : "border-border text-muted"}`}
+              aria-checked={theme === t.value}
+              onClick={() => applyTheme(t.value)}
+              className={`rounded-full border px-3.5 py-1.5 text-sm ${theme === t.value ? "border-accent bg-accent text-accent-text" : "border-border text-muted hover:border-accent hover:text-text"}`}
             >
-              {t}
+              {t.label}
             </button>
           ))}
         </div>
-      </Card>
+      </Section>
 
-      <Card className="space-y-2">
-        <h2 className="font-semibold">Backup</h2>
-        <p className="text-sm text-muted">
-          {signedIn
-            ? "Your progress is saved to your account automatically. You can also keep a copy as a file."
-            : "Without an account, everything is stored only in this browser. Export a backup now and then so you don't lose it."}
+      <Section title="Your data">
+        <p className="text-sm">
+          {signedIn ? (
+            <>
+              ✓ Saved on this device <b>and in your account</b>, so you can use it on other devices too.
+            </>
+          ) : (
+            <>
+              Saved <b>only in this browser</b>. If you clear your browser data or lose this phone, it&apos;s gone.{" "}
+              <a href="#account" className="font-medium text-accent underline-offset-2 hover:underline">
+                Make an account
+              </a>{" "}
+              to keep it safe, or download a copy now and then.
+            </>
+          )}
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={exportData}>Export JSON</Button>
-          <Button onClick={() => file.current?.click()}>Import JSON</Button>
+          <Button onClick={exportData}>Download a copy</Button>
+          <Button variant="ghost" onClick={() => file.current?.click()}>
+            Restore from a copy
+          </Button>
           <input
             ref={file}
             type="file"
@@ -146,30 +193,79 @@ export default function SettingsPage() {
             }}
           />
         </div>
-      </Card>
 
-      <Card className="space-y-2">
-        <h2 className="font-semibold">AI and privacy</h2>
-        {AI_ENABLED ? (
-          <p className="text-sm text-muted">Assistant: {aiStatus ?? "checking…"}</p>
-        ) : (
-          <p className="text-sm text-muted">This copy of the app runs without a server, so the AI assistant is off. Run it locally to use it.</p>
-        )}
-        <p className="text-sm leading-relaxed text-muted">
-          When you use the assistant, only your message and aggregate numbers are sent: your plan settings, a short summary like
-          &ldquo;about 23 pages memorized&rdquo;, and for check-ins weekly totals (completion rate, strong/okay/weak counts, overdue pages,
-          streak). Your day-by-day history, notes and backups never leave this device. The AI never writes your schedule or any Quran
-          text: it proposes settings, the app computes the plan, and you approve.
-        </p>
-        <p className="text-xs text-muted">Quran text: Uthmani script from the Quran.com API (v4), Madinah Mushaf page layout.</p>
-      </Card>
+        <details className="group rounded-xl bg-surface-2 px-3 py-2 text-sm">
+          <summary className="cursor-pointer font-medium">What&apos;s stored where</summary>
+          <ul className="mt-2 list-disc space-y-1.5 pl-5 leading-relaxed text-muted">
+            <li>
+              <b className="text-text">On this device:</b> your plan, progress, ratings and history.
+            </li>
+            <li>
+              <b className="text-text">In your account</b> (only if you make one): your email, and a copy of that same data so it syncs between
+              devices. Only you can read it.
+            </li>
+            {AI_ENABLED && (
+              <li>
+                <b className="text-text">When you use the assistant:</b> your message, your plan settings and short totals (like &ldquo;about 23 pages
+                memorized&rdquo;) are sent to the AI (Anthropic&apos;s Claude) to answer. Not your day-by-day history.
+              </li>
+            )}
+            <li>No ads, no tracking, nothing sold. The AI never writes your schedule or any Quran text: the app computes the plan and you approve.</li>
+          </ul>
+        </details>
 
-      <Card className="space-y-2">
-        <h2 className="font-semibold">Danger zone</h2>
-        <Button variant="danger" onClick={reset}>
-          Delete all data on this device
+        <div className="space-y-2 border-t border-border pt-3">
+          {confirming === "data" ? (
+            <ConfirmBox
+              text={`This deletes your plan, progress and history ${signedIn ? "on this device and in your account" : "on this device"}. It can't be undone. Download a copy first if you might want it back.`}
+              action="Yes, delete my progress"
+              busy={busy}
+              onConfirm={deleteData}
+              onCancel={() => setConfirming(null)}
+            />
+          ) : confirming === "account" ? (
+            <ConfirmBox
+              text="This deletes your account and the progress saved in it, on every device. This device keeps its own copy, without an account. It can't be undone."
+              action="Yes, delete my account"
+              busy={busy}
+              onConfirm={removeAccount}
+              onCancel={() => setConfirming(null)}
+            />
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="danger" onClick={() => setConfirming("data")}>
+                Delete my progress
+              </Button>
+              {signedIn && (
+                <Button variant="danger" onClick={() => setConfirming("account")}>
+                  Delete my account
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </Section>
+
+      <section className="space-y-1 px-1 text-xs text-muted">
+        <p>Quran text: Uthmani script from the Quran.com API (v4), Madinah Mushaf page layout.</p>
+        {aiStatus && <p>Assistant (only shown while developing): {aiStatus}</p>}
+      </section>
+    </div>
+  );
+}
+
+function ConfirmBox({ text, action, busy, onConfirm, onCancel }: { text: string; action: string; busy: boolean; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="space-y-3 rounded-xl border border-danger/40 bg-danger-soft p-3">
+      <p className="text-sm">{text}</p>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="danger" disabled={busy} onClick={onConfirm}>
+          {busy ? "Deleting…" : action}
         </Button>
-      </Card>
+        <Button variant="ghost" disabled={busy} onClick={onCancel}>
+          Keep it
+        </Button>
+      </div>
     </div>
   );
 }
