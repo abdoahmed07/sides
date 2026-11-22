@@ -900,6 +900,9 @@ const sv: Dict = {
     "Reciteringsljudet strömmas från Islamic Networks ljudbibliotek när du trycker på spela.",
   "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45 MB) downloads from Hugging Face.":
     "**Recitera och kontrollera** lyssnar genom mikrofonen bara medan du reciterar, och taligenkänningen körs på din enhet: din röst spelas aldrig in och skickas aldrig någonstans. Första gången laddas talmodellen (ungefär 45 MB) ner från Hugging Face.",
+  "I can't hear anything. Is the microphone allowed and not muted? Try speaking a little louder.":
+    "Jag hör ingenting. Är mikrofonen tillåten och inte avstängd? Försök prata lite högre.",
+  "Heard:": "Hörde:",
 };
 
 export default sv;

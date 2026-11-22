@@ -32,6 +32,9 @@ export function ReciteCheck({ ayahs, onRate }: { ayahs: number[]; onRate?: (r: R
   const [tentative, setTentative] = useState<Set<number>>(new Set());
   const [hintsRaw, setHints] = useState<number[]>([]);
   const [level, setLevel] = useState(0);
+  const [heard, setHeard] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [quiet, setQuiet] = useState(false);
   const [rating, setRating] = useState<Rating | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -39,6 +42,9 @@ export function ReciteCheck({ ayahs, onRate }: { ayahs: number[]; onRate?: (r: R
   const mic = useRef<Mic | null>(null);
   const chain = useRef<Promise<void>>(Promise.resolve());
   const busy = useRef(0);
+  /** How long the last check took: on slow phones the in-between previews are skipped so it doesn't fall behind. */
+  const lastCheckMs = useRef(0);
+  const lastSound = useRef(0);
 
   useEffect(() => {
     loadText().then(setText, () => setPhase("error"));
@@ -94,11 +100,24 @@ export function ReciteCheck({ ayahs, onRate }: { ayahs: number[]; onRate?: (r: R
     setTentative(new Set());
   };
 
+  const check = async (audio: Float32Array) => {
+    const t0 = performance.now();
+    setChecking(true);
+    try {
+      const text = await transcribe(audio);
+      if (text.trim()) setHeard(text.trim());
+      return text;
+    } finally {
+      lastCheckMs.current = performance.now() - t0;
+      if (busy.current <= 1) setChecking(false);
+    }
+  };
+
   const onPart = (audio: Float32Array) => {
     busy.current++;
     chain.current = chain.current.then(async () => {
       try {
-        commit(await transcribe(audio));
+        commit(await check(audio));
       } catch {
         /* a part that couldn't be read is simply skipped */
       } finally {
@@ -108,11 +127,12 @@ export function ReciteCheck({ ayahs, onRate }: { ayahs: number[]; onRate?: (r: R
   };
 
   const onPartial = (audio: Float32Array) => {
-    if (busy.current > 0) return; // don't fall behind: skip previews while a part is being checked
+    // Don't fall behind: skip previews while a part is being checked, or when this phone checks slowly.
+    if (busy.current > 0 || lastCheckMs.current > 2500) return;
     busy.current++;
     chain.current = chain.current.then(async () => {
       try {
-        const heard = await transcribe(audio);
+        const heard = await check(audio);
         const r = align(expected, heard.split(/\s+/).filter(Boolean), pointer.current);
         setTentative(new Set(r.statuses.filter((s) => s.status === "correct").map((s) => s.index)));
       } catch {
@@ -126,7 +146,18 @@ export function ReciteCheck({ ayahs, onRate }: { ayahs: number[]; onRate?: (r: R
   const start = async () => {
     reset();
     setErrorMsg(null);
-    const m = new Mic({ onPart, onPartial, onLevel: setLevel });
+    setHeard("");
+    setQuiet(false);
+    lastSound.current = Date.now();
+    const m = new Mic({
+      onPart,
+      onPartial,
+      onLevel: (l) => {
+        setLevel(l);
+        if (l > 0.02) lastSound.current = Date.now();
+        setQuiet(Date.now() - lastSound.current > 4000);
+      },
+    });
     try {
       await m.start();
       mic.current = m;
@@ -250,12 +281,26 @@ export function ReciteCheck({ ayahs, onRate }: { ayahs: number[]; onRate?: (r: R
             }}
           />
         )}
-        {listening && (
-          <div className="flex items-center gap-2 text-xs text-muted" aria-live="polite">
-            <span className="h-1.5 w-16 overflow-hidden rounded-full bg-border" aria-hidden>
-              <span className="block h-full rounded-full bg-accent transition-all" style={{ width: `${Math.round(level * 100)}%` }} />
-            </span>
-            {t("Listening… recite at your normal pace. Words appear as you get them right.")}
+        {(listening || phase === "finishing") && (
+          <div className="space-y-1 text-xs text-muted" aria-live="polite">
+            <div className="flex items-center gap-2">
+              <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-border" aria-hidden>
+                <span className="block h-full rounded-full bg-accent transition-all" style={{ width: `${Math.round(level * 100)}%` }} />
+              </span>
+              {checking ? (
+                <span className="flex items-center gap-1.5">
+                  <Spinner /> {t("Checking…")}
+                </span>
+              ) : (
+                t("Listening… recite at your normal pace. Words appear as you get them right.")
+              )}
+            </div>
+            {quiet && listening && <p className="text-warn">{t("I can't hear anything. Is the microphone allowed and not muted? Try speaking a little louder.")}</p>}
+            {heard && (
+              <p dir="rtl" lang="ar" className="truncate">
+                {t("Heard:")} {heard}
+              </p>
+            )}
           </div>
         )}
         {phase === "ready" && <p className="text-xs text-muted">{t("The text is hidden. Press start and recite from memory; use Hint if you get stuck.")}</p>}

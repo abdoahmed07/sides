@@ -1024,6 +1024,9 @@ const ar: Dict = {
     "يُبثّ صوت التلاوة من مكتبة Islamic Network الصوتية عندما تضغط تشغيل.",
   "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45 MB) downloads from Hugging Face.":
     "**التسميع والتصحيح** يستمع عبر الميكروفون فقط أثناء التسميع، والتعرّف على الكلام يعمل على جهازك: صوتك لا يُسجَّل ولا يُرسل إلى أي مكان. في المرة الأولى يُنزَّل نموذج الكلام (حوالي 45 ميغابايت) من Hugging Face.",
+  "I can't hear anything. Is the microphone allowed and not muted? Try speaking a little louder.":
+    "لا أسمع شيئاً. هل الميكروفون مسموح به وغير مكتوم؟ جرّب أن تتكلم بصوت أعلى قليلاً.",
+  "Heard:": "سمعت:",
 };
 
 export default ar;
