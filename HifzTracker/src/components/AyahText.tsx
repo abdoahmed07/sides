@@ -1,28 +1,48 @@
 "use client";
 import { useEffect, useState } from "react";
 import { q } from "@/lib/app";
+import { portionOrder } from "@/audio/recitation";
 import { t } from "@/i18n";
 import { useLang } from "@/i18n/react";
 
 let textCache: Promise<string[]> | null = null;
 /** The full Uthmani text is a separate chunk, loaded only when first needed. */
-function loadText(): Promise<string[]> {
+export function loadText(): Promise<string[]> {
   if (!textCache) textCache = import("../../data/quran-text.json").then((m) => m.default as unknown as string[]);
   return textCache;
 }
 
 const toArabicDigits = (n: number) => String(n).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[Number(d)]);
 
-export function AyahText({ indices }: { indices: number[] }) {
+/**
+ * The Uthmani text of some ayahs, grouped by surah. With audio: `active` is
+ * highlighted (and scrolled to), `hidden` replaces the text with dots for
+ * reciting from memory, and tapping an ayah calls `onPick`.
+ */
+export function AyahText({
+  indices,
+  active = null,
+  hidden = false,
+  onPick,
+}: {
+  indices: number[];
+  active?: number | null;
+  hidden?: boolean;
+  onPick?: (ayah: number) => void;
+}) {
   const [text, setText] = useState<string[] | null>(null);
   const [error, setError] = useState(false);
   const lang = useLang();
   useEffect(() => {
     loadText().then(setText, () => setError(true));
   }, []);
+  useEffect(() => {
+    if (active === null) return;
+    document.getElementById(`ayah-${active}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [active]);
   if (error) return <p className="text-sm text-danger">{t("Could not load the text.")}</p>;
   if (!text) return <p className="text-sm text-muted">{t("Loading text…")}</p>;
-  const sorted = [...indices].sort((a, b) => a - b);
+  const sorted = portionOrder(indices, q.surahOf);
   // Group by surah so each surah gets its own heading.
   const groups: number[][] = [];
   for (const i of sorted) {
@@ -44,8 +64,13 @@ export function AyahText({ indices }: { indices: number[] }) {
             </p>
             <p className="quran" lang="ar">
               {g.map((i) => (
-                <span key={i}>
-                  {text[i]}
+                <span
+                  key={i}
+                  id={`ayah-${i}`}
+                  onClick={onPick ? () => onPick(i) : undefined}
+                  className={`rounded-md transition-colors ${onPick ? "cursor-pointer" : ""} ${i === active ? "bg-accent-soft" : ""}`}
+                >
+                  {hidden ? <span className="text-muted">• • • </span> : text[i]}
                   <span className="ayah-num">﴿{toArabicDigits(q.ayahOf[i])}﴾</span>{" "}
                 </span>
               ))}

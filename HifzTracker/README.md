@@ -37,6 +37,12 @@ One-time setup (Hifz Tracker has its own Supabase project):
 
 Supabase's built-in email sender only allows a few emails per hour; for more users, add your own SMTP in Authentication → Emails.
 
+## Listen and Recite
+
+Every portion's text sheet has a player (`src/components/Listen.tsx`): **Listen** (straight through), **Repeat after** (one ayah, then it waits for you; no timers) and **Link** (ayah 1, 1–2, 1–3…), with Alafasy, Abdul Basit and Al-Husary from the Islamic Network audio CDN (one MP3 per ayah, free for non-commercial use).
+
+**Recite** checks a recitation word by word, like Tarteel, entirely on the device: Tarteel's open `whisper-tiny-ar-quran` model (Apache-2.0, ONNX conversion `Sharjeelbaig/whisper-tiny-ar-quran-onnx`, ~45 MB, downloaded once on request) runs in a web worker with transformers.js (`src/recite/`). The microphone audio is cut at pauses (`mic.ts`), transcribed, and aligned to the Uthmani text (`match.ts`: words folded to one spelling, fuzzy edit-distance alignment). It checks words, not tajweed, and can mishear; people can tap a red word to correct it. The rating is only suggested and confirmed by the person.
+
 ## Install as an app
 
 The app can be installed from the browser (no app store): iPhone → Share → **Add to Home Screen**; Android/Chrome → **Install app**. Settings shows the right steps for each device. Installed, it opens full screen and works offline: `public/sw.js` keeps a copy of the pages and built files (network first for pages, so updates arrive when online), and `src/app/manifest.ts` gives the name, colours and icons. The worker is off during `pnpm dev`.

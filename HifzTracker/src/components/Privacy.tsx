@@ -54,6 +54,15 @@ export function Privacy() {
         <P text={t("To keep the assistant free, we count how many messages each account sends per day. Only the count is stored, not the messages.")} />
       </Section>
 
+      <Section title={t("Listening and reciting")}>
+        <P text={t("Recitation audio streams from the Islamic Network audio library when you press play.")} />
+        <P
+          text={t(
+            "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45 MB) downloads from Hugging Face.",
+          )}
+        />
+      </Section>
+
       <Section title={t("If you contact us")}>
         <P text={t("Your email and message are sent through Formspree to the developer's inbox, only to answer you.")} />
       </Section>

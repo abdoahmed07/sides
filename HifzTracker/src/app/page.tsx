@@ -8,7 +8,8 @@ import { AI_ENABLED, AI_NEEDS_SIGN_IN } from "@/lib/ai-client";
 import type { DayItem } from "@/data/types";
 import { Button, Card, Notice, PageTitle } from "@/components/ui";
 import { DayItemRow } from "@/components/DayItemRow";
-import { AyahText, Sheet } from "@/components/AyahText";
+import { Sheet } from "@/components/AyahText";
+import { ReadAndListen } from "@/components/Listen";
 import { MissedDays } from "@/components/MissedDays";
 import { SignInNudge, useSyncStatus } from "@/components/Account";
 import { activeDatesOf, streaks } from "@/core/stats";
@@ -277,7 +278,12 @@ export default function TodayPage() {
       </Sheet>
 
       <Sheet open={!!open} onClose={() => setOpen(null)} title={open ? describe(open).title : ""}>
-        {open && <AyahText indices={textOf(open)} />}
+        {open && (
+          <ReadAndListen
+            indices={textOf(open)}
+            onRate={open.kind === "reading" ? undefined : (rating) => act(() => updateItem(today, open.id, { done: true, rating }))}
+          />
+        )}
       </Sheet>
     </div>
   );

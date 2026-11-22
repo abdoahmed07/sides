@@ -927,6 +927,103 @@ const ar: Dict = {
     "**احذف حسابك:** الإعدادات ← حذف حسابي. هذا يزيل تسجيل دخولك والتقدّم المحفوظ فيه وعدّادات المساعد.",
   "For anything else, like deleting a message you sent us, [contact us](/contact/).":
     "لأي شيء آخر، مثل حذف رسالة أرسلتها إلينا، [اتصل بنا](/contact/).",
+  "Add the next ayah": "أضف الآية التالية",
+  Again: "مرة أخرى",
+  "Classic, calm murattal": "مرتّل كلاسيكي هادئ",
+  "Clear and well-known": "واضح ومعروف",
+  "Couldn't play the audio. Check your internet connection.":
+    "تعذّر تشغيل الصوت. تحقق من اتصالك بالإنترنت.",
+  "Finished. Play again from the start?": "انتهى. هل تريد التشغيل من البداية؟",
+  "Hide text": "إخفاء النص",
+  Link: "ربط",
+  Listen: "استماع",
+  Mode: "الوضع",
+  "Next ayah": "الآية التالية",
+  Pause: "إيقاف مؤقت",
+  Play: "تشغيل",
+  "Plays ayah 1, then 1–2, then 1–3… so the ayahs join up. Recite along each time.":
+    "يشغّل الآية 1، ثم 1–2، ثم 1–3… لتترابط الآيات. سمّع معه في كل مرة.",
+  "Plays one ayah, then waits while you repeat it. Go on when you're ready.":
+    "يشغّل آية واحدة ثم ينتظر وأنت تكررها. تابع عندما تكون جاهزاً.",
+  "Plays the whole portion, ayah by ayah.": "يشغّل الورد كله، آية آية.",
+  "Previous ayah": "الآية السابقة",
+  "Recite {ayah} along. Heard {n}×.": "سمّع {ayah} معه. سُمعت {n}×.",
+  "Recite {from} to {to} together. Heard {n}×.":
+    "سمّع من {from} إلى {to} معاً. سُمعت {n}×.",
+  Reciter: "القارئ",
+  "Repeat after": "ردّد خلفه",
+  "Repeat {ayah} from memory. Heard {n}×.": "ردّد {ayah} غيباً. سُمعت {n}×.",
+  "Show text": "إظهار النص",
+  "Slow and precise, good for memorizing": "بطيء ومتقن، مناسب للحفظ",
+  Speed: "السرعة",
+  "Download and start": "نزّل وابدأ",
+  "Downloading… {pct}%": "جارٍ التنزيل… {pct}%",
+  "Getting ready…": "جارٍ التجهيز…",
+  Hint: "تلميح",
+  "I'm done": "انتهيت",
+  "It checks words (skipped or wrong), not tajweed. It can mishear sometimes, especially with background noise.":
+    "يفحص الكلمات (المتروكة أو الخاطئة)، لا التجويد. قد يخطئ في السماع أحياناً، خاصة مع الضوضاء.",
+  "It needs a one-time download of about 45 MB (best on Wi-Fi). It listens on this device: your voice is never sent anywhere.":
+    "يحتاج إلى تنزيل لمرة واحدة بحجم 45 ميغابايت تقريباً (يفضَّل عبر Wi-Fi). يستمع على هذا الجهاز: صوتك لا يُرسل إلى أي مكان.",
+  "Listening… recite at your normal pace. Words appear as you get them right.":
+    "جارٍ الاستماع… سمّع بسرعتك المعتادة. تظهر الكلمات عندما تقولها صحيحة.",
+  "No mistakes. Masha'Allah!": "لا أخطاء. ما شاء الله!",
+  Rating: "التقييم",
+  "Recite and check couldn't start. Check your internet connection and try again.":
+    "تعذّر بدء التسميع والتصحيح. تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
+  "Recite from memory and the app checks every word.":
+    "سمّع غيباً والتطبيق يتحقق من كل كلمة.",
+  "Recite from memory; the app checks every word.":
+    "سمّع غيباً؛ والتطبيق يتحقق من كل كلمة.",
+  Recite: "تسميع",
+  "Save as done: {rating}": "احفظ كمنجز: {rating}",
+  "Saved ✓": "تم الحفظ ✓",
+  "Start reciting": "ابدأ التسميع",
+  "Suggested rating:": "التقييم المقترح:",
+  "The microphone is blocked. Allow it for this site in your browser settings, then try again.":
+    "الميكروفون محظور. اسمح به لهذا الموقع من إعدادات المتصفح، ثم حاول مرة أخرى.",
+  "The text is hidden. Press start and recite from memory; use Hint if you get stuck.":
+    "النص مخفي. اضغط ابدأ وسمّع غيباً؛ استخدم التلميح إن توقفت.",
+  "{n} hints": {
+    zero: "{n} تلميح",
+    one: "تلميح واحد",
+    two: "تلميحان",
+    few: "{n} تلميحات",
+    many: "{n} تلميحاً",
+    other: "{n} تلميح",
+  },
+  "{n} skipped words": {
+    zero: "{n} كلمة متروكة",
+    one: "كلمة متروكة واحدة",
+    two: "كلمتان متروكتان",
+    few: "{n} كلمات متروكة",
+    many: "{n} كلمة متروكة",
+    other: "{n} كلمة متروكة",
+  },
+  "{n} words not reached": {
+    zero: "{n} كلمة لم تصل إليها",
+    one: "كلمة واحدة لم تصل إليها",
+    two: "كلمتان لم تصل إليهما",
+    few: "{n} كلمات لم تصل إليها",
+    many: "{n} كلمة لم تصل إليها",
+    other: "{n} كلمة لم تصل إليها",
+  },
+  "{n} wrong words": {
+    zero: "{n} كلمة خاطئة",
+    one: "كلمة خاطئة واحدة",
+    two: "كلمتان خاطئتان",
+    few: "{n} كلمات خاطئة",
+    many: "{n} كلمة خاطئة",
+    other: "{n} كلمة خاطئة",
+  },
+  "Tap if you said it right": "اضغط إن كنت قلتها صحيحة",
+  "Marked wrong but you said it right? Tap the word to correct it.":
+    "عُلِّمت خاطئة لكنك قلتها صحيحة؟ اضغط على الكلمة لتصحيحها.",
+  "Listening and reciting": "الاستماع والتسميع",
+  "Recitation audio streams from the Islamic Network audio library when you press play.":
+    "يُبثّ صوت التلاوة من مكتبة Islamic Network الصوتية عندما تضغط تشغيل.",
+  "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45 MB) downloads from Hugging Face.":
+    "**التسميع والتصحيح** يستمع عبر الميكروفون فقط أثناء التسميع، والتعرّف على الكلام يعمل على جهازك: صوتك لا يُسجَّل ولا يُرسل إلى أي مكان. في المرة الأولى يُنزَّل نموذج الكلام (حوالي 45 ميغابايت) من Hugging Face.",
 };
 
 export default ar;

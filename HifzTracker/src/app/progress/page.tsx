@@ -10,7 +10,8 @@ import { t, tp, tx } from "@/i18n";
 import { useLang } from "@/i18n/react";
 import { Rich } from "@/components/Language";
 import { Card, PageTitle } from "@/components/ui";
-import { AyahText, Sheet } from "@/components/AyahText";
+import { Sheet } from "@/components/AyahText";
+import { ReadAndListen } from "@/components/Listen";
 
 type MapStatus = PageStatus | "ahead";
 
@@ -209,7 +210,7 @@ export default function ProgressPage() {
       </Card>
 
       <Sheet open={page !== null} onClose={() => setPage(null)} title={page ? t("Page {n}", { n: page }) : ""}>
-        {page && <AyahText indices={unitByPage.get(page)?.ayahs ?? []} />}
+        {page && <ReadAndListen indices={unitByPage.get(page)?.ayahs ?? []} />}
       </Sheet>
     </div>
   );

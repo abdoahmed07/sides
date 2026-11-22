@@ -823,6 +823,83 @@ const sv: Dict = {
     "**Radera ditt konto:** Inställningar → Radera mitt konto. Det tar bort din inloggning, framstegen som sparats i den och dina räkningar för assistenten.",
   "For anything else, like deleting a message you sent us, [contact us](/contact/).":
     "För allt annat, som att radera ett meddelande du skickat oss, [kontakta oss](/contact/).",
+  "Add the next ayah": "Lägg till nästa vers",
+  Again: "Igen",
+  "Classic, calm murattal": "Klassisk, lugn murattal",
+  "Clear and well-known": "Tydlig och välkänd",
+  "Couldn't play the audio. Check your internet connection.":
+    "Kunde inte spela upp ljudet. Kontrollera internetanslutningen.",
+  "Finished. Play again from the start?": "Klart. Spela igen från början?",
+  "Hide text": "Dölj text",
+  Link: "Länka",
+  Listen: "Lyssna",
+  Mode: "Läge",
+  "Next ayah": "Nästa vers",
+  Pause: "Pausa",
+  Play: "Spela",
+  "Plays ayah 1, then 1–2, then 1–3… so the ayahs join up. Recite along each time.":
+    "Spelar vers 1, sedan 1–2, sedan 1–3… så att verserna hänger ihop. Recitera med varje gång.",
+  "Plays one ayah, then waits while you repeat it. Go on when you're ready.":
+    "Spelar en vers och väntar medan du upprepar den. Gå vidare när du är redo.",
+  "Plays the whole portion, ayah by ayah.": "Spelar hela delen, vers för vers.",
+  "Previous ayah": "Föregående vers",
+  "Recite {ayah} along. Heard {n}×.": "Recitera {ayah} med. Hörd {n}×.",
+  "Recite {from} to {to} together. Heard {n}×.":
+    "Recitera {from} till {to} i ett sträck. Hörda {n}×.",
+  Reciter: "Recitatör",
+  "Repeat after": "Upprepa efter",
+  "Repeat {ayah} from memory. Heard {n}×.":
+    "Upprepa {ayah} utantill. Hörd {n}×.",
+  "Show text": "Visa text",
+  "Slow and precise, good for memorizing":
+    "Långsam och noggrann, bra för att memorera",
+  Speed: "Hastighet",
+  "Download and start": "Ladda ner och starta",
+  "Downloading… {pct}%": "Laddar ner… {pct}%",
+  "Getting ready…": "Gör klart…",
+  Hint: "Ledtråd",
+  "I'm done": "Jag är klar",
+  "It checks words (skipped or wrong), not tajweed. It can mishear sometimes, especially with background noise.":
+    "Den kontrollerar ord (överhoppade eller fel), inte tajweed. Den kan höra fel ibland, särskilt med bakgrundsljud.",
+  "It needs a one-time download of about 45 MB (best on Wi-Fi). It listens on this device: your voice is never sent anywhere.":
+    "Det kräver en engångsnedladdning på ungefär 45 MB (helst via wifi). Den lyssnar på den här enheten: din röst skickas aldrig någonstans.",
+  "Listening… recite at your normal pace. Words appear as you get them right.":
+    "Lyssnar… recitera i din vanliga takt. Orden visas när du säger dem rätt.",
+  "No mistakes. Masha'Allah!": "Inga fel. Masha'Allah!",
+  Rating: "Betyg",
+  "Recite and check couldn't start. Check your internet connection and try again.":
+    "Recitera och kontrollera kunde inte starta. Kontrollera internetanslutningen och försök igen.",
+  "Recite from memory and the app checks every word.":
+    "Recitera utantill så kontrollerar appen varje ord.",
+  "Recite from memory; the app checks every word.":
+    "Recitera utantill; appen kontrollerar varje ord.",
+  Recite: "Recitera",
+  "Save as done: {rating}": "Spara som klar: {rating}",
+  "Saved ✓": "Sparat ✓",
+  "Start reciting": "Börja recitera",
+  "Suggested rating:": "Föreslaget betyg:",
+  "The microphone is blocked. Allow it for this site in your browser settings, then try again.":
+    "Mikrofonen är blockerad. Tillåt den för den här webbplatsen i webbläsarens inställningar och försök igen.",
+  "The text is hidden. Press start and recite from memory; use Hint if you get stuck.":
+    "Texten är dold. Tryck på start och recitera utantill; använd Ledtråd om du fastnar.",
+  "{n} hints": { one: "{n} ledtråd", other: "{n} ledtrådar" },
+  "{n} skipped words": {
+    one: "{n} överhoppat ord",
+    other: "{n} överhoppade ord",
+  },
+  "{n} words not reached": {
+    one: "{n} ord som inte nåddes",
+    other: "{n} ord som inte nåddes",
+  },
+  "{n} wrong words": { one: "{n} fel ord", other: "{n} fel ord" },
+  "Tap if you said it right": "Tryck om du sa det rätt",
+  "Marked wrong but you said it right? Tap the word to correct it.":
+    "Markerat som fel men du sa det rätt? Tryck på ordet för att rätta det.",
+  "Listening and reciting": "Lyssna och recitera",
+  "Recitation audio streams from the Islamic Network audio library when you press play.":
+    "Reciteringsljudet strömmas från Islamic Networks ljudbibliotek när du trycker på spela.",
+  "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45 MB) downloads from Hugging Face.":
+    "**Recitera och kontrollera** lyssnar genom mikrofonen bara medan du reciterar, och taligenkänningen körs på din enhet: din röst spelas aldrig in och skickas aldrig någonstans. Första gången laddas talmodellen (ungefär 45 MB) ner från Hugging Face.",
 };
 
 export default sv;
