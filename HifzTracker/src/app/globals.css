@@ -23,6 +23,7 @@
   --map-strong: #2f6b4f;
   --map-due: #d9a441;
   --map-weak: #c4574c;
+  --map-ahead: #dcb35f;
   color-scheme: light;
 }
 
@@ -46,6 +47,7 @@
   --map-strong: #6fbf95;
   --map-due: #c79235;
   --map-weak: #c4574c;
+  --map-ahead: #d6b26a;
   color-scheme: dark;
 }
 

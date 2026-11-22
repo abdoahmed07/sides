@@ -279,3 +279,36 @@ export function alternatives(input: ForecastInput): Alternative[] {
 
   return out.filter((a) => a.forecast.feasible).slice(0, 3);
 }
+
+/**
+ * What will be memorized at the end of each checkpoint date if the plan is
+ * followed: the same day-by-day rules as forecast(), so the last checkpoint on
+ * the completion date shows the whole target. Checkpoints must be sorted, from today on.
+ */
+export function projectMemorized(input: ForecastInput, checkpoints: IsoDate[]): Uint8Array[] {
+  const { config, q, today } = input;
+  const seq = buildSequence(config, q);
+  const mem = input.memorized.slice();
+  const out: Uint8Array[] = [];
+  if (!checkpoints.length) return out;
+  const last = checkpoints[checkpoints.length - 1];
+  let pos = 0;
+  let next = 0;
+  const days = Math.min(MAX_FORECAST_DAYS, diffDays(today, last) + 1);
+  for (let d = 0; d < days; d++) {
+    const date = addDays(today, d);
+    const paused = input.pausedUntil && date < input.pausedUntil;
+    const quota = paused ? 0 : newQuota(config, date);
+    if (quota > 0) {
+      const p = takePortion(seq, mem, quota, q, pos);
+      pos = p.endPos;
+      for (const i of p.indices) mem[i] = 1;
+    }
+    while (next < checkpoints.length && checkpoints[next] === date) {
+      out.push(mem.slice());
+      next++;
+    }
+  }
+  while (out.length < checkpoints.length) out.push(mem.slice());
+  return out;
+}

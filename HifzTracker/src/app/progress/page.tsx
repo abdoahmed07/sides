@@ -4,17 +4,24 @@ import { addDays, formatDate, weekdayOf, WEEKDAYS } from "@/core/dates";
 import { activeDatesOf, heatmap, juzProgress, pageStatuses, streaks, surahProgress, totals, type PageStatus } from "@/core/stats";
 import { useDayLogs, usePlan, useToday, useUnits } from "@/data/hooks";
 import { forecastFor, q } from "@/lib/app";
+import { projectionFor } from "@/core/plan/preview";
+import { fullPagesOf, lookAheadStops, pageCounts } from "@/core/plan/lookahead";
 import { Card, PageTitle } from "@/components/ui";
 import { AyahText, Sheet } from "@/components/AyahText";
 
-const STATUS: Record<PageStatus, { label: string; color: string }> = {
+type MapStatus = PageStatus | "ahead";
+
+const STATUS: Record<MapStatus, { label: string; color: string }> = {
   none: { label: "Not started", color: "var(--map-none)" },
   partial: { label: "Partly memorized", color: "var(--map-partial)" },
   memorized: { label: "Memorized", color: "var(--map-memorized)" },
   strong: { label: "Strong", color: "var(--map-strong)" },
   due: { label: "To revise today", color: "var(--map-due)" },
   weak: { label: "Weak", color: "var(--map-weak)" },
+  ahead: { label: "Memorized by then", color: "var(--map-ahead)" },
 };
+const NORMAL_KEYS: MapStatus[] = ["none", "partial", "memorized", "strong", "due", "weak"];
+const AHEAD_KEYS: MapStatus[] = ["none", "memorized", "ahead"];
 
 export default function ProgressPage() {
   const today = useToday();
@@ -23,6 +30,7 @@ export default function ProgressPage() {
   const logs = useDayLogs();
   const [page, setPage] = useState<number | null>(null);
   const [showAllSurahs, setShowAllSurahs] = useState(false);
+  const [ahead, setAhead] = useState(0);
 
   const data = useMemo(() => {
     if (!units || !logs) return null;
@@ -40,10 +48,27 @@ export default function ProgressPage() {
       forecast: plan ? forecastFor(plan.config, units, today) : null,
     };
   }, [units, logs, plan, today]);
+
+  // Look ahead: what the mushaf map will look like at each step if the plan is kept.
+  const look = useMemo(() => {
+    const f = data?.forecast;
+    if (!plan || !units || !f || f.done) return null;
+    const stops = lookAheadStops(today, f.completionDate);
+    if (!stops.length) return null;
+    const snaps = projectionFor(plan.config, units, q, today, stops.map((x) => x.date));
+    return stops.map((x, k) => ({ ...x, pages: fullPagesOf(snaps[k], q), counts: pageCounts(snaps[k], q) }));
+  }, [plan, units, today, data]);
   if (!data) return null;
 
+  const step = look && ahead > 0 ? look[Math.min(ahead, look.length) - 1] : null;
+  const statuses: MapStatus[] = step
+    ? data.statuses.map((s, p) =>
+        s === "none" || s === "partial" ? (p > 0 && step.pages.has(p) ? "ahead" : "none") : "memorized",
+      )
+    : data.statuses;
+
   const unitByPage = new Map((units ?? []).map((u) => [u.page, u]));
-  const counts = data.statuses.slice(1).reduce<Record<string, number>>((m, s) => ((m[s] = (m[s] ?? 0) + 1), m), {});
+  const counts = statuses.slice(1).reduce<Record<string, number>>((m, s) => ((m[s] = (m[s] ?? 0) + 1), m), {});
   const surahs = showAllSurahs ? data.surahs : data.surahs.filter((s) => s.memorized > 0);
 
   return (
@@ -67,9 +92,11 @@ export default function ProgressPage() {
 
       <Card>
         <h2 className="mb-1 font-semibold">Mushaf map</h2>
-        <p className="mb-3 text-xs text-muted">604 pages, right to left as in the mushaf (page 1 top right). Tap a memorized page to read it.</p>
+        <p className="mb-3 text-xs text-muted">
+          604 pages, right to left as in the mushaf (page 1 top right). Tap a memorized page to read it.{look && " Use Look ahead below to see it fill up."}
+        </p>
         <div dir="rtl" className="grid grid-cols-[repeat(20,minmax(0,1fr))] gap-[2px] sm:grid-cols-[repeat(30,minmax(0,1fr))]" role="img" aria-label="Map of the 604 pages of the Mushaf coloured by status">
-          {data.statuses.slice(1).map((s, k) => (
+          {statuses.slice(1).map((s, k) => (
             <button
               key={k}
               title={`Page ${k + 1}: ${STATUS[s].label}`}
@@ -80,11 +107,48 @@ export default function ProgressPage() {
             />
           ))}
         </div>
+        {look && (
+          <div className="sticky bottom-24 z-10 mt-3 rounded-xl border border-border bg-surface-2 p-3 shadow-lg sm:bottom-4">
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <label htmlFor="look-ahead" className="font-medium">
+                Look ahead
+              </label>
+              <span className={step ? "font-medium text-text" : "text-muted"}>
+                {step ? `${step.label} · ${formatDate(step.date, { day: "numeric", month: "short", year: "numeric" })}` : "Now"}
+              </span>
+            </div>
+            <input
+              id="look-ahead"
+              type="range"
+              min={0}
+              max={look.length}
+              step={1}
+              value={Math.min(ahead, look.length)}
+              onChange={(e) => setAhead(Number(e.target.value))}
+              className="mt-2 w-full accent-[var(--accent)]"
+              aria-valuetext={step ? `${step.label}: ${step.counts.full} pages` : "Now"}
+            />
+            <div className="flex justify-between text-[11px] text-muted" aria-hidden>
+              <span>Now</span>
+              <span>End of plan</span>
+            </div>
+            <p className="mt-1.5 text-xs text-muted">
+              {step ? (
+                <>
+                  <b className="text-text">{step.counts.full} pages</b> memorized (+{step.counts.full - data.totals.fullPages}) if you keep to your plan
+                  {step.end ? ". That's your whole target, inshallah." : "."}
+                </>
+              ) : (
+                "Slide to see how your mushaf fills up if you keep to your plan."
+              )}
+            </p>
+          </div>
+        )}
         <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-          {(Object.keys(STATUS) as PageStatus[]).map((s) => (
+          {(step ? AHEAD_KEYS : NORMAL_KEYS).map((s) => (
             <li key={s} className="flex items-center gap-1.5">
               <span className="h-3 w-3 rounded-sm" style={{ background: STATUS[s].color }} />
-              {STATUS[s].label} {counts[s] ? `(${counts[s]})` : ""}
+              {step && s === "memorized" ? "Memorized now" : STATUS[s].label} {counts[s] ? `(${counts[s]})` : ""}
             </li>
           ))}
         </ul>

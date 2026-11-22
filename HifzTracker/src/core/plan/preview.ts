@@ -11,7 +11,7 @@ import type { QuranIndex } from "../quran";
 import { buildDay, recentAdds } from "../schedule/day";
 import type { MemUnit } from "../srs";
 import { totals } from "../stats";
-import { alternatives, forecast, requiredLinesForTarget, type Forecast } from "./engine";
+import { alternatives, forecast, projectMemorized, requiredLinesForTarget, type Forecast, type ForecastInput } from "./engine";
 import { applyPatch } from "./patch";
 import type { MemorizedSelection, PlanConfig, PlanPatch } from "./schema";
 import { selectionIndices } from "./sequence";
@@ -23,21 +23,23 @@ export function memorizedArray(units: MemUnit[], q: QuranIndex): Uint8Array {
   return m;
 }
 
-export function forecastFor(config: PlanConfig, units: MemUnit[], q: QuranIndex, today: IsoDate): Forecast {
+function forecastInput(config: PlanConfig, units: MemUnit[], q: QuranIndex, today: IsoDate): ForecastInput {
   let pausedUntil: IsoDate | null = null;
   if (config.pauseNewUntilCaughtUp) {
     const day = buildDay(config, q, units, today);
     const days = estimatePauseDays(day.overdueLines, day.manzilQuotaLines);
     if (days > 0) pausedUntil = addDays(today, days);
   }
-  return forecast({
-    config,
-    q,
-    memorized: memorizedArray(units, q),
-    today,
-    recentAdds: recentAdds(units, q, today, config.sabqiWindowDays),
-    pausedUntil,
-  });
+  return { config, q, memorized: memorizedArray(units, q), today, recentAdds: recentAdds(units, q, today, config.sabqiWindowDays), pausedUntil };
+}
+
+export function forecastFor(config: PlanConfig, units: MemUnit[], q: QuranIndex, today: IsoDate): Forecast {
+  return forecast(forecastInput(config, units, q, today));
+}
+
+/** What will be memorized at each date if the plan is kept (same assumptions as forecastFor). */
+export function projectionFor(config: PlanConfig, units: MemUnit[], q: QuranIndex, today: IsoDate, dates: IsoDate[]): Uint8Array[] {
+  return projectMemorized(forecastInput(config, units, q, today), dates);
 }
 
 /** Key numbers plus, when a target date is set, the daily amount that finishes exactly by it. */
