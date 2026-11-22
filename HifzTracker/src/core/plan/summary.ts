@@ -31,6 +31,8 @@ export type KeyNumbers = {
   memorizedPages?: number;
   /** Pages started but not finished (shown next to memorizedPages). */
   memorizedPartPages?: number;
+  /** Pages of the target not fully memorized yet, counted as whole pages (shown instead of remainingPages). */
+  pagesLeft?: number;
 };
 
 export function keyNumbers(config: PlanConfig, f: Forecast): KeyNumbers {

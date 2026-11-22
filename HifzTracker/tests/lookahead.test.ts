@@ -47,3 +47,10 @@ describe("look ahead, day by day", () => {
     expect(inWords(900)).toBe("in 2.5 years");
   });
 });
+
+describe("pages left", () => {
+  it("counts whole pages, so Juz 30 is 23 pages", async () => {
+    const { pagesLeft } = await import("../src/core/plan/preview");
+    expect(pagesLeft(cfg({ target: { type: "juz", juz: [30] } }), [], q)).toBe(23);
+  });
+});

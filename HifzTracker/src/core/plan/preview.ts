@@ -13,8 +13,8 @@ import type { MemUnit } from "../srs";
 import { totals } from "../stats";
 import { alternatives, forecast, memorizeDays, requiredLinesForTarget, type Forecast, type ForecastInput } from "./engine";
 import { applyPatch } from "./patch";
-import type { MemorizedSelection, PlanConfig, PlanPatch } from "./schema";
-import { selectionIndices } from "./sequence";
+import { EXCEPTION_DEFAULTS, type MemorizedSelection, type PlanConfig, type PlanPatch, type WeeklyReading } from "./schema";
+import { buildSequence, selectionIndices } from "./sequence";
 import { alternativeFacts, keyNumbers, type KeyNumbers } from "./summary";
 
 export function memorizedArray(units: MemUnit[], q: QuranIndex): Uint8Array {
@@ -48,6 +48,7 @@ export function numbersFor(config: PlanConfig, units: MemUnit[], q: QuranIndex, 
   const t = totals(units, q);
   k.memorizedPages = t.fullPages;
   k.memorizedPartPages = t.partialPages;
+  k.pagesLeft = pagesLeft(config, units, q);
   if (config.targetFinishDate && !k.done) {
     k.linesToFinishByTarget = requiredLinesForTarget({ config, q, memorized: memorizedArray(units, q), today });
   }
@@ -175,23 +176,11 @@ export function describeChanges(before: PlanConfig | null, after: PlanConfig, ma
       .map(([d, o]) => `${WEEKDAY_LABEL[d as keyof typeof WEEKDAY_LABEL]} ${o?.revisionOnly ? "revision only" : `×${o?.newMultiplier}`}`)
       .join(", ") || "none",
   );
-  diff("Weekly reading", (c) => {
-    const r = c.weeklyReadings ?? [];
-    if (!r.length) return "none";
-    // One entry per surah: "Al-Mulk daily", "Al-Kahf on Fri", "Al-Waqiah on Mon, Thu".
-    const bySurah = new Map<number, Weekday[]>();
-    for (const x of r) bySurah.set(x.surah, [...(bySurah.get(x.surah) ?? []), x.day]);
-    return [...bySurah]
-      .map(([surah, days]) => {
-        const name = q.surah(surah).nameEn;
-        if (days.length === 7) return `${name} daily`;
-        return `${name} on ${WEEKDAYS.filter((d) => days.includes(d)).map((d) => WEEKDAY_LABEL[d]).join(", ")}`;
-      })
-      .join(", ");
-  });
+  diff("Weekly reading", (c) => readingsLabel(c.weeklyReadings ?? [], q) || "none");
   diff("New memorization paused", (c) => (c.pauseNewUntilCaughtUp ? "until revision is caught up" : "no"));
-  const exKey = (c: PlanConfig) => c.exceptions.map((e) => `${e.kind} ${formatDate(e.from)}–${formatDate(e.to)}`).join("; ") || "none";
-  diff("Exceptions", exKey);
+  const exKey = (c: PlanConfig) =>
+    c.exceptions.map((e) => `${EXCEPTION_DEFAULTS[e.kind].label} ${formatDate(e.from)}${e.to !== e.from ? `–${formatDate(e.to)}` : ""}`).join("; ") || "none";
+  diff("Travel, exams, Ramadan", exKey);
   for (const s of marked) out.push(`Mark as already memorized: ${selectionLabel(s, q)}`);
   return out;
 }
@@ -215,4 +204,25 @@ export function unitsFromRanges(ranges: [number, number][], q: QuranIndex, today
   const idx: number[] = [];
   for (const [a, b] of ranges) for (let i = Math.max(0, a); i <= Math.min(q.count - 1, b); i++) idx.push(i);
   return markPrior([], idx, q, today, cycleDays);
+}
+
+/** Pages of the target with anything still to memorize (whole pages, as people count them). */
+export function pagesLeft(config: PlanConfig, units: MemUnit[], q: QuranIndex): number {
+  const mem = memorizedArray(units, q);
+  const pages = new Set<number>();
+  for (const i of buildSequence(config, q)) if (!mem[i]) pages.add(q.pageOf[i]);
+  return pages.size;
+}
+
+/** "Al-Mulk daily, Al-Kahf on Fri, Al-Waqi'ah on Mon, Thu"; "" when there are none. */
+export function readingsLabel(r: WeeklyReading[], q: QuranIndex): string {
+  const bySurah = new Map<number, Weekday[]>();
+  for (const x of r) bySurah.set(x.surah, [...(bySurah.get(x.surah) ?? []), x.day]);
+  return [...bySurah]
+    .map(([surah, days]) => {
+      const name = q.surah(surah).nameEn;
+      if (days.length === 7) return `${name} daily`;
+      return `${name} on ${WEEKDAYS.filter((d) => days.includes(d)).map((d) => WEEKDAY_LABEL[d]).join(", ")}`;
+    })
+    .join(", ");
 }

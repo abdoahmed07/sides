@@ -13,7 +13,10 @@ const ROWS: Row[] = [
     get: (k) =>
       k.memorizedPages === undefined ? "—" : k.memorizedPages === 0 && !k.memorizedPartPages ? "Nothing yet" : pagesLabel(k.memorizedPages, k.memorizedPartPages),
   },
-  { label: "Left to memorize", get: (k) => (k.done ? "Nothing" : pages(k.remainingPages)) },
+  {
+    label: "Left to memorize",
+    get: (k) => (k.done ? "Nothing" : k.pagesLeft !== undefined ? `${k.pagesLeft} page${k.pagesLeft === 1 ? "" : "s"}` : pages(k.remainingPages)),
+  },
   { label: "New per study day", get: (k) => `${k.dailyNewLines} lines (${k.dailyNewPages} p)` },
   { label: "Study days", get: (k) => `${k.studyDaysPerWeek}/week` },
   { label: "Estimated finish", get: (k) => (k.done ? "Done" : k.completionDate ? fmtDate(k.completionDate) : "Never at this pace") },
