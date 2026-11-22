@@ -1,52 +1,37 @@
 /**
- * The Progress page's "look ahead" slider: steps from now to the end of the
- * plan (weekly for short plans, monthly or slower for long ones), and page
- * counts for a memorized array.
+ * The Progress page's "look ahead" slider: one step per day from now to the
+ * end of the plan. Works from the day each page gets finished, so moving the
+ * slider is instant even for plans of several years.
  */
-import { addDays, diffDays, type IsoDate } from "../dates";
 import type { QuranIndex } from "../quran";
+import { NEVER } from "./engine";
 
-export type Stop = { date: IsoDate; label: string; end: boolean };
+/**
+ * Day (0 = today) on which each page becomes fully memorized: -1 = already,
+ * NEVER = not in the plan. Index = page number (0 unused).
+ */
+export function pageDoneDays(ayahDays: Int32Array, q: QuranIndex): Int32Array {
+  const out = new Int32Array(605).fill(-1);
+  for (let i = 0; i < ayahDays.length; i++) {
+    const p = q.pageOf[i];
+    if (ayahDays[i] > out[p]) out[p] = ayahDays[i];
+  }
+  return out;
+}
 
-const MAX_STOPS = 14;
+/** Pages fully memorized by the end of `day` (day −1 = now). */
+export function pagesBy(doneDays: Int32Array, day: number): number {
+  let n = 0;
+  for (let p = 1; p < doneDays.length; p++) if (doneDays[p] !== NEVER && doneDays[p] <= day) n++;
+  return n;
+}
 
-function inWords(days: number): string {
-  if (days < 14) return "in 1 week";
-  if (days < 56) return `in ${Math.round(days / 7)} weeks`;
+/** "tomorrow", "in 5 days", "in 3 weeks", "in 4 months", "in 2.5 years". */
+export function inWords(days: number): string {
+  if (days <= 1) return "tomorrow";
+  if (days < 14) return `in ${days} days`;
+  if (days < 60) return `in ${Math.round(days / 7)} weeks`;
   const months = Math.round(days / 30.44);
-  if (months < 18) return `in ${months} month${months === 1 ? "" : "s"}`;
-  const years = Math.round((days / 365.25) * 2) / 2;
-  return `in ${years} years`;
-}
-
-/** Future steps up to and including the finish date (now itself is not a stop). */
-export function lookAheadStops(today: IsoDate, finish: IsoDate | null): Stop[] {
-  if (!finish) return [];
-  const span = diffDays(today, finish);
-  if (span <= 0) return [];
-  let step = 7;
-  if (span / 7 > MAX_STOPS) step = 28;
-  if (span / 28 > MAX_STOPS) step = Math.ceil(span / MAX_STOPS / 28) * 28;
-  const stops: Stop[] = [];
-  for (let d = step; d < span - step / 3; d += step) stops.push({ date: addDays(today, d), label: inWords(d), end: false });
-  stops.push({ date: finish, label: "End of plan", end: true });
-  return stops;
-}
-
-function perPage(memorized: Uint8Array, q: QuranIndex): Map<number, number> {
-  const per = new Map<number, number>();
-  for (let i = 0; i < memorized.length; i++) if (memorized[i]) per.set(q.pageOf[i], (per.get(q.pageOf[i]) ?? 0) + 1);
-  return per;
-}
-
-/** Pages fully memorized in `memorized`. */
-export function fullPagesOf(memorized: Uint8Array, q: QuranIndex): Set<number> {
-  return new Set([...perPage(memorized, q)].filter(([page, n]) => n >= q.ayahsOnPage(page)).map(([page]) => page));
-}
-
-/** Whole pages memorized, and pages started but not finished. */
-export function pageCounts(memorized: Uint8Array, q: QuranIndex): { full: number; partial: number } {
-  const per = perPage(memorized, q);
-  const full = fullPagesOf(memorized, q).size;
-  return { full, partial: per.size - full };
+  if (months < 18) return `in ${months} months`;
+  return `in ${Math.round((days / 365.25) * 2) / 2} years`;
 }

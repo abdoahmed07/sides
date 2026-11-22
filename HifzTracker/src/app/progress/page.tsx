@@ -1,11 +1,11 @@
 "use client";
 import { useMemo, useState } from "react";
-import { addDays, formatDate, weekdayOf, WEEKDAYS } from "@/core/dates";
+import { addDays, diffDays, formatDate, weekdayOf, WEEKDAYS } from "@/core/dates";
 import { activeDatesOf, heatmap, juzProgress, pageStatuses, streaks, surahProgress, totals, type PageStatus } from "@/core/stats";
 import { useDayLogs, usePlan, useToday, useUnits } from "@/data/hooks";
 import { forecastFor, q } from "@/lib/app";
-import { projectionFor } from "@/core/plan/preview";
-import { fullPagesOf, lookAheadStops, pageCounts } from "@/core/plan/lookahead";
+import { memorizeDaysFor } from "@/core/plan/preview";
+import { inWords, pageDoneDays, pagesBy } from "@/core/plan/lookahead";
 import { Card, PageTitle } from "@/components/ui";
 import { AyahText, Sheet } from "@/components/AyahText";
 
@@ -49,22 +49,29 @@ export default function ProgressPage() {
     };
   }, [units, logs, plan, today]);
 
-  // Look ahead: what the mushaf map will look like at each step if the plan is kept.
+  // Look ahead, one step per day: the day each page gets finished if the plan is kept.
   const look = useMemo(() => {
     const f = data?.forecast;
-    if (!plan || !units || !f || f.done) return null;
-    const stops = lookAheadStops(today, f.completionDate);
-    if (!stops.length) return null;
-    const snaps = projectionFor(plan.config, units, q, today, stops.map((x) => x.date));
-    return stops.map((x, k) => ({ ...x, pages: fullPagesOf(snaps[k], q), counts: pageCounts(snaps[k], q) }));
+    if (!plan || !units || !f || f.done || !f.completionDate) return null;
+    const span = diffDays(today, f.completionDate);
+    if (span <= 0) return null;
+    return { span, doneDays: pageDoneDays(memorizeDaysFor(plan.config, units, q, today), q) };
   }, [plan, units, today, data]);
   if (!data) return null;
 
-  const step = look && ahead > 0 ? look[Math.min(ahead, look.length) - 1] : null;
+  // 0 = now; d = by the end of the day d days from today.
+  const day = look ? Math.min(ahead, look.span) : 0;
+  const step =
+    look && day > 0
+      ? {
+          date: addDays(today, day),
+          label: day === look.span ? "End of plan" : inWords(day),
+          end: day === look.span,
+          pages: pagesBy(look.doneDays, day),
+        }
+      : null;
   const statuses: MapStatus[] = step
-    ? data.statuses.map((s, p) =>
-        s === "none" || s === "partial" ? (p > 0 && step.pages.has(p) ? "ahead" : "none") : "memorized",
-      )
+    ? data.statuses.map((s, p) => (s === "none" || s === "partial" ? (p > 0 && look!.doneDays[p] <= day ? "ahead" : "none") : "memorized"))
     : data.statuses;
 
   const unitByPage = new Map((units ?? []).map((u) => [u.page, u]));
@@ -121,12 +128,12 @@ export default function ProgressPage() {
               id="look-ahead"
               type="range"
               min={0}
-              max={look.length}
+              max={look.span}
               step={1}
-              value={Math.min(ahead, look.length)}
+              value={day}
               onChange={(e) => setAhead(Number(e.target.value))}
               className="mt-2 w-full accent-[var(--accent)]"
-              aria-valuetext={step ? `${step.label}: ${step.counts.full} pages` : "Now"}
+              aria-valuetext={step ? `${step.label}: ${step.pages} pages` : "Now"}
             />
             <div className="flex justify-between text-[11px] text-muted" aria-hidden>
               <span>Now</span>
@@ -135,7 +142,7 @@ export default function ProgressPage() {
             <p className="mt-1.5 text-xs text-muted">
               {step ? (
                 <>
-                  <b className="text-text">{step.counts.full} pages</b> memorized (+{step.counts.full - data.totals.fullPages}) if you keep to your plan
+                  <b className="text-text">{step.pages} pages</b> memorized (+{step.pages - data.totals.fullPages}) if you keep to your plan
                   {step.end ? ". That's your whole target, inshallah." : "."}
                 </>
               ) : (

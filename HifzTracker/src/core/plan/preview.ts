@@ -11,7 +11,7 @@ import type { QuranIndex } from "../quran";
 import { buildDay, recentAdds } from "../schedule/day";
 import type { MemUnit } from "../srs";
 import { totals } from "../stats";
-import { alternatives, forecast, projectMemorized, requiredLinesForTarget, type Forecast, type ForecastInput } from "./engine";
+import { alternatives, forecast, memorizeDays, requiredLinesForTarget, type Forecast, type ForecastInput } from "./engine";
 import { applyPatch } from "./patch";
 import type { MemorizedSelection, PlanConfig, PlanPatch } from "./schema";
 import { selectionIndices } from "./sequence";
@@ -37,9 +37,9 @@ export function forecastFor(config: PlanConfig, units: MemUnit[], q: QuranIndex,
   return forecast(forecastInput(config, units, q, today));
 }
 
-/** What will be memorized at each date if the plan is kept (same assumptions as forecastFor). */
-export function projectionFor(config: PlanConfig, units: MemUnit[], q: QuranIndex, today: IsoDate, dates: IsoDate[]): Uint8Array[] {
-  return projectMemorized(forecastInput(config, units, q, today), dates);
+/** The day (0 = today) each ayah gets memorized if the plan is kept (same assumptions as forecastFor). */
+export function memorizeDaysFor(config: PlanConfig, units: MemUnit[], q: QuranIndex, today: IsoDate): Int32Array {
+  return memorizeDays(forecastInput(config, units, q, today));
 }
 
 /** Key numbers plus, when a target date is set, the daily amount that finishes exactly by it. */
