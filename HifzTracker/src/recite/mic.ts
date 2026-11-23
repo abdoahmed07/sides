@@ -9,7 +9,12 @@ export const RATE = 16000;
 /** Pause length that ends a part, and the longest part (the model handles up to 30 s). */
 const PAUSE_S = 0.7;
 const MAX_PART_S = 20;
-const PARTIAL_EVERY_S = 2.5;
+/** How often the part so far is offered for a live preview (skipped while the model is busy). */
+const PARTIAL_EVERY_S = 1.2;
+/** Audio kept from just before the voice starts, so the soft start of the first word isn't cut off. */
+const PRE_ROLL_S = 0.4;
+/** The end of each part is repeated at the start of the next, so a word at a cut isn't lost. */
+const OVERLAP_S = 0.8;
 
 export type MicHandlers = {
   onPart: (audio: Float32Array) => void;
@@ -61,6 +66,9 @@ export class Mic {
   private speaking = false;
   private sincePartial = 0;
   private floor = 0.01;
+  private preRoll: Float32Array[] = [];
+  private preRollSamples = 0;
+  private tail: Float32Array | null = null;
 
   constructor(private h: MicHandlers) {}
 
@@ -113,8 +121,23 @@ export class Mic {
     if (!voice) this.floor = rms < this.floor ? rms : this.floor * 0.98 + rms * 0.02;
     this.h.onLevel?.(Math.min(1, rms * 8));
 
-    if (!this.speaking && !voice) return;
-    this.speaking = true;
+    if (!this.speaking && !voice) {
+      this.preRoll.push(frame);
+      this.preRollSamples += frame.length;
+      while (this.preRoll.length > 1 && this.preRollSamples - this.preRoll[0].length >= PRE_ROLL_S * RATE)
+        this.preRollSamples -= this.preRoll.shift()!.length;
+      return;
+    }
+    if (!this.speaking) {
+      // A new part: the end of the previous one (if it just ended), then the moment before the voice.
+      this.speaking = true;
+      if (this.tail) this.part.push(this.tail);
+      this.part.push(...this.preRoll);
+      this.partSamples = this.part.reduce((n, c) => n + c.length, 0);
+      this.tail = null;
+      this.preRoll = [];
+      this.preRollSamples = 0;
+    }
     this.part.push(frame);
     this.partSamples += frame.length;
     this.silentSamples = voice ? 0 : this.silentSamples + frame.length;
@@ -128,7 +151,10 @@ export class Mic {
   }
 
   private endPart() {
-    if (this.partSamples > 0.3 * RATE) this.h.onPart(concat(this.part));
+    const audio = concat(this.part);
+    if (this.partSamples > 0.3 * RATE) this.h.onPart(audio);
+    // Keep the end for the next part only when it was cut mid-flow (no real pause).
+    this.tail = this.silentSamples < PAUSE_S * RATE ? audio.slice(Math.max(0, audio.length - OVERLAP_S * RATE)) : null;
     this.part = [];
     this.partSamples = 0;
     this.silentSamples = 0;

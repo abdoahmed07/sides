@@ -2,10 +2,10 @@
  * The browser side of the speech model: one background worker per session,
  * loaded on demand, one transcription at a time.
  */
-import type { Out } from "./worker";
+import type { Backend, Out } from "./worker";
 
 let worker: Worker | null = null;
-let ready: Promise<void> | null = null;
+let ready: Promise<Backend> | null = null;
 let nextId = 1;
 const pending = new Map<number, { resolve: (t: string) => void; reject: (e: Error) => void }>();
 const progressListeners = new Set<(loaded: number, total: number) => void>();
@@ -28,14 +28,14 @@ function getWorker(): Worker {
 }
 
 /** Downloads (first time) and starts the model. `onProgress` gets bytes loaded / total. */
-export function loadModel(onProgress?: (loaded: number, total: number) => void): Promise<void> {
+export function loadModel(onProgress?: (loaded: number, total: number) => void): Promise<Backend> {
   if (onProgress) progressListeners.add(onProgress);
-  ready ??= new Promise<void>((resolve, reject) => {
+  ready ??= new Promise<Backend>((resolve, reject) => {
     const w = getWorker();
     const onMsg = (e: MessageEvent<Out>) => {
       if (e.data.type === "ready") {
         w.removeEventListener("message", onMsg);
-        resolve();
+        resolve(e.data.backend);
       } else if (e.data.type === "error" && e.data.id === undefined) {
         w.removeEventListener("message", onMsg);
         ready = null;

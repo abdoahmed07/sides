@@ -960,13 +960,8 @@ const ar: Dict = {
   "Downloading… {pct}%": "جارٍ التنزيل… {pct}%",
   "Getting ready…": "جارٍ التجهيز…",
   Hint: "تلميح",
-  "I'm done": "انتهيت",
   "It checks words (skipped or wrong), not tajweed. It can mishear sometimes, especially with background noise.":
     "يفحص الكلمات (المتروكة أو الخاطئة)، لا التجويد. قد يخطئ في السماع أحياناً، خاصة مع الضوضاء.",
-  "It needs a one-time download of about 45 MB (best on Wi-Fi). It listens on this device: your voice is never sent anywhere.":
-    "يحتاج إلى تنزيل لمرة واحدة بحجم 45 ميغابايت تقريباً (يفضَّل عبر Wi-Fi). يستمع على هذا الجهاز: صوتك لا يُرسل إلى أي مكان.",
-  "Listening… recite at your normal pace. Words appear as you get them right.":
-    "جارٍ الاستماع… سمّع بسرعتك المعتادة. تظهر الكلمات عندما تقولها صحيحة.",
   "No mistakes. Masha'Allah!": "لا أخطاء. ما شاء الله!",
   Rating: "التقييم",
   "Recite and check couldn't start. Check your internet connection and try again.":
@@ -982,8 +977,6 @@ const ar: Dict = {
   "Suggested rating:": "التقييم المقترح:",
   "The microphone is blocked. Allow it for this site in your browser settings, then try again.":
     "الميكروفون محظور. اسمح به لهذا الموقع من إعدادات المتصفح، ثم حاول مرة أخرى.",
-  "The text is hidden. Press start and recite from memory; use Hint if you get stuck.":
-    "النص مخفي. اضغط ابدأ وسمّع غيباً؛ استخدم التلميح إن توقفت.",
   "{n} hints": {
     zero: "{n} تلميح",
     one: "تلميح واحد",
@@ -1022,11 +1015,35 @@ const ar: Dict = {
   "Listening and reciting": "الاستماع والتسميع",
   "Recitation audio streams from the Islamic Network audio library when you press play.":
     "يُبثّ صوت التلاوة من مكتبة Islamic Network الصوتية عندما تضغط تشغيل.",
-  "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45 MB) downloads from Hugging Face.":
-    "**التسميع والتصحيح** يستمع عبر الميكروفون فقط أثناء التسميع، والتعرّف على الكلام يعمل على جهازك: صوتك لا يُسجَّل ولا يُرسل إلى أي مكان. في المرة الأولى يُنزَّل نموذج الكلام (حوالي 45 ميغابايت) من Hugging Face.",
+  "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45–70 MB) downloads from Hugging Face.":
+    "**التسميع والتصحيح** يستمع عبر الميكروفون فقط أثناء التسميع، والتعرّف على الكلام يعمل على جهازك: صوتك لا يُسجَّل ولا يُرسل إلى أي مكان. في المرة الأولى يُنزَّل نموذج الكلام (حوالي 45–70 ميغابايت) من Hugging Face.",
   "I can't hear anything. Is the microphone allowed and not muted? Try speaking a little louder.":
     "لا أسمع شيئاً. هل الميكروفون مسموح به وغير مكتوم؟ جرّب أن تتكلم بصوت أعلى قليلاً.",
-  "Heard:": "سمعت:",
+  "Ayah {n} of {total}": "الآية {n} من {total}",
+  "Checking the last part…": "جارٍ التحقق من الجزء الأخير…",
+  "Continue reciting": "تابع التسميع",
+  Finish: "إنهاء",
+  "It needs a one-time download of about 45–70 MB (best on Wi-Fi). It listens on this device: your voice is never sent anywhere.":
+    "يحتاج إلى تنزيل لمرة واحدة بحجم 45–70 ميغابايت تقريباً (يفضَّل عبر Wi-Fi). يستمع على هذا الجهاز: صوتك لا يُرسل إلى أي مكان.",
+  "Listen to {ayah}": "استمع إلى {ayah}",
+  "Listening… recite at your normal pace.":
+    "جارٍ الاستماع… سمّع بسرعتك المعتادة.",
+  "Paused. Tap the microphone to continue.":
+    "متوقف مؤقتاً. اضغط على الميكروفون للمتابعة.",
+  "Tap the microphone and start reciting. Use the bulb if you get stuck.":
+    "اضغط على الميكروفون وابدأ التسميع. استخدم المصباح إن توقفت.",
+  "The text is hidden. Recite from memory.": "النص مخفي. سمّع غيباً.",
+  "What the app heard": "ما سمعه التطبيق",
+  "{n} mistakes": {
+    zero: "لا أخطاء",
+    one: "خطأ واحد",
+    two: "خطآن",
+    few: "{n} أخطاء",
+    many: "{n} خطأً",
+    other: "{n} خطأ",
+  },
+  "{pct}% correct": "{pct}% صحيح",
+  "{right} of {total} words right": "{right} من {total} كلمة صحيحة",
 };
 
 export default ar;

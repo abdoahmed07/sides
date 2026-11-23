@@ -53,6 +53,13 @@ describe("aligning a recitation", () => {
     expect(r.next).toBe(4);
   });
 
+  it("scores each pairing, so only confident matches are trusted from one pass", () => {
+    // A cut-off "الوسواس" ("الوس") looks a bit like "إله" but isn't a confident match.
+    const r = align(nas, ["الوس"], 6);
+    expect(r.statuses[0].score).toBeLessThan(0.75);
+    expect(align(nas, ["اله"], 6).statuses[0].score).toBeGreaterThanOrEqual(0.75);
+  });
+
   it("forgives one misheard letter in a short word, but not a different word", () => {
     const heard = "قل اعوذ برب الناس تلك الناس".split(" ");
     expect(align(nas, heard, 0).statuses.every((s) => s.status === "correct")).toBe(true);
@@ -61,7 +68,7 @@ describe("aligning a recitation", () => {
 
   it("doesn't call the words you haven't reached yet skipped", () => {
     const r = align(nas, ["قل"], 0);
-    expect(r.statuses).toEqual([{ index: 0, status: "correct" }]);
+    expect(r.statuses).toEqual([{ index: 0, status: "correct", score: 1, heard: 0 }]);
     expect(r.next).toBe(1);
   });
 });

@@ -58,7 +58,7 @@ export function Privacy() {
         <P text={t("Recitation audio streams from the Islamic Network audio library when you press play.")} />
         <P
           text={t(
-            "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45 MB) downloads from Hugging Face.",
+            "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45–70 MB) downloads from Hugging Face.",
           )}
         />
       </Section>

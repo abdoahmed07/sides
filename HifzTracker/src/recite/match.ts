@@ -51,16 +51,20 @@ export function similarity(a: string, b: string): number {
 
 /**
  * Close enough to count as the right word: allows the usual script
- * differences and one misheard letter in a short word (the model's typical
- * slip, e.g. ملك heard as تلك). Real mistakes are mostly other words or missing ones.
+ * differences and a misheard letter or two (the small model's typical slips,
+ * e.g. ملك heard as تلك). Real mistakes are mostly other words or missing ones;
+ * a false "mistake" is worse for the person than a missed one.
  */
-export const SAME = 0.6;
+export const SAME = 0.5;
 
 export type WordStatus = "pending" | "correct" | "wrong" | "skipped";
 
 export type Alignment = {
-  /** Status per expected word, from `from` on (earlier words are untouched). */
-  statuses: { index: number; status: Exclude<WordStatus, "pending"> }[];
+  /**
+   * Status per expected word, from `from` on (earlier words are untouched).
+   * `score`: how alike the heard and expected word were (0–1); `heard`: which heard word it was paired with.
+   */
+  statuses: { index: number; status: Exclude<WordStatus, "pending">; score: number; heard: number }[];
   /** First expected word not yet covered. */
   next: number;
 };
@@ -119,11 +123,12 @@ export function align(expected: string[], heard: string[], from: number): Alignm
   while (i > 0 || j > 0) {
     const mv = move[i][j];
     if (mv === 1) {
-      statuses.push({ index: from + i - 1, status: similarity(e[i - 1], h[j - 1]) >= SAME ? "correct" : "wrong" });
+      const score = similarity(e[i - 1], h[j - 1]);
+      statuses.push({ index: from + i - 1, status: score >= SAME ? "correct" : "wrong", score, heard: j - 1 });
       i--;
       j--;
     } else if (mv === 2) {
-      statuses.push({ index: from + i - 1, status: "skipped" });
+      statuses.push({ index: from + i - 1, status: "skipped", score: 0, heard: -1 });
       i--;
     } else j--;
   }
@@ -133,6 +138,9 @@ export function align(expected: string[], heard: string[], from: number): Alignm
   const last = statuses[statuses.length - 1];
   return { statuses, next: last ? last.index + 1 : from };
 }
+
+/** A match this close is trusted from a single pass (it locks the word in as right). */
+export const SURE = 0.75;
 
 export type Rating = "strong" | "okay" | "weak";
 

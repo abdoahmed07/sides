@@ -858,13 +858,8 @@ const sv: Dict = {
   "Downloading… {pct}%": "Laddar ner… {pct}%",
   "Getting ready…": "Gör klart…",
   Hint: "Ledtråd",
-  "I'm done": "Jag är klar",
   "It checks words (skipped or wrong), not tajweed. It can mishear sometimes, especially with background noise.":
     "Den kontrollerar ord (överhoppade eller fel), inte tajweed. Den kan höra fel ibland, särskilt med bakgrundsljud.",
-  "It needs a one-time download of about 45 MB (best on Wi-Fi). It listens on this device: your voice is never sent anywhere.":
-    "Det kräver en engångsnedladdning på ungefär 45 MB (helst via wifi). Den lyssnar på den här enheten: din röst skickas aldrig någonstans.",
-  "Listening… recite at your normal pace. Words appear as you get them right.":
-    "Lyssnar… recitera i din vanliga takt. Orden visas när du säger dem rätt.",
   "No mistakes. Masha'Allah!": "Inga fel. Masha'Allah!",
   Rating: "Betyg",
   "Recite and check couldn't start. Check your internet connection and try again.":
@@ -880,8 +875,6 @@ const sv: Dict = {
   "Suggested rating:": "Föreslaget betyg:",
   "The microphone is blocked. Allow it for this site in your browser settings, then try again.":
     "Mikrofonen är blockerad. Tillåt den för den här webbplatsen i webbläsarens inställningar och försök igen.",
-  "The text is hidden. Press start and recite from memory; use Hint if you get stuck.":
-    "Texten är dold. Tryck på start och recitera utantill; använd Ledtråd om du fastnar.",
   "{n} hints": { one: "{n} ledtråd", other: "{n} ledtrådar" },
   "{n} skipped words": {
     one: "{n} överhoppat ord",
@@ -898,11 +891,29 @@ const sv: Dict = {
   "Listening and reciting": "Lyssna och recitera",
   "Recitation audio streams from the Islamic Network audio library when you press play.":
     "Reciteringsljudet strömmas från Islamic Networks ljudbibliotek när du trycker på spela.",
-  "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45 MB) downloads from Hugging Face.":
-    "**Recitera och kontrollera** lyssnar genom mikrofonen bara medan du reciterar, och taligenkänningen körs på din enhet: din röst spelas aldrig in och skickas aldrig någonstans. Första gången laddas talmodellen (ungefär 45 MB) ner från Hugging Face.",
+  "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45–70 MB) downloads from Hugging Face.":
+    "**Recitera och kontrollera** lyssnar genom mikrofonen bara medan du reciterar, och taligenkänningen körs på din enhet: din röst spelas aldrig in och skickas aldrig någonstans. Första gången laddas talmodellen (ungefär 45–70 MB) ner från Hugging Face.",
   "I can't hear anything. Is the microphone allowed and not muted? Try speaking a little louder.":
     "Jag hör ingenting. Är mikrofonen tillåten och inte avstängd? Försök prata lite högre.",
-  "Heard:": "Hörde:",
+  "Ayah {n} of {total}": "Vers {n} av {total}",
+  "Checking the last part…": "Kontrollerar den sista delen…",
+  "Continue reciting": "Fortsätt recitera",
+  Finish: "Avsluta",
+  "It needs a one-time download of about 45–70 MB (best on Wi-Fi). It listens on this device: your voice is never sent anywhere.":
+    "Det kräver en engångsnedladdning på ungefär 45–70 MB (helst via wifi). Den lyssnar på den här enheten: din röst skickas aldrig någonstans.",
+  "Listen to {ayah}": "Lyssna på {ayah}",
+  "Listening… recite at your normal pace.":
+    "Lyssnar… recitera i din vanliga takt.",
+  "Paused. Tap the microphone to continue.":
+    "Pausad. Tryck på mikrofonen för att fortsätta.",
+  "Tap the microphone and start reciting. Use the bulb if you get stuck.":
+    "Tryck på mikrofonen och börja recitera. Använd lampan om du fastnar.",
+  "The text is hidden. Recite from memory.":
+    "Texten är dold. Recitera utantill.",
+  "What the app heard": "Vad appen hörde",
+  "{n} mistakes": { one: "{n} fel", other: "{n} fel" },
+  "{pct}% correct": "{pct}% rätt",
+  "{right} of {total} words right": "{right} av {total} ord rätt",
 };
 
 export default sv;
