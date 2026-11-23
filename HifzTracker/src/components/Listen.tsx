@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   audioUrl,
   portionOrder,
@@ -14,15 +15,11 @@ import { q } from "@/lib/app";
 import { t, tx } from "@/i18n";
 import { useLang } from "@/i18n/react";
 import { AyahText } from "./AyahText";
-import { ReciteCheck } from "./ReciteCheck";
-import type { Rating } from "@/recite/match";
 
-type UiMode = Mode | "recite";
-
-const MODES: { value: UiMode; label: string; hint: string }[] = [
+const MODES: { value: Mode; label: string; hint: string }[] = [
   {
     value: "listen",
-    label: tx("Listen"),
+    label: tx("Play all"),
     hint: tx("Plays the whole portion, ayah by ayah."),
   },
   {
@@ -39,15 +36,10 @@ const MODES: { value: UiMode; label: string; hint: string }[] = [
       "Plays ayah 1, then 1–2, then 1–3… so the ayahs join up. Recite along each time.",
     ),
   },
-  {
-    value: "recite",
-    label: tx("Recite"),
-    hint: tx("Recite from memory; the app checks every word."),
-  },
 ];
 
 /** Remembered per device: reciter, speed, mode and hide-text. */
-function usePref<T extends string>(
+export function usePref<T extends string>(
   key: string,
   fallback: T,
 ): [T, (v: T) => void] {
@@ -73,13 +65,16 @@ function usePref<T extends string>(
 
 type Phase = "idle" | "playing" | "paused" | "waiting" | "finished";
 
-/** The text of a portion with a player on top: Listen, Repeat after (waits for you) and Link. */
-export function ReadAndListen({
+/**
+ * Listen to some ayahs: Play all, Repeat after (waits for you) and Link. The
+ * controls go into `slot` (the reader's pinned header); the text stays in place.
+ */
+export function ListenPlayer({
   indices,
-  onRate,
+  slot,
 }: {
   indices: number[];
-  onRate?: (r: Rating) => Promise<void> | void;
+  slot: HTMLElement | null;
 }) {
   useLang();
   const ayahs = useMemo(() => portionOrder(indices, q.surahOf), [indices]);
@@ -89,8 +84,10 @@ export function ReadAndListen({
     RECITERS[0].id,
   );
   const [speedStr, setSpeedStr] = usePref<string>("hifz:speed", "1");
-  const [uiMode, setModeRaw] = usePref<UiMode>("hifz:listenMode", "repeat");
-  const mode: Mode = uiMode === "recite" ? "repeat" : uiMode;
+  const [storedMode, setModeRaw] = usePref<string>("hifz:listenMode", "repeat");
+  const mode: Mode = MODES.some((m) => m.value === storedMode)
+    ? (storedMode as Mode)
+    : "repeat";
   const [hiddenStr, setHiddenStr] = usePref<string>("hifz:hideText", "0");
   const hidden = hiddenStr === "1";
   const speed = Number(speedStr) || 1;
@@ -183,7 +180,7 @@ export function ReadAndListen({
     else startStep(pos);
   };
 
-  const setMode = (m: UiMode) => {
+  const setMode = (m: Mode) => {
     stop();
     setRounds(0);
     setModeRaw(m);
@@ -214,174 +211,172 @@ export function ReadAndListen({
             ? q.rangeLabel([current])
             : t(MODES.find((m) => m.value === mode)!.hint);
 
-  return (
-    <div className="space-y-4">
-      <div className="sticky top-0 z-10 -mx-5 -mt-4 space-y-2.5 border-b border-border bg-surface px-5 pb-3 pt-3">
-        <div
-          className="flex flex-wrap items-center gap-1.5"
-          role="radiogroup"
-          aria-label={t("Mode")}
-        >
-          {MODES.map((m) => (
-            <button
-              key={m.value}
-              role="radio"
-              aria-checked={uiMode === m.value}
-              onClick={() => setMode(m.value)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium ${uiMode === m.value ? "border-accent bg-accent text-accent-text" : "border-border text-muted hover:text-text"}`}
-            >
-              {t(m.label)}
-            </button>
-          ))}
-          {uiMode !== "recite" && (
-            <button
-              aria-pressed={hidden}
-              onClick={() => setHiddenStr(hidden ? "0" : "1")}
-              className={`ms-auto rounded-full border px-3 py-1 text-xs ${hidden ? "border-accent text-accent" : "border-border text-muted hover:text-text"}`}
-            >
-              {hidden ? t("Show text") : t("Hide text")}
-            </button>
-          )}
-        </div>
-
-        {uiMode !== "recite" && (
-          <>
-            <div className="flex items-center gap-2">
-              {phase === "waiting" ? (
-                <>
-                  <button
-                    onClick={() => startStep(pos)}
-                    className="flex-1 rounded-xl border border-border px-3 py-2.5 text-sm font-medium hover:bg-surface-2"
-                  >
-                    ↺ {t("Again")}
-                  </button>
-                  <button
-                    onClick={() => (atEnd ? stop() : go(pos + 1))}
-                    className="flex-1 rounded-xl bg-accent px-3 py-2.5 text-sm font-medium text-accent-text hover:opacity-90"
-                  >
-                    {atEnd
-                      ? t("Done")
-                      : mode === "link"
-                        ? t("Add the next ayah")
-                        : t("Next ayah")}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <IconButton
-                    label={t("Previous ayah")}
-                    disabled={pos === 0}
-                    onClick={() => go(pos - 1)}
-                    path="M15 6l-6 6 6 6"
-                  />
-                  <button
-                    onClick={main}
-                    aria-label={phase === "playing" ? t("Pause") : t("Play")}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-text hover:opacity-90"
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="h-5 w-5"
-                      fill="currentColor"
-                      aria-hidden
-                    >
-                      {phase === "playing" ? (
-                        <path d="M7 5h4v14H7zM13 5h4v14h-4z" />
-                      ) : (
-                        <path d="M8 5v14l11-7z" />
-                      )}
-                    </svg>
-                  </button>
-                  <IconButton
-                    label={t("Next ayah")}
-                    disabled={atEnd}
-                    onClick={() => go(pos + 1)}
-                    path="M9 6l6 6-6 6"
-                  />
-                  <p
-                    className="min-w-0 flex-1 truncate text-xs text-muted"
-                    aria-live="polite"
-                  >
-                    {status}
-                  </p>
-                </>
-              )}
-            </div>
-            {phase === "waiting" && (
-              <p className="text-xs text-muted" aria-live="polite">
-                {status}
-              </p>
-            )}
-            {error && (
-              <p className="text-xs text-danger">
-                {t("Couldn't play the audio. Check your internet connection.")}
-              </p>
-            )}
-
-            <details className="text-xs text-muted">
-              <summary className="cursor-pointer">
-                {reciter.name} · {speed}×
-              </summary>
-              <div className="mt-2 space-y-2">
-                <div
-                  className="space-y-1"
-                  role="radiogroup"
-                  aria-label={t("Reciter")}
-                >
-                  {RECITERS.map((r) => (
-                    <button
-                      key={r.id}
-                      role="radio"
-                      aria-checked={r.id === reciter.id}
-                      onClick={() => {
-                        stop();
-                        setReciterId(r.id);
-                      }}
-                      className={`block w-full rounded-lg border px-3 py-1.5 text-start ${r.id === reciter.id ? "border-accent text-text" : "border-border hover:text-text"}`}
-                    >
-                      <span className="font-medium">{r.name}</span> ·{" "}
-                      {t(r.style)}
-                    </button>
-                  ))}
-                </div>
-                <div
-                  className="flex items-center gap-1.5"
-                  role="radiogroup"
-                  aria-label={t("Speed")}
-                >
-                  <span>{t("Speed")}</span>
-                  {SPEEDS.map((sp) => (
-                    <button
-                      key={sp}
-                      role="radio"
-                      aria-checked={sp === speed}
-                      onClick={() => {
-                        setSpeedStr(String(sp));
-                        if (audio.current) audio.current.playbackRate = sp;
-                      }}
-                      className={`rounded-full border px-2.5 py-0.5 ${sp === speed ? "border-accent text-accent" : "border-border hover:text-text"}`}
-                    >
-                      {sp}×
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </details>
-          </>
-        )}
+  const controls = (
+    <div className="space-y-2.5 pt-2">
+      <div
+        className="flex flex-wrap items-center gap-1.5"
+        role="radiogroup"
+        aria-label={t("Mode")}
+      >
+        {MODES.map((m) => (
+          <button
+            key={m.value}
+            role="radio"
+            aria-checked={mode === m.value}
+            onClick={() => setMode(m.value)}
+            className={`rounded-full border px-3 py-1 text-xs font-medium ${mode === m.value ? "border-accent bg-accent text-accent-text" : "border-border text-muted hover:text-text"}`}
+          >
+            {t(m.label)}
+          </button>
+        ))}
+        {
+          <button
+            aria-pressed={hidden}
+            onClick={() => setHiddenStr(hidden ? "0" : "1")}
+            className={`ms-auto rounded-full border px-3 py-1 text-xs ${hidden ? "border-accent text-accent" : "border-border text-muted hover:text-text"}`}
+          >
+            {hidden ? t("Show text") : t("Hide text")}
+          </button>
+        }
       </div>
 
-      {uiMode === "recite" ? (
-        <ReciteCheck ayahs={ayahs} onRate={onRate} />
-      ) : (
-        <AyahText
-          indices={ayahs}
-          active={current ?? (phase === "waiting" ? ayahs[pos] : null)}
-          hidden={hidden}
-          onPick={(a) => go(ayahs.indexOf(a))}
-        />
-      )}
+      {
+        <>
+          <div className="flex items-center gap-2">
+            {phase === "waiting" ? (
+              <>
+                <button
+                  onClick={() => startStep(pos)}
+                  className="flex-1 rounded-xl border border-border px-3 py-2.5 text-sm font-medium hover:bg-surface-2"
+                >
+                  ↺ {t("Again")}
+                </button>
+                <button
+                  onClick={() => (atEnd ? stop() : go(pos + 1))}
+                  className="flex-1 rounded-xl bg-accent px-3 py-2.5 text-sm font-medium text-accent-text hover:opacity-90"
+                >
+                  {atEnd
+                    ? t("Done")
+                    : mode === "link"
+                      ? t("Add the next ayah")
+                      : t("Next ayah")}
+                </button>
+              </>
+            ) : (
+              <>
+                <IconButton
+                  label={t("Previous ayah")}
+                  disabled={pos === 0}
+                  onClick={() => go(pos - 1)}
+                  path="M15 6l-6 6 6 6"
+                />
+                <button
+                  onClick={main}
+                  aria-label={phase === "playing" ? t("Pause") : t("Play")}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-text hover:opacity-90"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-5 w-5"
+                    fill="currentColor"
+                    aria-hidden
+                  >
+                    {phase === "playing" ? (
+                      <path d="M7 5h4v14H7zM13 5h4v14h-4z" />
+                    ) : (
+                      <path d="M8 5v14l11-7z" />
+                    )}
+                  </svg>
+                </button>
+                <IconButton
+                  label={t("Next ayah")}
+                  disabled={atEnd}
+                  onClick={() => go(pos + 1)}
+                  path="M9 6l6 6-6 6"
+                />
+                <p
+                  className="min-w-0 flex-1 truncate text-xs text-muted"
+                  aria-live="polite"
+                >
+                  {status}
+                </p>
+              </>
+            )}
+          </div>
+          {phase === "waiting" && (
+            <p className="text-xs text-muted" aria-live="polite">
+              {status}
+            </p>
+          )}
+          {error && (
+            <p className="text-xs text-danger">
+              {t("Couldn't play the audio. Check your internet connection.")}
+            </p>
+          )}
+
+          <details className="text-xs text-muted">
+            <summary className="cursor-pointer">
+              {reciter.name} · {speed}×
+            </summary>
+            <div className="mt-2 space-y-2">
+              <div
+                className="space-y-1"
+                role="radiogroup"
+                aria-label={t("Reciter")}
+              >
+                {RECITERS.map((r) => (
+                  <button
+                    key={r.id}
+                    role="radio"
+                    aria-checked={r.id === reciter.id}
+                    onClick={() => {
+                      stop();
+                      setReciterId(r.id);
+                    }}
+                    className={`block w-full rounded-lg border px-3 py-1.5 text-start ${r.id === reciter.id ? "border-accent text-text" : "border-border hover:text-text"}`}
+                  >
+                    <span className="font-medium">{r.name}</span> · {t(r.style)}
+                  </button>
+                ))}
+              </div>
+              <div
+                className="flex items-center gap-1.5"
+                role="radiogroup"
+                aria-label={t("Speed")}
+              >
+                <span>{t("Speed")}</span>
+                {SPEEDS.map((sp) => (
+                  <button
+                    key={sp}
+                    role="radio"
+                    aria-checked={sp === speed}
+                    onClick={() => {
+                      setSpeedStr(String(sp));
+                      if (audio.current) audio.current.playbackRate = sp;
+                    }}
+                    className={`rounded-full border px-2.5 py-0.5 ${sp === speed ? "border-accent text-accent" : "border-border hover:text-text"}`}
+                  >
+                    {sp}×
+                  </button>
+                ))}
+              </div>
+            </div>
+          </details>
+        </>
+      }
     </div>
+  );
+
+  return (
+    <>
+      {slot && createPortal(controls, slot)}
+      <AyahText
+        indices={ayahs}
+        active={current ?? (phase === "waiting" ? ayahs[pos] : null)}
+        hidden={hidden}
+        onPick={(a) => go(ayahs.indexOf(a))}
+      />
+    </>
   );
 }
 

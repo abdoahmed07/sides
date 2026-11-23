@@ -10,8 +10,8 @@ import { t, tp, tx } from "@/i18n";
 import { useLang } from "@/i18n/react";
 import { Rich } from "@/components/Language";
 import { Card, PageTitle } from "@/components/ui";
-import { Sheet } from "@/components/AyahText";
-import { ReadAndListen } from "@/components/Listen";
+import { readHref } from "@/lib/read";
+import { useRouter } from "next/navigation";
 
 type MapStatus = PageStatus | "ahead";
 
@@ -32,7 +32,7 @@ export default function ProgressPage() {
   const plan = usePlan();
   const units = useUnits();
   const logs = useDayLogs();
-  const [page, setPage] = useState<number | null>(null);
+  const router = useRouter();
   const [showAllSurahs, setShowAllSurahs] = useState(false);
   const [ahead, setAhead] = useState(0);
   useLang();
@@ -79,7 +79,6 @@ export default function ProgressPage() {
     ? data.statuses.map((s, p) => (s === "none" || s === "partial" ? (p > 0 && look!.doneDays[p] <= day ? "ahead" : "none") : "memorized"))
     : data.statuses;
 
-  const unitByPage = new Map((units ?? []).map((u) => [u.page, u]));
   const counts = statuses.slice(1).reduce<Record<string, number>>((m, s) => ((m[s] = (m[s] ?? 0) + 1), m), {});
   const surahs = showAllSurahs ? data.surahs : data.surahs.filter((s) => s.memorized > 0);
 
@@ -105,7 +104,7 @@ export default function ProgressPage() {
       <Card>
         <h2 className="mb-1 font-semibold">{t("Mushaf map")}</h2>
         <p className="mb-3 text-xs text-muted">
-          {t("604 pages, right to left as in the mushaf (page 1 top right). Tap a memorized page to read it.")}
+          {t("604 pages, right to left as in the mushaf (page 1 top right). Tap a page to read it.")}
           {look && " " + t("Use Look ahead below to see it fill up.")}
         </p>
         <div
@@ -119,7 +118,7 @@ export default function ProgressPage() {
               key={k}
               title={`${t("Page {n}", { n: k + 1 })}: ${t(STATUS[s].label)}`}
               aria-label={`${t("Page {n}", { n: k + 1 })}: ${t(STATUS[s].label)}`}
-              onClick={() => unitByPage.has(k + 1) && setPage(k + 1)}
+              onClick={() => router.push(readHref({ kind: "page", page: k + 1 }))}
               className="aspect-[3/4] rounded-[2px]"
               style={{ background: STATUS[s].color }}
             />
@@ -209,9 +208,7 @@ export default function ProgressPage() {
         )}
       </Card>
 
-      <Sheet open={page !== null} onClose={() => setPage(null)} title={page ? t("Page {n}", { n: page }) : ""}>
-        {page && <ReadAndListen indices={unitByPage.get(page)?.ayahs ?? []} />}
-      </Sheet>
+
     </div>
   );
 }

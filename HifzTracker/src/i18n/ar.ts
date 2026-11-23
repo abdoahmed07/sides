@@ -174,8 +174,8 @@ const ar: Dict = {
   Done: "منتهٍ",
   target: "الهدف",
   "Mushaf map": "خريطة المصحف",
-  "604 pages, right to left as in the mushaf (page 1 top right). Tap a memorized page to read it.":
-    "604 صفحات، من اليمين إلى اليسار كما في المصحف (الصفحة 1 في أعلى اليمين). اضغط على صفحة محفوظة لقراءتها.",
+  "604 pages, right to left as in the mushaf (page 1 top right). Tap a page to read it.":
+    "604 صفحات، من اليمين إلى اليسار كما في المصحف (الصفحة 1 في أعلى اليمين). اضغط على صفحة لقراءتها.",
   "Use Look ahead below to see it fill up.":
     "استخدم «نظرة للأمام» بالأسفل لترى كيف تمتلئ.",
   "Map of the 604 pages of the Mushaf coloured by status":
@@ -968,8 +968,6 @@ const ar: Dict = {
     "تعذّر بدء التسميع والتصحيح. تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
   "Recite from memory and the app checks every word.":
     "سمّع غيباً والتطبيق يتحقق من كل كلمة.",
-  "Recite from memory; the app checks every word.":
-    "سمّع غيباً؛ والتطبيق يتحقق من كل كلمة.",
   Recite: "تسميع",
   "Save as done: {rating}": "احفظ كمنجز: {rating}",
   "Saved ✓": "تم الحفظ ✓",
@@ -1044,6 +1042,27 @@ const ar: Dict = {
   },
   "{pct}% correct": "{pct}% صحيح",
   "{right} of {total} words right": "{right} من {total} كلمة صحيحة",
+  Back: "رجوع",
+  "Go to page": "انتقل إلى صفحة",
+  Go: "انتقال",
+  Next: "التالي",
+  "No surah found.": "لم يُعثر على سورة.",
+  Page: "صفحة",
+  "Play all": "تشغيل الكل",
+  Previous: "السابق",
+  Quran: "القرآن",
+  Read: "قراءة",
+  "Read, listen and recite any part of the Quran.":
+    "اقرأ واستمع وسمّع أي جزء من القرآن.",
+  "Search a surah": "ابحث عن سورة",
+  "{n} ayahs": {
+    zero: "{n} آية",
+    one: "آية واحدة",
+    two: "آيتان",
+    few: "{n} آيات",
+    many: "{n} آية",
+    other: "{n} آية",
+  },
 };
 
 export default ar;

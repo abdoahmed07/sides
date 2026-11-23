@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { addDays, formatDate } from "@/core/dates";
 import { useDayLog, useDayLogs, useMeta, usePlan, useToday, useUnits } from "@/data/hooks";
@@ -9,7 +10,7 @@ import type { DayItem } from "@/data/types";
 import { Button, Card, Notice, PageTitle } from "@/components/ui";
 import { DayItemRow } from "@/components/DayItemRow";
 import { Sheet } from "@/components/AyahText";
-import { ReadAndListen } from "@/components/Listen";
+import { readHref } from "@/lib/read";
 import { MissedDays } from "@/components/MissedDays";
 import { SignInNudge, useSyncStatus } from "@/components/Account";
 import { activeDatesOf, streaks } from "@/core/stats";
@@ -29,7 +30,7 @@ export default function TodayPage() {
   const units = useUnits();
   const logs = useDayLogs();
   const lastCheckin = useMeta<string>("lastCheckin");
-  const [open, setOpen] = useState<DayItem | null>(null);
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [extraOpen, setExtraOpen] = useState(false);
   const [roundOpen, setRoundOpen] = useState(false);
@@ -83,12 +84,12 @@ export default function TodayPage() {
     }
     return { title: u ? q.rangeLabel(u.ayahs) : t("Page {n}", { n: i.page! }), detail };
   };
-  const textOf = (i: DayItem) => {
-    if (i.kind === "reading") {
-      const [a, b] = q.surahRange(i.surah!);
-      return Array.from({ length: b - a + 1 }, (_, k) => a + k);
-    }
-    return i.kind === "sabaq" ? (i.ayahs ?? []) : (unitByPage.get(i.page!)?.ayahs ?? []);
+  /** Opens the portion in the Quran reader (Read, Listen, Recite); Recite can save it as done here. */
+  const openItem = (i: DayItem) => {
+    const from = { item: i.id, date: today };
+    if (i.kind === "reading") return router.push(readHref({ kind: "surah", surah: i.surah! }, from));
+    const ayahs = i.kind === "sabaq" ? (i.ayahs ?? []) : (unitByPage.get(i.page!)?.ayahs ?? []);
+    if (ayahs.length) router.push(readHref({ kind: "ayahs", ayahs }, from));
   };
 
   const act = async (fn: () => Promise<void>) => {
@@ -141,7 +142,7 @@ export default function TodayPage() {
                     rateable={i.kind !== "reading"}
                     onToggle={(done) => act(() => updateItem(today, i.id, { done }))}
                     onRate={(rating) => act(() => updateItem(today, i.id, { done: true, rating }))}
-                    onOpen={() => setOpen(i)}
+                    onOpen={() => openItem(i)}
                   />
                 );
               })}
@@ -277,14 +278,6 @@ export default function TodayPage() {
         </ul>
       </Sheet>
 
-      <Sheet open={!!open} onClose={() => setOpen(null)} title={open ? describe(open).title : ""}>
-        {open && (
-          <ReadAndListen
-            indices={textOf(open)}
-            onRate={open.kind === "reading" ? undefined : (rating) => act(() => updateItem(today, open.id, { done: true, rating }))}
-          />
-        )}
-      </Sheet>
     </div>
   );
 }

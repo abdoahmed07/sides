@@ -7,6 +7,7 @@ import { LanguageButton } from "./Language";
 
 const LINKS = [
   { href: "/", label: tx("Today"), icon: "M3 12l9-9 9 9M5 10v10h14V10" },
+  { href: "/read/", label: tx("Quran"), icon: "M12 6.5C10.5 5 8 4.5 4 4.5v13c4 0 6.5.5 8 2 1.5-1.5 4-2 8-2v-13c-4 0-6.5.5-8 2zM12 6.5v13" },
   { href: "/progress/", label: tx("Progress"), icon: "M4 20V10M10 20V4M16 20v-7M22 20H2" },
   { href: "/plan/", label: tx("Plan"), icon: "M5 4h14v16H5zM9 8h6M9 12h6M9 16h4" },
   { href: "/guide/", label: tx("Guide"), icon: "M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2zM4 5v16M8 7h7M8 11h7" },
@@ -32,14 +33,14 @@ export function Nav() {
               key={l.href}
               href={l.href}
               aria-current={active ? "page" : undefined}
-              className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] sm:flex-none sm:flex-row sm:gap-2 sm:px-3 sm:py-4 sm:text-sm ${
+              className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] sm:flex-none sm:flex-row sm:gap-2 sm:px-3 sm:py-4 sm:text-sm ${
                 active ? "text-accent" : "text-muted hover:text-text"
               }`}
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5 sm:hidden" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d={l.icon} />
               </svg>
-              {t(l.label)}
+              <span className="max-w-full truncate px-0.5">{t(l.label)}</span>
             </Link>
           );
         })}

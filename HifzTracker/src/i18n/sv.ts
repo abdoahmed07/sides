@@ -150,8 +150,8 @@ const sv: Dict = {
   Done: "Klart",
   target: "mål",
   "Mushaf map": "Mushaf-karta",
-  "604 pages, right to left as in the mushaf (page 1 top right). Tap a memorized page to read it.":
-    "604 sidor, från höger till vänster som i mushafen (sida 1 högst upp till höger). Tryck på en memorerad sida för att läsa den.",
+  "604 pages, right to left as in the mushaf (page 1 top right). Tap a page to read it.":
+    "604 sidor, från höger till vänster som i mushafen (sida 1 högst upp till höger). Tryck på en sida för att läsa den.",
   "Use Look ahead below to see it fill up.":
     "Använd Blicka framåt nedan för att se den fyllas.",
   "Map of the 604 pages of the Mushaf coloured by status":
@@ -866,8 +866,6 @@ const sv: Dict = {
     "Recitera och kontrollera kunde inte starta. Kontrollera internetanslutningen och försök igen.",
   "Recite from memory and the app checks every word.":
     "Recitera utantill så kontrollerar appen varje ord.",
-  "Recite from memory; the app checks every word.":
-    "Recitera utantill; appen kontrollerar varje ord.",
   Recite: "Recitera",
   "Save as done: {rating}": "Spara som klar: {rating}",
   "Saved ✓": "Sparat ✓",
@@ -914,6 +912,20 @@ const sv: Dict = {
   "{n} mistakes": { one: "{n} fel", other: "{n} fel" },
   "{pct}% correct": "{pct}% rätt",
   "{right} of {total} words right": "{right} av {total} ord rätt",
+  Back: "Tillbaka",
+  "Go to page": "Gå till sida",
+  Go: "Gå",
+  Next: "Nästa",
+  "No surah found.": "Ingen sura hittades.",
+  Page: "Sida",
+  "Play all": "Spela allt",
+  Previous: "Föregående",
+  Quran: "Koranen",
+  Read: "Läs",
+  "Read, listen and recite any part of the Quran.":
+    "Läs, lyssna och recitera vilken del av Koranen som helst.",
+  "Search a surah": "Sök en sura",
+  "{n} ayahs": { one: "{n} vers", other: "{n} verser" },
 };
 
 export default sv;
