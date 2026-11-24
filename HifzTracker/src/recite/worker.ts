@@ -17,11 +17,20 @@ type In = { type: "load" } | { type: "transcribe"; id: number; audio: Float32Arr
 export type Backend = "gpu" | "cpu";
 export type Out =
   | { type: "progress"; loaded: number; total: number }
-  | { type: "ready"; backend: Backend }
+  | { type: "ready"; backend: Backend; threads: number }
   | { type: "result"; id: number; text: string }
   | { type: "error"; id?: number; message: string };
 
 const post = (m: Out) => (self as unknown as DedicatedWorkerGlobalScope).postMessage(m);
+
+/**
+ * On a cross-origin-isolated page the processor uses several cores (about 0.5–1 s per check), so the
+ * graphics chip must be clearly quicker than that to be worth it; on one core it's 1–2.5 s.
+ */
+const ISOLATED = (self as unknown as { crossOriginIsolated?: boolean }).crossOriginIsolated === true;
+const GPU_MAX_MS = ISOLATED ? 700 : 1500;
+/** How many processor cores the model runs on (the runtime decides once it starts). */
+const threads = () => (env.backends.onnx as unknown as { wasm?: { numThreads?: number } }).wasm?.numThreads ?? 1;
 
 let asr: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
 let backend: Backend = "cpu";
@@ -69,7 +78,7 @@ function load() {
         await p(new Float32Array(16000), opts);
         const t0 = performance.now();
         await p(new Float32Array(16000), opts);
-        if (performance.now() - t0 < 1500) {
+        if (performance.now() - t0 < GPU_MAX_MS) {
           backend = "gpu";
           return p;
         }
@@ -89,7 +98,7 @@ self.onmessage = async (e: MessageEvent<In>) => {
   try {
     if (msg.type === "load") {
       await load();
-      post({ type: "ready", backend });
+      post({ type: "ready", backend, threads: threads() });
     } else {
       const run = await load();
       const out = await run(msg.audio, { language: "arabic", task: "transcribe" });

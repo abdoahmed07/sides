@@ -78,6 +78,15 @@ export type Alignment = {
  */
 /** Cost of a heard word that isn't in the text (repeating yourself): cheaper than a skip, dearer than a near-match. */
 const EXTRA = 0.8;
+/**
+ * The Uthmani text and plain Arabic don't always split words the same way: يَٰٓأَيُّهَا and يَٰقَوْمِ are
+ * one word in the mushaf but "يا أيها", "يا قوم" in plain writing, and the model sometimes joins two
+ * words. One heard word may stand for two expected ones (or two for one), but only when the joined
+ * spelling is a close match, so a really skipped word is still caught. A little extra cost keeps a
+ * plain one-to-one pairing first when both fit.
+ */
+const JOIN_SAME = 0.8;
+const JOIN = 0.15;
 
 export function align(expected: string[], heard: string[], from: number): Alignment {
   const e = expected.slice(from, from + heard.length + 8).map(fold);
@@ -88,7 +97,8 @@ export function align(expected: string[], heard: string[], from: number): Alignm
   // cost[i][j]: aligning e[0..i) with h[0..j). Skipping an expected word costs 1, an extra heard word EXTRA,
   // pairing two words 1.3 × (1 − similarity): a near-match is cheap, a wrong word ~1.3.
   const cost = Array.from({ length: n + 1 }, () => new Float64Array(m + 1));
-  const move = Array.from({ length: n + 1 }, () => new Uint8Array(m + 1)); // 1 diag, 2 skip expected, 3 extra heard
+  // 1 diag, 2 skip expected, 3 extra heard, 4 two expected = one heard, 5 one expected = two heard
+  const move = Array.from({ length: n + 1 }, () => new Uint8Array(m + 1));
   for (let i = 1; i <= n; i++) {
     cost[i][0] = i;
     move[i][0] = 2;
@@ -103,16 +113,24 @@ export function align(expected: string[], heard: string[], from: number): Alignm
       const diag = cost[i - 1][j - 1] + 1.3 * (1 - similarity(e[i - 1], h[j - 1]));
       const skip = cost[i - 1][j] + 1;
       const extra = cost[i][j - 1] + EXTRA;
-      if (diag <= skip && diag <= extra) {
-        cost[i][j] = diag;
-        move[i][j] = 1;
-      } else if (skip <= extra) {
-        cost[i][j] = skip;
-        move[i][j] = 2;
-      } else {
-        cost[i][j] = extra;
-        move[i][j] = 3;
+      let best = diag;
+      let mv = 1;
+      // On a tie, a heard word goes with the earlier of two same words ("الناس" is in every ayah of
+      // An-Nas): what you said comes first and the skipped stretch after it, not the other way round.
+      if (skip <= best) [best, mv] = [skip, 2];
+      if (extra < best) [best, mv] = [extra, 3];
+      if (i >= 2) {
+        const s = similarity(e[i - 2] + e[i - 1], h[j - 1]);
+        const c = cost[i - 2][j - 1] + 1.3 * (1 - s) + JOIN;
+        if (s >= JOIN_SAME && c < best) [best, mv] = [c, 4];
       }
+      if (j >= 2) {
+        const s = similarity(e[i - 1], h[j - 2] + h[j - 1]);
+        const c = cost[i - 1][j - 2] + 1.3 * (1 - s) + JOIN;
+        if (s >= JOIN_SAME && c < best) [best, mv] = [c, 5];
+      }
+      cost[i][j] = best;
+      move[i][j] = mv;
     }
   // Everything heard must be used; the expected side may stop early (the rest is still to come).
   let best = 0;
@@ -130,6 +148,17 @@ export function align(expected: string[], heard: string[], from: number): Alignm
     } else if (mv === 2) {
       statuses.push({ index: from + i - 1, status: "skipped", score: 0, heard: -1 });
       i--;
+    } else if (mv === 4) {
+      const score = similarity(e[i - 2] + e[i - 1], h[j - 1]);
+      statuses.push({ index: from + i - 1, status: "correct", score, heard: j - 1 });
+      statuses.push({ index: from + i - 2, status: "correct", score, heard: j - 1 });
+      i -= 2;
+      j--;
+    } else if (mv === 5) {
+      const score = similarity(e[i - 1], h[j - 2] + h[j - 1]);
+      statuses.push({ index: from + i - 1, status: "correct", score, heard: j - 1 });
+      i--;
+      j -= 2;
     } else j--;
   }
   statuses.reverse();

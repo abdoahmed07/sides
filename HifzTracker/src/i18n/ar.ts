@@ -1011,8 +1011,8 @@ const ar: Dict = {
   "Marked wrong but you said it right? Tap the word to correct it.":
     "عُلِّمت خاطئة لكنك قلتها صحيحة؟ اضغط على الكلمة لتصحيحها.",
   "Listening and reciting": "الاستماع والتسميع",
-  "Recitation audio streams from the Islamic Network audio library when you press play.":
-    "يُبثّ صوت التلاوة من مكتبة Islamic Network الصوتية عندما تضغط تشغيل.",
+  "Recitation audio streams from EveryAyah (everyayah.com) when you press play.":
+    "يُبثّ صوت التلاوة من موقع EveryAyah (everyayah.com) عندما تضغط تشغيل.",
   "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45–70 MB) downloads from Hugging Face.":
     "**التسميع والتصحيح** يستمع عبر الميكروفون فقط أثناء التسميع، والتعرّف على الكلام يعمل على جهازك: صوتك لا يُسجَّل ولا يُرسل إلى أي مكان. في المرة الأولى يُنزَّل نموذج الكلام (حوالي 45–70 ميغابايت) من Hugging Face.",
   "I can't hear anything. Is the microphone allowed and not muted? Try speaking a little louder.":
@@ -1032,6 +1032,15 @@ const ar: Dict = {
     "اضغط على الميكروفون وابدأ التسميع. استخدم المصباح إن توقفت.",
   "The text is hidden. Recite from memory.": "النص مخفي. سمّع غيباً.",
   "What the app heard": "ما سمعه التطبيق",
+  "Speed: about {s} s per check, using the graphics chip.": "السرعة: نحو {s} ث لكل فحص، باستخدام معالج الرسوميات.",
+  "Speed: about {s} s per check, using {n} processor cores.": {
+    zero: "السرعة: نحو {s} ث لكل فحص.",
+    one: "السرعة: نحو {s} ث لكل فحص، باستخدام نواة واحدة من المعالج.",
+    two: "السرعة: نحو {s} ث لكل فحص، باستخدام نواتين من المعالج.",
+    few: "السرعة: نحو {s} ث لكل فحص، باستخدام {n} أنوية من المعالج.",
+    many: "السرعة: نحو {s} ث لكل فحص، باستخدام {n} نواة من المعالج.",
+    other: "السرعة: نحو {s} ث لكل فحص، باستخدام {n} نواة من المعالج.",
+  },
   "{n} mistakes": {
     zero: "لا أخطاء",
     one: "خطأ واحد",

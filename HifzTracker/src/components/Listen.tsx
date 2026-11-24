@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   audioUrl,
+  newAudio,
   portionOrder,
   RECITERS,
   reciterById,
@@ -128,7 +129,7 @@ export function ListenPlayer({
     // Warm up the next file so there's no gap.
     const next = queue.current[qi.current + 1];
     if (next !== undefined)
-      new Audio(audioUrl(reciter, ayahs[next])).preload = "auto";
+      newAudio(audioUrl(reciter, ayahs[next])).preload = "auto";
   };
 
   useEffect(() => {
@@ -139,7 +140,7 @@ export function ListenPlayer({
   const startStep = (p: number) => {
     if (!audio.current) {
       // One element for the whole session: phones only allow sound that starts from a tap.
-      const a = new Audio();
+      const a = newAudio();
       a.addEventListener("ended", () => {
         qi.current += 1;
         if (qi.current < queue.current.length) return playAtRef.current();

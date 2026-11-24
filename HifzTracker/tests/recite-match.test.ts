@@ -66,6 +66,31 @@ describe("aligning a recitation", () => {
     expect(align(nas, "قل اعوذ برب البيت".split(" "), 0).statuses[3].status).toBe("wrong");
   });
 
+  it("accepts words the mushaf joins and plain Arabic splits (يا أيها), and the other way round", () => {
+    // Al-Baqarah 21: يَٰٓأَيُّهَا is one word in the mushaf.
+    const baqarah = words(2, 21, 21);
+    const r = align(baqarah, "يا ايها الناس اعبدوا ربكم".split(" "), 0);
+    expect(r.statuses.map((s) => s.status)).toEqual(["correct", "correct", "correct", "correct"]);
+    expect(r.next).toBe(4);
+    // Two words heard as one.
+    const r2 = align(nas, "قل اعوذ بربالناس".split(" "), 0);
+    expect(r2.statuses.map((s) => s.status)).toEqual(["correct", "correct", "correct", "correct"]);
+  });
+
+  it("pairs a repeated word with its first place, so a skipped ayah is the one flagged", () => {
+    // Ayah 2, then ayah 4 (ayah 3 "إله الناس" skipped): "الناس" belongs to ayah 2.
+    const r = align(nas, "ملك الناس من شر الوسواس الخناس".split(" "), 4);
+    const by = Object.fromEntries(r.statuses.map((s) => [s.index, s.status]));
+    expect([by[4], by[5], by[6], by[7]]).toEqual(["correct", "correct", "skipped", "skipped"]);
+    expect(r.next).toBe(12);
+  });
+
+  it("still catches a skipped word next to a word that was said", () => {
+    const by = Object.fromEntries(align(nas, "قل اعوذ الناس ملك".split(" "), 0).statuses.map((s) => [s.index, s.status]));
+    expect(by[2]).toBe("skipped"); // برب
+    expect(by[3]).toBe("correct");
+  });
+
   it("doesn't call the words you haven't reached yet skipped", () => {
     const r = align(nas, ["قل"], 0);
     expect(r.statuses).toEqual([{ index: 0, status: "correct", score: 1, heard: 0 }]);

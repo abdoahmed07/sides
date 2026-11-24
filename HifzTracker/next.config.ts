@@ -21,6 +21,24 @@ const nextConfig: NextConfig = {
   ...(isStatic ? { output: "export" as const, trailingSlash: true, basePath } : {}),
   pageExtensions: isStatic ? ["tsx", "ts"] : ["server.ts", "tsx", "ts"],
   images: { unoptimized: true },
+  // Cross-origin isolation: lets Recite's speech model use several processor cores (2–3× faster checks).
+  // In return, every file from another site must allow it (CORS): the recitation audio (EveryAyah), the
+  // model (Hugging Face) and its runtime (jsDelivr) do. GitHub Pages can't send headers, so it runs on one core.
+  ...(isStatic
+    ? {}
+    : {
+        async headers() {
+          return [
+            {
+              source: "/:path*",
+              headers: [
+                { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+                { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+              ],
+            },
+          ];
+        },
+      }),
   env: {
     NEXT_PUBLIC_AI_ENABLED: isStatic ? "0" : "1",
     NEXT_PUBLIC_AI_REQUIRES_SIGN_IN: aiNeedsSignIn ? "1" : "0",

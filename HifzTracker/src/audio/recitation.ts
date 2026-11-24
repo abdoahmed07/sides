@@ -2,18 +2,20 @@
  * Listen and repeat: which ayahs to play next, and where the audio comes from.
  * Pure, so it can be tested; the player component drives an <audio> element with it.
  *
- * Audio: one MP3 per ayah from the Islamic Network CDN (free for non-commercial
- * use, as used by alquran.cloud). Files are numbered 1–6236 in mushaf order,
- * which is our ayah index + 1.
+ * Audio: one MP3 per ayah from EveryAyah (everyayah.com, free, used by many Quran
+ * apps), named by surah and ayah: 114001.mp3. It allows other sites to load its
+ * files (CORS), which the app needs: its pages are "cross-origin isolated" so the
+ * speech model can use several processor cores, and then only such files can play.
  */
+import { SURAH_AYAH_COUNTS } from "@/core/quran";
 import { tx } from "@/i18n";
 
-export type Reciter = { id: string; name: string; style: string; edition: string; bitrate: number };
+export type Reciter = { id: string; name: string; style: string; folder: string };
 
 export const RECITERS: Reciter[] = [
-  { id: "alafasy", name: "Mishary Alafasy", style: tx("Clear and well-known"), edition: "ar.alafasy", bitrate: 128 },
-  { id: "abdulbasit", name: "Abdul Basit Abdul Samad", style: tx("Classic, calm murattal"), edition: "ar.abdulbasitmurattal", bitrate: 64 },
-  { id: "husary", name: "Mahmoud Khalil Al-Husary", style: tx("Slow and precise, good for memorizing"), edition: "ar.husary", bitrate: 128 },
+  { id: "alafasy", name: "Mishary Alafasy", style: tx("Clear and well-known"), folder: "Alafasy_128kbps" },
+  { id: "abdulbasit", name: "Abdul Basit Abdul Samad", style: tx("Classic, calm murattal"), folder: "Abdul_Basit_Murattal_64kbps" },
+  { id: "husary", name: "Mahmoud Khalil Al-Husary", style: tx("Slow and precise, good for memorizing"), folder: "Husary_128kbps" },
 ];
 
 export function reciterById(id: string | null | undefined): Reciter {
@@ -21,7 +23,19 @@ export function reciterById(id: string | null | undefined): Reciter {
 }
 
 export function audioUrl(reciter: Reciter, ayahIndex: number): string {
-  return `https://cdn.islamic.network/quran/audio/${reciter.bitrate}/${reciter.edition}/${ayahIndex + 1}.mp3`;
+  let surah = 0;
+  let ayah = ayahIndex;
+  while (surah < SURAH_AYAH_COUNTS.length - 1 && ayah >= SURAH_AYAH_COUNTS[surah]) ayah -= SURAH_AYAH_COUNTS[surah++];
+  const pad = (n: number) => String(n).padStart(3, "0");
+  return `https://everyayah.com/data/${reciter.folder}/${pad(surah + 1)}${pad(ayah + 1)}.mp3`;
+}
+
+/** An audio element for those files, loaded with CORS (required on the isolated pages). */
+export function newAudio(src?: string): HTMLAudioElement {
+  const a = new Audio();
+  a.crossOrigin = "anonymous";
+  if (src) a.src = src;
+  return a;
 }
 
 /** listen: play straight through · repeat: one ayah, then wait · link: ayahs 1…k, then wait. */

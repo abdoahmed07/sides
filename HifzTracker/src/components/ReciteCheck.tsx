@@ -1,10 +1,10 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { q } from "@/lib/app";
 import { t, tp } from "@/i18n";
 import { useLang } from "@/i18n/react";
-import { audioUrl, reciterById } from "@/audio/recitation";
+import { audioUrl, newAudio, reciterById } from "@/audio/recitation";
 import {
   align,
   ayahWords,
@@ -15,8 +15,8 @@ import {
   type Rating,
   type WordStatus,
 } from "@/recite/match";
-import { Mic } from "@/recite/mic";
-import { loadModel, modelIsDownloaded, transcribe } from "@/recite/recognizer";
+import { concat, Mic, RATE } from "@/recite/mic";
+import { loadModel, modelIsDownloaded, transcribe, type Engine } from "@/recite/recognizer";
 import { loadText } from "./AyahText";
 import { Button, Spinner } from "./ui";
 
@@ -40,6 +40,17 @@ const RATING_LABEL: Record<Rating, string> = {
   okay: "Okay",
   weak: "Weak",
 };
+
+/**
+ * The last word of a live preview is often cut off mid-word, so it only counts when it's
+ * (almost) exactly right; the others need a confident match (SURE).
+ */
+const LAST_WORD_SURE = 0.9;
+
+/** A part the model couldn't make sense of is kept (up to this long) and heard again with the next part. */
+const CARRY_MAX_S = 12;
+/** The model reads at most 30 s at a time. */
+const MODEL_MAX_S = 28;
 
 /** A little silence in front shifts the model's window, so a second listen can hear a word the first one missed. */
 function shifted(audio: Float32Array): Float32Array {
@@ -74,21 +85,30 @@ export function ReciteCheck({
   const [confirmed, setConfirmed] = useState<Set<number>>(new Set());
   const [ptr, setPtr] = useState(0);
   const [hintsRaw, setHints] = useState<number[]>([]);
-  const [level, setLevel] = useState(0);
   const [checking, setChecking] = useState(false);
   const [quiet, setQuiet] = useState(false);
   const [heardLog, setHeardLog] = useState<string[]>([]);
   const [rating, setRating] = useState<Rating | null>(null);
   const [saved, setSaved] = useState(false);
+  const [engine, setEngine] = useState<Engine | null>(null);
+  /** Average time per check, shown under "What the app heard" (helps when it feels slow). */
+  const [avgMs, setAvgMs] = useState(0);
 
   const pointer = useRef(0);
   const seen = useRef<Set<number>>(new Set());
   const mic = useRef<Mic | null>(null);
   const chain = useRef<Promise<void>>(Promise.resolve());
   const busy = useRef(0);
-  /** How long the last check took: slow phones skip live previews and second listens so they don't fall behind. */
+  /** How long the last check took: very slow phones skip live previews and second listens so they don't fall behind. */
   const lastCheckMs = useRef(0);
+  const checkTimes = useRef<number[]>([]);
   const lastSound = useRef(0);
+  /** The ring around the microphone button: sized straight from the mic, without redrawing the page. */
+  const ring = useRef<HTMLSpanElement>(null);
+  /** Audio the model couldn't make sense of yet: checked again together with the next part. */
+  const carry = useRef<Float32Array | null>(null);
+  /** The previous part and where in the text it started: context for a second listen. */
+  const prev = useRef<{ audio: Float32Array; from: number } | null>(null);
 
   useEffect(() => {
     loadText().then(setText, () => setPhase("error"));
@@ -112,13 +132,20 @@ export function ReciteCheck({
   const expected = useMemo(() => words.map((w) => w.text), [words]);
 
   // Per-word state, sized to the words (fresh when the text arrives or after a reset).
-  const status: WordStatus[] =
-    statusRaw.length === words.length ? statusRaw : words.map(() => "pending");
-  const hints: number[] =
-    hintsRaw.length === words.length ? hintsRaw : words.map(() => 0);
+  // (Memoized, so the word list below is only redrawn when a word really changes.)
+  const status: WordStatus[] = useMemo(
+    () => (statusRaw.length === words.length ? statusRaw : words.map(() => "pending")),
+    [statusRaw, words],
+  );
+  const hints: number[] = useMemo(
+    () => (hintsRaw.length === words.length ? hintsRaw : words.map(() => 0)),
+    [hintsRaw, words],
+  );
 
   const reset = () => {
     pointer.current = 0;
+    carry.current = null;
+    prev.current = null;
     seen.current = new Set();
     setPtr(0);
     setStatus(words.map(() => "pending"));
@@ -133,10 +160,10 @@ export function ReciteCheck({
   useEffect(() => {
     if (phase !== "loading") return;
     loadModel((loaded, total) => setProgress(total ? loaded / total : 0)).then(
-      (backend) => {
+      (e) => {
         if (process.env.NODE_ENV !== "production")
-          (window as unknown as { __reciteBackend?: string }).__reciteBackend =
-            backend;
+          (window as unknown as { __reciteBackend?: Engine }).__reciteBackend = e;
+        setEngine(e);
         setPhase("ready");
       },
       (e: Error) => {
@@ -153,9 +180,16 @@ export function ReciteCheck({
       // A copy goes to the model: the original is still needed for a second listen.
       const heard = (await transcribe(audio.slice())).trim();
       if (heard) setHeardLog((l) => [...l.slice(-30), heard]);
+      if (process.env.NODE_ENV !== "production") {
+        const w = window as unknown as { __reciteAudio?: unknown[] };
+        (w.__reciteAudio ??= []).push({ at: Math.round(t0), secs: +(audio.length / 16000).toFixed(2), ms: Math.round(performance.now() - t0), heard });
+      }
       return heard.split(/\s+/).filter(Boolean);
     } finally {
       lastCheckMs.current = performance.now() - t0;
+      const times = [...checkTimes.current.slice(-19), lastCheckMs.current];
+      checkTimes.current = times;
+      setAvgMs(times.reduce((a, b) => a + b, 0) / times.length);
       if (busy.current <= 1) setChecking(false);
     }
   };
@@ -170,8 +204,7 @@ export function ReciteCheck({
     for (const s of r.statuses)
       if (
         s.status === "correct" &&
-        s.score >= SURE &&
-        !(preview && s.heard === heardCount - 1) &&
+        s.score >= (preview && s.heard === heardCount - 1 ? LAST_WORD_SURE : SURE) &&
         !seen.current.has(s.index)
       ) {
         seen.current.add(s.index);
@@ -208,30 +241,58 @@ export function ReciteCheck({
     setPtr(r.next);
   };
 
-  const onPart = (audio: Float32Array) => {
+  /**
+   * A second listen before anything is called a mistake. With the part before it in front, the
+   * model hears a continuation ("…برب الناس ملك الناس"), which it recognizes far better than a
+   * fragment on its own; the first part gets a little silence in front instead.
+   */
+  const listenAgain = async (audio: Float32Array, from: number): Promise<Alignment> => {
+    const p = prev.current;
+    if (p && p.audio.length + audio.length <= MODEL_MAX_S * RATE) {
+      const heard = await check(concat([p.audio, audio]));
+      const r = align(expected, heard, p.from);
+      debug("second listen, with the part before", heard, r);
+      // The part before is settled: its words can only change to right, never to a mistake.
+      const statuses = r.statuses.filter((s) => s.index >= from || s.status === "correct");
+      remember({ statuses, next: r.next }, heard.length, false);
+      return { statuses, next: Math.max(r.next, from) };
+    }
+    const heard = await check(shifted(audio));
+    const r = align(expected, heard, from);
+    debug("second listen", heard, r);
+    remember(r, heard.length, false);
+    return r;
+  };
+
+  const onPart = (part: Float32Array) => {
     busy.current++;
     chain.current = chain.current.then(async () => {
+      const audio = carry.current ? concat([carry.current, part]) : part;
+      carry.current = null;
+      const from = pointer.current;
       try {
         const heard = await check(audio);
-        let r = align(expected, heard, pointer.current);
+        let r = align(expected, heard, from);
         debug("part", heard, r);
         remember(r, heard.length, false);
-        const doubtful = r.statuses.some(
-          (s) => s.status !== "correct" && !seen.current.has(s.index),
-        );
+        const doubtful =
+          !r.statuses.length || r.statuses.some((s) => s.status !== "correct" && !seen.current.has(s.index));
         // Listen once more before calling anything a mistake (when the phone is quick enough).
         if (doubtful && lastCheckMs.current < 1800) {
           try {
-            const heard2 = await check(shifted(audio));
-            const again = align(expected, heard2, pointer.current);
-            debug("second listen", heard2, again);
-            remember(again, heard2.length, false);
+            const again = await listenAgain(audio, from);
             if (again.next > r.next) r = again;
           } catch {
             /* keep the first result */
           }
         }
+        // Nothing recognized at all: don't lose it, hear it again together with the next part.
+        if (!r.statuses.length && audio.length < CARRY_MAX_S * RATE) {
+          carry.current = audio;
+          return;
+        }
         commit(r);
+        prev.current = { audio, from };
       } catch {
         /* a part that couldn't be read is simply skipped */
       } finally {
@@ -241,12 +302,12 @@ export function ReciteCheck({
   };
 
   const onPartial = (audio: Float32Array) => {
-    // Live preview: only when the model is free and quick enough, so it never falls behind.
-    if (busy.current > 0 || lastCheckMs.current > 2500) return;
+    // Live preview: whenever the model is free (and not hopelessly slow), so it never falls behind.
+    if (busy.current > 0 || lastCheckMs.current > 4000) return;
     busy.current++;
     chain.current = chain.current.then(async () => {
       try {
-        const heard = await check(audio);
+        const heard = await check(carry.current ? concat([carry.current, audio]) : audio);
         const r = align(expected, heard, pointer.current);
         debug("preview", heard, r);
         remember(r, heard.length, true);
@@ -266,7 +327,7 @@ export function ReciteCheck({
       onPart,
       onPartial,
       onLevel: (l) => {
-        setLevel(l);
+        if (ring.current) ring.current.style.transform = `scale(${1 + Math.min(0.6, l * 1.2)})`;
         if (l > 0.02) lastSound.current = Date.now();
         setQuiet(Date.now() - lastSound.current > 4000);
       },
@@ -287,14 +348,12 @@ export function ReciteCheck({
   const pause = () => {
     mic.current?.stop();
     mic.current = null;
-    setLevel(0);
     setPhase("paused");
   };
 
   const finish = async () => {
     mic.current?.stop();
     mic.current = null;
-    setLevel(0);
     setPhase("finishing");
     await chain.current;
     setPhase("done");
@@ -405,6 +464,20 @@ export function ReciteCheck({
           onChoose={setRating}
           saved={saved}
           heardLog={heardLog}
+          speed={
+            !engine || !avgMs
+              ? undefined
+              : engine.backend === "gpu"
+                ? t("Speed: about {s} s per check, using the graphics chip.", { s: (avgMs / 1000).toFixed(1) })
+                : tp(
+                    {
+                      one: "Speed: about {s} s per check, using {n} processor core.",
+                      other: "Speed: about {s} s per check, using {n} processor cores.",
+                    },
+                    engine.threads,
+                    { s: (avgMs / 1000).toFixed(1) },
+                  )
+          }
           onSave={
             onRate
               ? async () => {
@@ -462,11 +535,9 @@ export function ReciteCheck({
               >
                 {listening && (
                   <span
+                    ref={ring}
                     aria-hidden
                     className="absolute inset-0 rounded-full bg-accent/30 transition-transform duration-150"
-                    style={{
-                      transform: `scale(${1 + Math.min(0.6, level * 1.2)})`,
-                    }}
                   />
                 )}
                 <svg
@@ -517,57 +588,99 @@ export function ReciteCheck({
         )
       )}
 
-      <p className="quran text-justify" lang="ar" dir="rtl">
-        {words.map((w, i) => {
-          const st = status[i];
-          const isShown = shown(i);
-          const fixable = done && (st === "wrong" || st === "skipped");
-          const hintShown = !isShown && hints[i] > 0;
-          const cls = hintShown
-            ? "text-muted"
-            : st === "wrong"
-              ? "rounded-md bg-danger-soft text-danger"
-              : st === "skipped"
-                ? "rounded-md text-warn underline decoration-dotted decoration-2 underline-offset-8"
-                : isShown
-                  ? done && st === "pending" && !confirmed.has(i)
-                    ? "text-muted"
-                    : ""
-                  : // Hidden: a slim word-shaped bar, as wide as the word itself.
-                    `inline-block h-[0.55em] overflow-hidden rounded-full align-middle leading-[0.55em] text-transparent ${
-                      i === nextHidden && started
-                        ? "bg-accent/35 motion-safe:animate-pulse"
-                        : "bg-border"
-                    }`;
-          return (
-            <span key={i}>
-              <span
-                className={`transition-colors duration-500 ${cls} ${fixable ? "cursor-pointer" : ""}`}
-                data-hidden={!isShown && !hintShown ? "" : undefined}
-                title={fixable ? t("Tap if you said it right") : undefined}
-                onClick={
-                  fixable
-                    ? () =>
-                        setStatus(
-                          status.map((v, k) => (k === i ? "correct" : v)),
-                        )
-                    : undefined
-                }
-              >
-                {hintShown ? hintText(w.text, hints[i]) : w.text}
-              </span>
-              {w.last && (
-                <span className="ayah-num">
-                  ﴿{toArabicDigits(q.ayahOf[w.ayah])}﴾
-                </span>
-              )}{" "}
-            </span>
-          );
-        })}
-      </p>
+      <RecitedText
+        words={words}
+        status={status}
+        confirmed={confirmed}
+        hints={hints}
+        done={done}
+        nextHidden={nextHidden}
+        started={started}
+        setStatus={setStatus}
+      />
     </div>
   );
 }
+
+/**
+ * The portion's words: hidden bars, revealed words, hints and mistakes. Kept apart and memoized:
+ * long portions have hundreds of words, and redrawing them all on every check (or every mic
+ * update) keeps a phone busy.
+ */
+const RecitedText = memo(function RecitedText({
+  words,
+  status,
+  confirmed,
+  hints,
+  done,
+  nextHidden,
+  started,
+  setStatus,
+}: {
+  words: Word[];
+  status: WordStatus[];
+  confirmed: Set<number>;
+  hints: number[];
+  done: boolean;
+  nextHidden: number;
+  started: boolean;
+  setStatus: Dispatch<SetStateAction<WordStatus[]>>;
+}) {
+  useLang();
+  const shown = (i: number) =>
+    done ||
+    status[i] === "correct" ||
+    confirmed.has(i) ||
+    status[i] === "wrong" ||
+    status[i] === "skipped";
+  const fix = (i: number) =>
+    setStatus((prev) =>
+      (prev.length === words.length ? prev : status).map((v, k) => (k === i ? "correct" : v)),
+    );
+  return (
+    <p className="quran text-justify" lang="ar" dir="rtl">
+      {words.map((w, i) => {
+        const st = status[i];
+        const isShown = shown(i);
+        const fixable = done && (st === "wrong" || st === "skipped");
+        const hintShown = !isShown && hints[i] > 0;
+        const cls = hintShown
+          ? "text-muted"
+          : st === "wrong"
+            ? "rounded-md bg-danger-soft text-danger"
+            : st === "skipped"
+              ? "rounded-md text-warn underline decoration-dotted decoration-2 underline-offset-8"
+              : isShown
+                ? done && st === "pending" && !confirmed.has(i)
+                  ? "text-muted"
+                  : ""
+                : // Hidden: a slim word-shaped bar, as wide as the word itself.
+                  `inline-block h-[0.55em] overflow-hidden rounded-full align-middle leading-[0.55em] text-transparent ${
+                    i === nextHidden && started
+                      ? "bg-accent/35 motion-safe:animate-pulse"
+                      : "bg-border"
+                  }`;
+        return (
+          <span key={i}>
+            <span
+              className={`transition-colors duration-500 ${cls} ${fixable ? "cursor-pointer" : ""}`}
+              data-hidden={!isShown && !hintShown ? "" : undefined}
+              title={fixable ? t("Tap if you said it right") : undefined}
+              onClick={fixable ? () => fix(i) : undefined}
+            >
+              {hintShown ? hintText(w.text, hints[i]) : w.text}
+            </span>
+            {w.last && (
+              <span className="ayah-num">
+                ﴿{toArabicDigits(q.ayahOf[w.ayah])}﴾
+              </span>
+            )}{" "}
+          </span>
+        );
+      })}
+    </p>
+  );
+});
 
 function RoundButton({
   label,
@@ -614,7 +727,7 @@ function playAyah(ayah: number) {
     /* ignore */
   }
   player?.pause();
-  player = new Audio(audioUrl(reciterById(id), ayah));
+  player = newAudio(audioUrl(reciterById(id), ayah));
   void player.play().catch(() => {});
 }
 
@@ -630,6 +743,7 @@ function Summary(p: {
   onSave?: () => Promise<void>;
   saved: boolean;
   heardLog: string[];
+  speed?: string;
   onAgain: () => void;
 }) {
   const total = p.words.length;
@@ -783,6 +897,7 @@ function Summary(p: {
           <p className="mt-1 leading-relaxed" lang="ar" dir="rtl">
             {p.heardLog.join(" · ")}
           </p>
+          {p.speed && <p className="mt-1">{p.speed}</p>}
         </details>
       )}
     </div>

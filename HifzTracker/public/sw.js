@@ -5,9 +5,9 @@
  *  - Never touches the AI route, sign-in/sync (other sites) or anything but GET.
  * Your progress lives in the browser's database, not here; this only stores the app itself.
  */
-const VERSION = "hifz-v1";
+const VERSION = "hifz-v2";
 const SCOPE = new URL(self.registration.scope);
-const ROUTES = ["", "plan/", "progress/", "guide/", "settings/"].map((p) => new URL(p, SCOPE).href);
+const ROUTES = ["", "read/", "plan/", "progress/", "guide/", "settings/"].map((p) => new URL(p, SCOPE).href);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

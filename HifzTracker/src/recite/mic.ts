@@ -6,11 +6,14 @@
  */
 export const RATE = 16000;
 
-/** Pause length that ends a part, and the longest part (the model handles up to 30 s). */
-const PAUSE_S = 0.7;
-const MAX_PART_S = 20;
+/**
+ * Pause length that ends a part (a breath between ayahs or at a pause sign), and the longest part:
+ * the model handles up to 30 s, but shorter parts are checked sooner and heard more accurately.
+ */
+const PAUSE_S = 0.6;
+const MAX_PART_S = 14;
 /** How often the part so far is offered for a live preview (skipped while the model is busy). */
-const PARTIAL_EVERY_S = 1.2;
+const PARTIAL_EVERY_S = 0.8;
 /** Audio kept from just before the voice starts, so the soft start of the first word isn't cut off. */
 const PRE_ROLL_S = 0.4;
 /** The end of each part is repeated at the start of the next, so a word at a cut isn't lost. */
@@ -46,7 +49,7 @@ function resample(input: Float32Array, from: number): Float32Array {
   return out;
 }
 
-function concat(chunks: Float32Array[]): Float32Array {
+export function concat(chunks: Float32Array[]): Float32Array {
   const out = new Float32Array(chunks.reduce((s, c) => s + c.length, 0));
   let o = 0;
   for (const c of chunks) {
@@ -56,10 +59,34 @@ function concat(chunks: Float32Array[]): Float32Array {
   return out;
 }
 
+/**
+ * Collects microphone samples on the browser's audio thread and hands them over in blocks.
+ * The page's own thread can be busy (drawing, a slow phone); messages wait in line there, so no
+ * sound is lost, unlike the older ScriptProcessor, which drops audio whenever the page is busy.
+ */
+const TAP = `
+class HifzTap extends AudioWorkletProcessor {
+  constructor() { super(); this.buf = new Float32Array(4096); this.n = 0; }
+  process(inputs) {
+    const ch = inputs[0] && inputs[0][0];
+    if (ch) for (let i = 0; i < ch.length; i++) {
+      this.buf[this.n++] = ch[i];
+      if (this.n === this.buf.length) {
+        this.port.postMessage(this.buf, [this.buf.buffer]);
+        this.buf = new Float32Array(4096);
+        this.n = 0;
+      }
+    }
+    return true;
+  }
+}
+registerProcessor("hifz-tap", HifzTap);
+`;
+
 export class Mic {
   private stream: MediaStream | null = null;
   private ctx: AudioContext | null = null;
-  private node: ScriptProcessorNode | null = null;
+  private node: AudioNode | null = null;
   private part: Float32Array[] = [];
   private partSamples = 0;
   private silentSamples = 0;
@@ -95,15 +122,37 @@ export class Mic {
     await resumed;
     if (ctx.state !== "running") await ctx.resume().catch(() => {});
     const src = ctx.createMediaStreamSource(this.stream);
-    // ScriptProcessor is old but works everywhere, including iPhones.
-    this.node = ctx.createScriptProcessor(4096, 1, 1);
-    this.node.onaudioprocess = (e) => this.feed(resample(new Float32Array(e.inputBuffer.getChannelData(0)), ctx.sampleRate));
+    this.node = (await this.tap(ctx)) ?? this.scriptProcessor(ctx);
     src.connect(this.node);
+    // Connected to the output so the browser keeps it running; it outputs silence.
     this.node.connect(ctx.destination);
     // iPhone can pause the engine when a call or another app takes the audio; pick up again.
     ctx.onstatechange = () => {
       if (ctx.state === "suspended" || (ctx.state as string) === "interrupted") void ctx.resume().catch(() => {});
     };
+  }
+
+  /** The audio-thread tap (all current browsers, iPhone since iOS 14.5); null if it can't start. */
+  private async tap(ctx: AudioContext): Promise<AudioNode | null> {
+    if (!ctx.audioWorklet || typeof AudioWorkletNode === "undefined") return null;
+    const url = URL.createObjectURL(new Blob([TAP], { type: "text/javascript" }));
+    try {
+      await ctx.audioWorklet.addModule(url);
+      const node = new AudioWorkletNode(ctx, "hifz-tap", { channelCount: 1, channelCountMode: "explicit" });
+      node.port.onmessage = (e: MessageEvent<Float32Array>) => this.feed(resample(e.data, ctx.sampleRate));
+      return node;
+    } catch {
+      return null;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  /** Fallback for old browsers: works everywhere, but runs on the page's thread. */
+  private scriptProcessor(ctx: AudioContext): AudioNode {
+    const node = ctx.createScriptProcessor(4096, 1, 1);
+    node.onaudioprocess = (e) => this.feed(resample(new Float32Array(e.inputBuffer.getChannelData(0)), ctx.sampleRate));
+    return node;
   }
 
   /** Whether sound is actually arriving (for the on-screen check). */
@@ -165,6 +214,7 @@ export class Mic {
   /** Stops listening; whatever was being said is sent as a last part. */
   stop() {
     if (this.speaking) this.endPart();
+    if (typeof AudioWorkletNode !== "undefined" && this.node instanceof AudioWorkletNode) this.node.port.onmessage = null;
     this.node?.disconnect();
     this.stream?.getTracks().forEach((t) => t.stop());
     void this.ctx?.close();

@@ -887,8 +887,8 @@ const sv: Dict = {
   "Marked wrong but you said it right? Tap the word to correct it.":
     "Markerat som fel men du sa det rätt? Tryck på ordet för att rätta det.",
   "Listening and reciting": "Lyssna och recitera",
-  "Recitation audio streams from the Islamic Network audio library when you press play.":
-    "Reciteringsljudet strömmas från Islamic Networks ljudbibliotek när du trycker på spela.",
+  "Recitation audio streams from EveryAyah (everyayah.com) when you press play.":
+    "Reciteringsljudet strömmas från EveryAyah (everyayah.com) när du trycker på spela.",
   "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45–70 MB) downloads from Hugging Face.":
     "**Recitera och kontrollera** lyssnar genom mikrofonen bara medan du reciterar, och taligenkänningen körs på din enhet: din röst spelas aldrig in och skickas aldrig någonstans. Första gången laddas talmodellen (ungefär 45–70 MB) ner från Hugging Face.",
   "I can't hear anything. Is the microphone allowed and not muted? Try speaking a little louder.":
@@ -909,6 +909,11 @@ const sv: Dict = {
   "The text is hidden. Recite from memory.":
     "Texten är dold. Recitera utantill.",
   "What the app heard": "Vad appen hörde",
+  "Speed: about {s} s per check, using the graphics chip.": "Hastighet: cirka {s} s per kontroll, med grafikkretsen.",
+  "Speed: about {s} s per check, using {n} processor cores.": {
+    one: "Hastighet: cirka {s} s per kontroll, med {n} processorkärna.",
+    other: "Hastighet: cirka {s} s per kontroll, med {n} processorkärnor.",
+  },
   "{n} mistakes": { one: "{n} fel", other: "{n} fel" },
   "{pct}% correct": "{pct}% rätt",
   "{right} of {total} words right": "{right} av {total} ord rätt",

@@ -26,10 +26,12 @@ describe("listen and repeat", () => {
     expect(waitsAfter("link")).toBe(true);
   });
 
-  it("builds one file per ayah, numbered 1–6236", () => {
+  it("builds one file per ayah, named by surah and ayah", () => {
     const r = reciterById("husary");
-    expect(audioUrl(r, 0)).toBe("https://cdn.islamic.network/quran/audio/128/ar.husary/1.mp3");
-    expect(audioUrl(r, 6235)).toMatch(/\/6236\.mp3$/);
+    expect(audioUrl(r, 0)).toBe("https://everyayah.com/data/Husary_128kbps/001001.mp3");
+    expect(audioUrl(r, 7)).toMatch(/\/002001\.mp3$/); // Al-Baqarah 1
+    expect(audioUrl(r, q.surahRange(18)[0] + 9)).toMatch(/\/018010\.mp3$/);
+    expect(audioUrl(r, 6235)).toMatch(/\/114006\.mp3$/);
     expect(reciterById("unknown")).toBe(RECITERS[0]);
   });
 
