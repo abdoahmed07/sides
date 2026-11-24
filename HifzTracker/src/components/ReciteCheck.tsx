@@ -10,6 +10,7 @@ import {
   ayahWords,
   fold,
   hintText,
+  quranWords,
   SURE,
   suggestRating,
   type Alignment,
@@ -18,7 +19,7 @@ import {
 } from "@/recite/match";
 import { concat, Mic, RATE } from "@/recite/mic";
 import { loadModel, modelIsDownloaded, transcribe, type Engine } from "@/recite/recognizer";
-import { LAST_WORD_SURE, reveal, settleable, type Live } from "@/recite/reveal";
+import { LAST_WORD_SURE, reveal, type Live } from "@/recite/reveal";
 import { heardWords, WebSpeech, webSpeechAvailable, type SpeechProblem } from "@/recite/webspeech";
 import { loadText } from "./AyahText";
 import { Button, Spinner } from "./ui";
@@ -61,8 +62,18 @@ const RATING_LABEL: Record<Rating, string> = {
   weak: "Weak",
 };
 
-/** Phone recognition: text that hasn't changed for this long counts as settled (iPhone never says "final"). */
-const SETTLE_MS = 1000;
+/**
+ * Phone recognition: once the text hasn't changed for this long you've paused, and what you said is
+ * settled, a wrong word you stopped on included (iPhone never says "final").
+ */
+const SETTLE_MS = 1200;
+
+/** Every word of the Quran, for checking phone recognition strictly: worked out once, when first needed. */
+let knownWords: { text: string[]; words: Set<string> } | null = null;
+function known(text: string[]): Set<string> {
+  if (knownWords?.text !== text) knownWords = { text, words: quranWords(text) };
+  return knownWords.words;
+}
 
 const PROBLEM: Record<Exclude<SpeechProblem, "interrupted">, string> = {
   blocked: tx(
@@ -137,9 +148,13 @@ export function ReciteCheck({
   const speech = useRef<WebSpeech | null>(null);
   /** Words of the current recognition session already settled (what comes after them is new). */
   const settledWords = useRef<string[]>([]);
-  /** The latest live result, until it's settled. */
-  const pending = useRef<{ r: Alignment; words: string[]; base: number; fresh: string[] } | null>(null);
+  /** The latest live result (the session's words, how many were settled, and the new ones), until it's settled. */
+  const pending = useRef<{ words: string[]; base: number; fresh: string[] } | null>(null);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** Words from an ended session that may be the start of the next word ("يا" of يا أيها): checked with what comes next. */
+  const waiting = useRef<string[]>([]);
+  /** All the words waiting so far (those from ended sessions and the current one's). */
+  const lastRest = useRef<string[]>([]);
 
   // On-device model (private mode).
   const mic = useRef<Mic | null>(null);
@@ -161,6 +176,13 @@ export function ReciteCheck({
       clearTimeout(settleTimer.current);
     };
   }, []);
+
+  // Phone recognition is checked against every word of the Quran: work that out ahead (a moment's work).
+  useEffect(() => {
+    if (!text || mode !== "phone") return;
+    const id = setTimeout(() => known(text), 300);
+    return () => clearTimeout(id);
+  }, [text, mode]);
 
   // Private mode: is the model already on the device?
   useEffect(() => {
@@ -207,6 +229,8 @@ export function ReciteCheck({
     seen.current = new Set();
     settledWords.current = [];
     pending.current = null;
+    waiting.current = [];
+    lastRest.current = [];
     setStatus(words.map(() => "pending"));
     setLive(null);
     setConfirmed(new Set());
@@ -286,34 +310,48 @@ export function ReciteCheck({
     }, 160);
   };
 
-  /** Settles the latest live result: all of it when final, else all but a wrong last word. */
-  const settle = (final: boolean) => {
+  /**
+   * Settles what was heard: you paused (or the phone says the words are final), so what you said last
+   * counts too, and a wrong word you stopped on shows as a mistake. `end`: you've finished. Returns the
+   * words that wait for what comes next (the start of a word, like "يا" of يا أيها).
+   */
+  const settle = (end: boolean): string[] => {
     clearTimeout(settleTimer.current);
-    const p = pending.current;
+    const p =
+      pending.current ??
+      (waiting.current.length ? { words: settledWords.current, base: settledWords.current.length, fresh: waiting.current } : null);
     pending.current = null;
-    if (!p) return;
-    const s = settleable(p.r, p.fresh.length, final);
-    debug(final ? "phone: final" : "phone: settled", p.fresh, s);
-    commit(s);
-    settledWords.current = p.words.slice(0, p.base + s.used);
-    if (s.used) setHeardLog((l) => [...l.slice(-30), p.fresh.slice(0, s.used).join(" ")]);
+    if (!p || !text) return [];
+    const r = align(expected, p.fresh, pointer.current, { known: known(text), stopped: end ? "end" : "pause" });
+    debug(end ? "phone: end" : "phone: settled", p.fresh, r);
+    commit(r);
+    const rest = p.fresh.slice(p.fresh.length - (r.rest ?? 0));
+    // Waiting words from this session's text come again with its next result; earlier ones are kept here.
+    const inText = Math.min(rest.length, p.words.length - p.base);
+    settledWords.current = p.words.slice(0, p.words.length - inText);
+    waiting.current = rest.slice(0, rest.length - inText);
+    const said = p.fresh.slice(0, p.fresh.length - rest.length);
+    if (said.length) setHeardLog((l) => [...l.slice(-30), said.join(" ")]);
     setLive(null);
+    lastRest.current = rest;
+    return rest;
   };
 
   const onText = (transcript: string, final: boolean) => {
+    if (!text) return;
     const heard = heardWords(transcript);
     // The words at the start that were already settled are skipped. If the recognizer started
     // over or changed its mind, fewer words match, and the rest simply counts as new.
     const done = settledWords.current;
     let base = 0;
     while (base < done.length && base < heard.length && fold(heard[base]) === fold(done[base])) base++;
-    const fresh = heard.slice(base);
-    const r = align(expected, fresh, pointer.current);
-    pending.current = { r, words: heard, base, fresh };
+    const fresh = [...waiting.current, ...heard.slice(base)];
+    const r = align(expected, fresh, pointer.current, { known: known(text) });
+    pending.current = { words: heard, base, fresh };
     setLive({ statuses: r.statuses, heard: fresh.length });
     pulse();
     clearTimeout(settleTimer.current);
-    if (final) settle(true);
+    if (final) settle(false);
     else settleTimer.current = setTimeout(() => settle(false), SETTLE_MS);
   };
 
@@ -464,7 +502,8 @@ export function ReciteCheck({
           lastSound.current = Date.now();
         },
         onSessionEnd: () => {
-          settle(false);
+          // The session's text is gone: words still waiting for what comes next go on to the next one.
+          waiting.current = pending.current ? settle(false) : lastRest.current;
           settledWords.current = [];
         },
         onError: onProblem,
@@ -515,7 +554,7 @@ export function ReciteCheck({
       const s = speech.current;
       speech.current = null;
       await s?.stop();
-      settle(false);
+      settle(true);
     } else {
       mic.current?.stop();
       mic.current = null;

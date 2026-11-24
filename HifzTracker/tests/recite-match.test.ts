@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import text from "../data/quran-text.json";
-import { align, ayahWords, fold, hintText, similarity, suggestRating } from "../src/recite/match";
+import { align, ayahWords, fold, hintText, quranWords, similarity, suggestRating } from "../src/recite/match";
 import { q } from "./helpers";
 
 const quran = text as unknown as string[];
@@ -107,6 +107,86 @@ describe("aligning a recitation", () => {
     const r = align(nas, ["قل"], 0);
     expect(r.statuses).toEqual([{ index: 0, status: "correct", score: 1, heard: 0 }]);
     expect(r.next).toBe(1);
+  });
+});
+
+describe("checking the phone's recognition strictly", () => {
+  const known = quranWords(quran);
+  const strict = { known };
+  const at = (surah: number, ayah: number) => q.surahRange(surah)[0] + ayah - 1;
+  /** Statuses for a recitation of whole ayahs, as words of the given ayahs (strict, as the phone is checked). */
+  const check = (surah: number, ayah: number, heard: string, opts = {}) =>
+    align(ayahWords(quran[at(surah, ayah)]), heard.split(" "), 0, { ...strict, ...opts }).statuses.map((s) => s.status);
+
+  it("calls a similar word a mistake, where the forgiving check let it through", () => {
+    const fatiha = words(1, 1, 4); // بسم الله الرحمن الرحيم الحمد لله رب العالمين الرحمن الرحيم مالك يوم الدين
+    const heard = "بسم الله الرحمن الرحيم الحمد لله رب العالمين الرحيم الرحيم مالك يوم الدين".split(" ");
+    expect(align(fatiha, heard, 0, strict).statuses[8].status).toBe("wrong");
+    expect(align(fatiha, heard, 0).statuses[8].status).toBe("correct");
+    // One letter off, but another word: يعلمون for تعلمون, عليه for عليهم, الذي for الذين.
+    const baqarah216 = "كتب عليكم القتال وهو كره لكم وعسى أن تكرهوا شيئا وهو خير لكم وعسى أن تحبوا شيئا وهو شر لكم والله يعلم وأنتم لا";
+    expect(check(2, 216, `${baqarah216} يعلمون`, { stopped: "end" }).at(-1)).toBe("wrong");
+    expect(check(2, 216, `${baqarah216} تعلمون`, { stopped: "end" }).at(-1)).toBe("correct");
+    expect(check(1, 7, "صراط الذين أنعمت عليه غير المغضوب عليهم ولا الضالين")[3]).toBe("wrong");
+    expect(check(1, 7, "صراط الذي أنعمت عليهم غير المغضوب عليهم ولا الضالين")[1]).toBe("wrong");
+  });
+
+  it("accepts the plain spellings phones write", () => {
+    // Plain Arabic as the phone writes it (Tanzil's simple text): hamza, small alef, silent letters, يا joined.
+    const plain: [number, number, string][] = [
+      [2, 3, "الذين يؤمنون بالغيب ويقيمون الصلاة ومما رزقناهم ينفقون"],
+      [2, 40, "يا بني إسرائيل اذكروا نعمتي التي أنعمت عليكم وأوفوا بعهدي أوف بعهدكم وإياي فارهبون"],
+      [7, 60, "قال الملأ من قومه إنا لنراك في ضلال مبين"],
+      [20, 9, "وهل أتاك حديث موسى"],
+      [3, 66, "ها أنتم هؤلاء حاججتم فيما لكم به علم فلم تحاجون فيما ليس لكم به علم والله يعلم وأنتم لا تعلمون"],
+      [12, 87, "يا بني اذهبوا فتحسسوا من يوسف وأخيه ولا تيأسوا من روح الله إنه لا ييأس من روح الله إلا القوم الكافرون"],
+      [10, 94, "فإن كنت في شك مما أنزلنا إليك فاسأل الذين يقرءون الكتاب من قبلك لقد جاءك الحق من ربك فلا تكونن من الممترين"],
+      [38, 26, "يا داوود إنا جعلناك خليفة في الأرض فاحكم بين الناس بالحق ولا تتبع الهوى فيضلك عن سبيل الله إن الذين يضلون عن سبيل الله لهم عذاب شديد بما نسوا يوم الحساب"],
+      [106, 2, "إيلافهم رحلة الشتاء والصيف"],
+    ];
+    for (const [surah, ayah, heard] of plain) {
+      const statuses = check(surah, ayah, heard, { stopped: "end" });
+      expect(statuses.length, `${surah}:${ayah}`).toBe(ayahWords(quran[at(surah, ayah)]).length);
+      expect(statuses.every((s) => s === "correct"), `${surah}:${ayah}`).toBe(true);
+    }
+  });
+
+  it("hears the opening letters said by their names (alif lam mim)", () => {
+    const baqarah = words(2, 1, 2);
+    const r = align(baqarah, "ألف لام ميم ذلك الكتاب لا ريب فيه هدى للمتقين".split(" "), 0, strict);
+    expect(r.statuses.map((s) => s.status)).toEqual(baqarah.map(() => "correct"));
+    expect(align(words(36, 1, 2), "ياسين والقرآن الحكيم".split(" "), 0, strict).statuses.every((s) => s.status === "correct")).toBe(true);
+  });
+});
+
+describe("when you stop", () => {
+  const known = quranWords(quran);
+  const nas = words(114);
+  const stop = (heard: string, from = 0, stopped: "pause" | "end" = "pause") =>
+    align(nas, heard.split(" "), from, { known, stopped });
+
+  it("calls a wrong word you stop on a mistake (while reciting, it waits)", () => {
+    expect(stop("قل أعوذ برب الفلق").statuses.map((s) => s.status)).toEqual(["correct", "correct", "correct", "wrong"]);
+    // Even a word nothing like the right one.
+    expect(stop("قل أعوذ برب يوم").statuses[3]).toMatchObject({ index: 3, status: "wrong" });
+    // Still reciting: the last word may be the start of what comes next, so it's left open.
+    expect(align(nas, "قل أعوذ برب يوم".split(" "), 0, { known }).statuses.every((s) => s.status === "correct")).toBe(true);
+  });
+
+  it("doesn't count the isti'adha, the basmala, repeating yourself or sadaqa Allahu l-'azim", () => {
+    expect(stop("أعوذ بالله من الشيطان الرجيم بسم الله الرحمن الرحيم").statuses).toEqual([]);
+    expect(stop("قل أعوذ برب الناس ملك الناس الناس").statuses.every((s) => s.status === "correct")).toBe(true);
+    const end = stop("من الجنة والناس صدق الله العظيم", 17, "end");
+    expect(end.statuses.map((s) => s.status)).toEqual(["correct", "correct", "correct"]);
+  });
+
+  it("after a pause, lets the start of a word wait for the rest (يا of يا أيها)", () => {
+    const baqarah = words(2, 21, 21); // يَـٰٓأَيُّهَا ٱلنَّاسُ ٱعْبُدُوا۟ رَبَّكُمُ …
+    const paused = align(baqarah, ["يا"], 0, { known, stopped: "pause" });
+    expect(paused).toMatchObject({ statuses: [], rest: 1 });
+    expect(align(baqarah, "يا أيها الناس اعبدوا".split(" "), 0, { known, stopped: "pause" }).statuses.every((s) => s.status === "correct")).toBe(true);
+    // At the end it's decided.
+    expect(align(baqarah, ["يا"], 0, { known, stopped: "end" }).statuses[0].status).toBe("wrong");
   });
 });
 

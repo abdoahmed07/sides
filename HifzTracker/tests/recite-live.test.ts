@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import text from "../data/quran-text.json";
 import { align, ayahWords, type WordStatus } from "../src/recite/match";
-import { reveal, settleable } from "../src/recite/reveal";
+import { reveal } from "../src/recite/reveal";
 import { assemble, heardWords, WebSpeech, type SpeechProblem } from "../src/recite/webspeech";
 import { q } from "./helpers";
 
@@ -58,23 +58,6 @@ describe("revealing words while reciting", () => {
     const r = reveal(settled, null, new Set([2, 4]));
     expect(shown(r.status).slice(0, 6)).toBe("cwc...");
     expect(r.next).toBe(3);
-  });
-});
-
-describe("settling a result", () => {
-  it("settles a final result whole", () => {
-    const heard = "قل اعوذ برب البيت".split(" ");
-    const r = settleable(align(nas, heard, 0), heard.length, true);
-    expect(r.statuses.map((s) => s.status)).toEqual(["correct", "correct", "correct", "wrong"]);
-    expect(r.used).toBe(4);
-  });
-
-  it("leaves a wrong last word open when the result isn't final: it may still change", () => {
-    const heard = "قل اعوذ برب البيت".split(" ");
-    const r = settleable(align(nas, heard, 0), heard.length, false);
-    expect(r.statuses.map((s) => s.status)).toEqual(["correct", "correct", "correct"]);
-    expect(r.next).toBe(3);
-    expect(r.used).toBe(3);
   });
 });
 
