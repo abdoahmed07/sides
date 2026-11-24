@@ -1,13 +1,14 @@
 "use client";
-import { memo, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { q } from "@/lib/app";
-import { t, tp } from "@/i18n";
+import { t, tp, tx } from "@/i18n";
 import { useLang } from "@/i18n/react";
 import { audioUrl, newAudio, reciterById } from "@/audio/recitation";
 import {
   align,
   ayahWords,
+  fold,
   hintText,
   SURE,
   suggestRating,
@@ -17,6 +18,8 @@ import {
 } from "@/recite/match";
 import { concat, Mic, RATE } from "@/recite/mic";
 import { loadModel, modelIsDownloaded, transcribe, type Engine } from "@/recite/recognizer";
+import { LAST_WORD_SURE, reveal, settleable, type Live } from "@/recite/reveal";
+import { heardWords, WebSpeech, webSpeechAvailable, type SpeechProblem } from "@/recite/webspeech";
 import { loadText } from "./AyahText";
 import { Button, Spinner } from "./ui";
 
@@ -35,17 +38,44 @@ type Phase =
   | "done"
   | "error";
 
+/**
+ * phone: the phone's own speech recognition (Google or Apple): nothing to download, words come
+ * back while you speak, and it knows all kinds of voices. device: private mode, a speech model
+ * that runs on the device (one-time download, slower).
+ */
+type Mode = "phone" | "device";
+const MODE_KEY = "hifz:reciteMode";
+
+function initialMode(): Mode {
+  if (!webSpeechAvailable()) return "device";
+  try {
+    return localStorage.getItem(MODE_KEY) === "device" ? "device" : "phone";
+  } catch {
+    return "phone";
+  }
+}
+
 const RATING_LABEL: Record<Rating, string> = {
   strong: "Strong",
   okay: "Okay",
   weak: "Weak",
 };
 
-/**
- * The last word of a live preview is often cut off mid-word, so it only counts when it's
- * (almost) exactly right; the others need a confident match (SURE).
- */
-const LAST_WORD_SURE = 0.9;
+/** Phone recognition: text that hasn't changed for this long counts as settled (iPhone never says "final"). */
+const SETTLE_MS = 1000;
+
+const PROBLEM: Record<Exclude<SpeechProblem, "interrupted">, string> = {
+  blocked: tx(
+    "Speech recognition is blocked. Allow the microphone (and speech recognition) for this site in your settings, then try again.",
+  ),
+  unavailable: tx(
+    "Your phone's speech recognition isn't available here. On iPhone, turn on Dictation (Settings › General › Keyboard) and open the app in Safari, or use private mode.",
+  ),
+  network: tx(
+    "Speech recognition needs an internet connection. Check it, or use private mode, which works offline.",
+  ),
+  "no-mic": tx("No microphone was found."),
+};
 
 /** A part the model couldn't make sense of is kept (up to this long) and heard again with the next part. */
 const CARRY_MAX_S = 12;
@@ -60,10 +90,9 @@ function shifted(audio: Float32Array): Float32Array {
 }
 
 /**
- * Recite from memory with the text hidden; the app listens (on this device)
- * and reveals each word you get right, live. Each word gets several chances:
- * if any check heard it right, it's right. Only consistent mistakes are
- * flagged. At the end: a score, the mistakes per ayah (with the correct
+ * Recite from memory with the text hidden; the app listens and reveals each
+ * word you get right, live and strictly in order. A mistake shows once you've
+ * moved past it. At the end: a score, the mistakes per ayah (with the correct
  * recitation to listen to) and a suggested rating to confirm.
  */
 export function ReciteCheck({
@@ -77,13 +106,16 @@ export function ReciteCheck({
   slot: HTMLElement | null;
 }) {
   useLang();
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [text, setText] = useState<string[] | null>(null);
-  const [phase, setPhase] = useState<Phase>("check");
+  const [phase, setPhase] = useState<Phase>(mode === "phone" ? "ready" : "check");
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  /** Settled statuses: what a finished part or a final result decided. */
   const [statusRaw, setStatus] = useState<WordStatus[]>([]);
+  /** What's being heard right now (not settled yet). */
+  const [live, setLive] = useState<Live | null>(null);
   const [confirmed, setConfirmed] = useState<Set<number>>(new Set());
-  const [ptr, setPtr] = useState(0);
   const [hintsRaw, setHints] = useState<number[]>([]);
   const [checking, setChecking] = useState(false);
   const [quiet, setQuiet] = useState(false);
@@ -94,17 +126,28 @@ export function ReciteCheck({
   /** Average time per check, shown under "What the app heard" (helps when it feels slow). */
   const [avgMs, setAvgMs] = useState(0);
 
+  /** First word not settled yet: new speech is matched from here. */
   const pointer = useRef(0);
   const seen = useRef<Set<number>>(new Set());
+  const lastSound = useRef(0);
+  /** The ring around the microphone button: moved straight from the mic, without redrawing the page. */
+  const ring = useRef<HTMLSpanElement>(null);
+
+  // Phone recognition.
+  const speech = useRef<WebSpeech | null>(null);
+  /** Words of the current recognition session already settled (what comes after them is new). */
+  const settledWords = useRef<string[]>([]);
+  /** The latest live result, until it's settled. */
+  const pending = useRef<{ r: Alignment; words: string[]; base: number; fresh: string[] } | null>(null);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // On-device model (private mode).
   const mic = useRef<Mic | null>(null);
   const chain = useRef<Promise<void>>(Promise.resolve());
   const busy = useRef(0);
   /** How long the last check took: very slow phones skip live previews and second listens so they don't fall behind. */
   const lastCheckMs = useRef(0);
   const checkTimes = useRef<number[]>([]);
-  const lastSound = useRef(0);
-  /** The ring around the microphone button: sized straight from the mic, without redrawing the page. */
-  const ring = useRef<HTMLSpanElement>(null);
   /** Audio the model couldn't make sense of yet: checked again together with the next part. */
   const carry = useRef<Float32Array | null>(null);
   /** The previous part and where in the text it started: context for a second listen. */
@@ -112,11 +155,24 @@ export function ReciteCheck({
 
   useEffect(() => {
     loadText().then(setText, () => setPhase("error"));
-    void modelIsDownloaded().then((yes) =>
-      setPhase((p) => (p === "check" ? (yes ? "loading" : "intro") : p)),
-    );
-    return () => mic.current?.stop();
+    return () => {
+      mic.current?.stop();
+      void speech.current?.stop();
+      clearTimeout(settleTimer.current);
+    };
   }, []);
+
+  // Private mode: is the model already on the device?
+  useEffect(() => {
+    if (phase !== "check") return;
+    let current = true;
+    void modelIsDownloaded().then((yes) => {
+      if (current) setPhase((p) => (p === "check" ? (yes ? "loading" : "intro") : p));
+    });
+    return () => {
+      current = false;
+    };
+  }, [phase]);
 
   const words: Word[] = useMemo(() => {
     if (!text) return [];
@@ -141,19 +197,34 @@ export function ReciteCheck({
     () => (hintsRaw.length === words.length ? hintsRaw : words.map(() => 0)),
     [hintsRaw, words],
   );
+  /** What shows while reciting: settled words, then live ones, strictly in order. */
+  const view = useMemo(() => reveal(status, live, confirmed), [status, live, confirmed]);
 
   const reset = () => {
     pointer.current = 0;
     carry.current = null;
     prev.current = null;
     seen.current = new Set();
-    setPtr(0);
+    settledWords.current = [];
+    pending.current = null;
     setStatus(words.map(() => "pending"));
+    setLive(null);
     setConfirmed(new Set());
     setHints(words.map(() => 0));
     setHeardLog([]);
     setRating(null);
     setSaved(false);
+  };
+
+  const chooseMode = (m: Mode) => {
+    try {
+      localStorage.setItem(MODE_KEY, m);
+    } catch {
+      /* not saved; fine for now */
+    }
+    setMode(m);
+    setErrorMsg(null);
+    setPhase(m === "phone" ? "ready" : "check");
   };
 
   // Load the model once the person has agreed (or it's already on the device).
@@ -173,46 +244,6 @@ export function ReciteCheck({
     );
   }, [phase]);
 
-  const check = async (audio: Float32Array) => {
-    const t0 = performance.now();
-    setChecking(true);
-    try {
-      // A copy goes to the model: the original is still needed for a second listen.
-      const heard = (await transcribe(audio.slice())).trim();
-      if (heard) setHeardLog((l) => [...l.slice(-30), heard]);
-      if (process.env.NODE_ENV !== "production") {
-        const w = window as unknown as { __reciteAudio?: unknown[] };
-        (w.__reciteAudio ??= []).push({ at: Math.round(t0), secs: +(audio.length / 16000).toFixed(2), ms: Math.round(performance.now() - t0), heard });
-      }
-      return heard.split(/\s+/).filter(Boolean);
-    } finally {
-      lastCheckMs.current = performance.now() - t0;
-      const times = [...checkTimes.current.slice(-19), lastCheckMs.current];
-      checkTimes.current = times;
-      setAvgMs(times.reduce((a, b) => a + b, 0) / times.length);
-      if (busy.current <= 1) setChecking(false);
-    }
-  };
-
-  /**
-   * Words a check heard clearly stay right, even if another check missed them.
-   * Only confident matches count, and in a live preview not the last word
-   * (it's often cut off mid-word and can look like another word).
-   */
-  const remember = (r: Alignment, heardCount: number, preview: boolean) => {
-    let added = false;
-    for (const s of r.statuses)
-      if (
-        s.status === "correct" &&
-        s.score >= (preview && s.heard === heardCount - 1 ? LAST_WORD_SURE : SURE) &&
-        !seen.current.has(s.index)
-      ) {
-        seen.current.add(s.index);
-        added = true;
-      }
-    if (added) setConfirmed(new Set(seen.current));
-  };
-
   /** Development only: what each check heard and decided (window.__recite in the browser console). */
   const debug = (kind: string, heard: string[], r: Alignment) => {
     if (process.env.NODE_ENV === "production") return;
@@ -226,19 +257,116 @@ export function ReciteCheck({
     });
   };
 
+  /** Settles words: a settled word can still turn right (heard right later), never back into a mistake. */
   const commit = (r: Alignment) => {
     if (!r.statuses.length) return;
+    const from = pointer.current;
     setStatus((prev) => {
       const next =
         prev.length === expected.length
           ? [...prev]
           : expected.map((): WordStatus => "pending");
-      for (const s of r.statuses)
+      for (const s of r.statuses) {
+        if (s.index < from && s.status !== "correct") continue;
         next[s.index] = seen.current.has(s.index) ? "correct" : s.status;
+      }
       return next;
     });
-    pointer.current = r.next;
-    setPtr(r.next);
+    pointer.current = Math.max(from, r.next);
+  };
+
+  // ---- Phone recognition ----
+
+  const pulse = () => {
+    const el = ring.current;
+    if (!el) return;
+    el.style.transform = "scale(1.35)";
+    setTimeout(() => {
+      el.style.transform = "scale(1)";
+    }, 160);
+  };
+
+  /** Settles the latest live result: all of it when final, else all but a wrong last word. */
+  const settle = (final: boolean) => {
+    clearTimeout(settleTimer.current);
+    const p = pending.current;
+    pending.current = null;
+    if (!p) return;
+    const s = settleable(p.r, p.fresh.length, final);
+    debug(final ? "phone: final" : "phone: settled", p.fresh, s);
+    commit(s);
+    settledWords.current = p.words.slice(0, p.base + s.used);
+    if (s.used) setHeardLog((l) => [...l.slice(-30), p.fresh.slice(0, s.used).join(" ")]);
+    setLive(null);
+  };
+
+  const onText = (transcript: string, final: boolean) => {
+    const heard = heardWords(transcript);
+    // The words at the start that were already settled are skipped. If the recognizer started
+    // over or changed its mind, fewer words match, and the rest simply counts as new.
+    const done = settledWords.current;
+    let base = 0;
+    while (base < done.length && base < heard.length && fold(heard[base]) === fold(done[base])) base++;
+    const fresh = heard.slice(base);
+    const r = align(expected, fresh, pointer.current);
+    pending.current = { r, words: heard, base, fresh };
+    setLive({ statuses: r.statuses, heard: fresh.length });
+    pulse();
+    clearTimeout(settleTimer.current);
+    if (final) settle(true);
+    else settleTimer.current = setTimeout(() => settle(false), SETTLE_MS);
+  };
+
+  const onProblem = (p: SpeechProblem) => {
+    speech.current = null;
+    if (p === "interrupted") return setPhase("paused");
+    setErrorMsg(t(PROBLEM[p]));
+    setPhase(pointer.current > 0 ? "paused" : "ready");
+  };
+
+  // The phone's recognition has no sound level: warn when nothing has been heard for a while.
+  useEffect(() => {
+    if (phase !== "listening" || mode !== "phone") return;
+    const id = setInterval(() => setQuiet(Date.now() - lastSound.current > 8000), 1000);
+    return () => clearInterval(id);
+  }, [phase, mode]);
+
+  // ---- On-device model (private mode) ----
+
+  const check = async (audio: Float32Array) => {
+    const t0 = performance.now();
+    setChecking(true);
+    try {
+      // A copy goes to the model: the original is still needed for a second listen.
+      const heard = (await transcribe(audio.slice())).trim();
+      if (heard) setHeardLog((l) => [...l.slice(-30), heard]);
+      return heard.split(/\s+/).filter(Boolean);
+    } finally {
+      lastCheckMs.current = performance.now() - t0;
+      const times = [...checkTimes.current.slice(-19), lastCheckMs.current];
+      checkTimes.current = times;
+      setAvgMs(times.reduce((a, b) => a + b, 0) / times.length);
+      if (busy.current <= 1) setChecking(false);
+    }
+  };
+
+  /**
+   * Words a check heard clearly stay right, even if another check missed them.
+   * Only confident matches count, and the last word of a live preview only when
+   * (almost) exact: it's often cut off mid-word and can look like another word.
+   */
+  const remember = (r: Alignment, heardCount: number, preview: boolean) => {
+    let added = false;
+    for (const s of r.statuses)
+      if (
+        s.status === "correct" &&
+        s.score >= (preview && s.heard === heardCount - 1 ? LAST_WORD_SURE : SURE) &&
+        !seen.current.has(s.index)
+      ) {
+        seen.current.add(s.index);
+        added = true;
+      }
+    if (added) setConfirmed(new Set(seen.current));
   };
 
   /**
@@ -292,6 +420,7 @@ export function ReciteCheck({
           return;
         }
         commit(r);
+        setLive(null);
         prev.current = { audio, from };
       } catch {
         /* a part that couldn't be read is simply skipped */
@@ -311,6 +440,7 @@ export function ReciteCheck({
         const r = align(expected, heard, pointer.current);
         debug("preview", heard, r);
         remember(r, heard.length, true);
+        setLive({ statuses: r.statuses, heard: heard.length });
       } catch {
         /* ignore */
       } finally {
@@ -319,10 +449,32 @@ export function ReciteCheck({
     });
   };
 
+  // ---- Controls ----
+
   const listen = async () => {
     setErrorMsg(null);
     setQuiet(false);
     lastSound.current = Date.now();
+    if (mode === "phone") {
+      settledWords.current = [];
+      pending.current = null;
+      const s = new WebSpeech({
+        onText,
+        onActivity: () => {
+          lastSound.current = Date.now();
+        },
+        onSessionEnd: () => {
+          settle(false);
+          settledWords.current = [];
+        },
+        onError: onProblem,
+      });
+      speech.current = s;
+      // Straight from the tap: browsers only start recognition from one.
+      s.start();
+      setPhase("listening");
+      return;
+    }
     const m = new Mic({
       onPart,
       onPartial,
@@ -346,50 +498,68 @@ export function ReciteCheck({
   };
 
   const pause = () => {
-    mic.current?.stop();
-    mic.current = null;
+    if (mode === "phone") {
+      const s = speech.current;
+      speech.current = null;
+      void s?.stop();
+    } else {
+      mic.current?.stop();
+      mic.current = null;
+    }
     setPhase("paused");
   };
 
   const finish = async () => {
-    mic.current?.stop();
-    mic.current = null;
     setPhase("finishing");
-    await chain.current;
+    if (mode === "phone") {
+      const s = speech.current;
+      speech.current = null;
+      await s?.stop();
+      settle(false);
+    } else {
+      mic.current?.stop();
+      mic.current = null;
+      await chain.current;
+    }
+    setLive(null);
+    // Words a check heard clearly count as right.
+    setStatus((prev) =>
+      (prev.length === expected.length ? prev : expected.map((): WordStatus => "pending")).map((s, i) =>
+        s === "pending" && seen.current.has(i) ? "correct" : s,
+      ),
+    );
     setPhase("done");
   };
 
   const done = phase === "done";
-  const shown = (i: number) =>
-    done ||
-    status[i] === "correct" ||
-    confirmed.has(i) ||
-    status[i] === "wrong" ||
-    status[i] === "skipped";
   // The next word still hidden: where you are, and where the hint helps.
-  const nextHidden = (() => {
-    let i = ptr;
-    while (i < words.length && shown(i)) i++;
-    return i;
-  })();
+  const nextHidden = view.next;
 
   const hint = () => {
     if (nextHidden >= words.length) return;
     setHints(hints.map((v, k) => (k === nextHidden ? v + 1 : v)));
   };
 
-  // Results.
-  const wrong = status.filter((s) => s === "wrong").length;
-  const skipped = status.filter((s) => s === "skipped").length;
-  const notReached = done
-    ? status.filter((s, i) => s === "pending" && !confirmed.has(i)).length
-    : 0;
+  const fix = useCallback(
+    (i: number) => setStatus((prev) => prev.map((v, k) => (k === i ? "correct" : v))),
+    [],
+  );
+
+  // Results (while reciting: what's shown so far).
+  const counted = done ? status : view.status;
+  const wrong = counted.filter((s) => s === "wrong").length;
+  const skipped = counted.filter((s) => s === "skipped").length;
+  const notReached = done ? status.filter((s) => s === "pending").length : 0;
   const hinted = hints.filter((h) => h > 0).length;
   const mistakes = wrong + skipped;
   const suggestion = suggestRating(words.length, mistakes + notReached, hinted);
   const chosen = rating ?? suggestion;
   const currentAyah = words[Math.min(nextHidden, words.length - 1)]?.ayah;
   const ayahNo = currentAyah === undefined ? 0 : ayahs.indexOf(currentAyah) + 1;
+  const phoneAvailable = webSpeechAvailable();
+  const usePhone = phoneAvailable && (
+    <Button onClick={() => chooseMode("phone")}>{t("Use phone recognition instead")}</Button>
+  );
 
   if (!text || phase === "check")
     return <p className="text-sm text-muted">{t("Loading text…")}</p>;
@@ -410,9 +580,12 @@ export function ReciteCheck({
             "It checks words (skipped or wrong), not tajweed. It can mishear sometimes, especially with background noise.",
           )}
         </p>
-        <Button variant="primary" onClick={() => setPhase("loading")}>
-          {t("Download and start")}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="primary" onClick={() => setPhase("loading")}>
+            {t("Download and start")}
+          </Button>
+          {usePhone}
+        </div>
       </div>
     );
 
@@ -443,7 +616,10 @@ export function ReciteCheck({
           )}
         </p>
         {errorMsg && <p className="text-xs text-muted">{errorMsg}</p>}
-        <Button onClick={() => setPhase("loading")}>{t("Try again")}</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setPhase(mode === "phone" ? "ready" : "loading")}>{t("Try again")}</Button>
+          {mode === "device" && usePhone}
+        </div>
       </div>
     );
 
@@ -465,18 +641,20 @@ export function ReciteCheck({
           saved={saved}
           heardLog={heardLog}
           speed={
-            !engine || !avgMs
-              ? undefined
-              : engine.backend === "gpu"
-                ? t("Speed: about {s} s per check, using the graphics chip.", { s: (avgMs / 1000).toFixed(1) })
-                : tp(
-                    {
-                      one: "Speed: about {s} s per check, using {n} processor core.",
-                      other: "Speed: about {s} s per check, using {n} processor cores.",
-                    },
-                    engine.threads,
-                    { s: (avgMs / 1000).toFixed(1) },
-                  )
+            mode === "phone"
+              ? t("Recognized by your phone's speech recognition.")
+              : !engine || !avgMs
+                ? undefined
+                : engine.backend === "gpu"
+                  ? t("Speed: about {s} s per check, using the graphics chip.", { s: (avgMs / 1000).toFixed(1) })
+                  : tp(
+                      {
+                        one: "Speed: about {s} s per check, using {n} processor core.",
+                        other: "Speed: about {s} s per check, using {n} processor cores.",
+                      },
+                      engine.threads,
+                      { s: (avgMs / 1000).toFixed(1) },
+                    )
           }
           onSave={
             onRate
@@ -583,6 +761,19 @@ export function ReciteCheck({
             {errorMsg && (
               <p className="text-center text-xs text-danger">{errorMsg}</p>
             )}
+            {!started && (mode === "phone" || phoneAvailable) && (
+              <p className="text-center text-[11px] leading-snug text-muted">
+                {mode === "phone"
+                  ? t("Uses your phone's speech recognition (Google or Apple), like voice typing: nothing to download.")
+                  : t("Private mode: everything stays on this device.")}{" "}
+                <button
+                  className="underline underline-offset-2 hover:text-text"
+                  onClick={() => chooseMode(mode === "phone" ? "device" : "phone")}
+                >
+                  {mode === "phone" ? t("Use private mode") : t("Use phone recognition instead")}
+                </button>
+              </p>
+            )}
           </div>,
           slot,
         )
@@ -590,13 +781,12 @@ export function ReciteCheck({
 
       <RecitedText
         words={words}
-        status={status}
-        confirmed={confirmed}
+        status={done ? status : view.status}
         hints={hints}
         done={done}
-        nextHidden={nextHidden}
+        next={nextHidden}
         started={started}
-        setStatus={setStatus}
+        onFix={fix}
       />
     </div>
   );
@@ -604,44 +794,31 @@ export function ReciteCheck({
 
 /**
  * The portion's words: hidden bars, revealed words, hints and mistakes. Kept apart and memoized:
- * long portions have hundreds of words, and redrawing them all on every check (or every mic
- * update) keeps a phone busy.
+ * long portions have hundreds of words, and redrawing them all on every result keeps a phone busy.
  */
 const RecitedText = memo(function RecitedText({
   words,
   status,
-  confirmed,
   hints,
   done,
-  nextHidden,
+  next,
   started,
-  setStatus,
+  onFix,
 }: {
   words: Word[];
   status: WordStatus[];
-  confirmed: Set<number>;
   hints: number[];
   done: boolean;
-  nextHidden: number;
+  next: number;
   started: boolean;
-  setStatus: Dispatch<SetStateAction<WordStatus[]>>;
+  onFix: (i: number) => void;
 }) {
   useLang();
-  const shown = (i: number) =>
-    done ||
-    status[i] === "correct" ||
-    confirmed.has(i) ||
-    status[i] === "wrong" ||
-    status[i] === "skipped";
-  const fix = (i: number) =>
-    setStatus((prev) =>
-      (prev.length === words.length ? prev : status).map((v, k) => (k === i ? "correct" : v)),
-    );
   return (
     <p className="quran text-justify" lang="ar" dir="rtl">
       {words.map((w, i) => {
         const st = status[i];
-        const isShown = shown(i);
+        const isShown = done || st !== "pending";
         const fixable = done && (st === "wrong" || st === "skipped");
         const hintShown = !isShown && hints[i] > 0;
         const cls = hintShown
@@ -651,12 +828,12 @@ const RecitedText = memo(function RecitedText({
             : st === "skipped"
               ? "rounded-md text-warn underline decoration-dotted decoration-2 underline-offset-8"
               : isShown
-                ? done && st === "pending" && !confirmed.has(i)
+                ? done && st === "pending"
                   ? "text-muted"
                   : ""
                 : // Hidden: a slim word-shaped bar, as wide as the word itself.
                   `inline-block h-[0.55em] overflow-hidden rounded-full align-middle leading-[0.55em] text-transparent ${
-                    i === nextHidden && started
+                    i === next && started
                       ? "bg-accent/35 motion-safe:animate-pulse"
                       : "bg-border"
                   }`;
@@ -666,7 +843,7 @@ const RecitedText = memo(function RecitedText({
               className={`transition-colors duration-500 ${cls} ${fixable ? "cursor-pointer" : ""}`}
               data-hidden={!isShown && !hintShown ? "" : undefined}
               title={fixable ? t("Tap if you said it right") : undefined}
-              onClick={fixable ? () => fix(i) : undefined}
+              onClick={fixable ? () => onFix(i) : undefined}
             >
               {hintShown ? hintText(w.text, hints[i]) : w.text}
             </span>

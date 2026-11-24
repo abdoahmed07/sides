@@ -1013,8 +1013,21 @@ const ar: Dict = {
   "Listening and reciting": "الاستماع والتسميع",
   "Recitation audio streams from EveryAyah (everyayah.com) when you press play.":
     "يُبثّ صوت التلاوة من موقع EveryAyah (everyayah.com) عندما تضغط تشغيل.",
-  "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45–70 MB) downloads from Hugging Face.":
-    "**التسميع والتصحيح** يستمع عبر الميكروفون فقط أثناء التسميع، والتعرّف على الكلام يعمل على جهازك: صوتك لا يُسجَّل ولا يُرسل إلى أي مكان. في المرة الأولى يُنزَّل نموذج الكلام (حوالي 45–70 ميغابايت) من Hugging Face.",
+  "**Recite and check** listens through your microphone only while you recite. By default it uses your phone's own speech recognition (Google on Android and in Chrome, Apple on iPhone and in Safari): like voice typing, your recitation is sent to them to be turned into text. In private mode, the recognition runs on your device instead and your voice is never sent anywhere; the first time, its speech model (about 45–70 MB) downloads from Hugging Face. The app itself never records or keeps your voice.":
+    "**التسميع والتصحيح** يستمع عبر الميكروفون فقط أثناء التسميع. افتراضياً يستخدم خدمة التعرّف على الكلام في هاتفك (Google على أندرويد وفي Chrome، وApple على الآيفون وفي Safari): كما في الكتابة بالصوت، تُرسَل تلاوتك إليهم لتحويلها إلى نص. في الوضع الخاص يعمل التعرّف على الكلام على جهازك بدلاً من ذلك ولا يُرسل صوتك إلى أي مكان؛ وفي المرة الأولى يُنزَّل نموذج الكلام (حوالي 45–70 ميغابايت) من Hugging Face. التطبيق نفسه لا يسجّل صوتك ولا يحتفظ به.",
+  "Speech recognition is blocked. Allow the microphone (and speech recognition) for this site in your settings, then try again.":
+    "التعرّف على الكلام محظور. اسمح بالميكروفون (وبالتعرّف على الكلام) لهذا الموقع من الإعدادات، ثم حاول مرة أخرى.",
+  "Your phone's speech recognition isn't available here. On iPhone, turn on Dictation (Settings › General › Keyboard) and open the app in Safari, or use private mode.":
+    "التعرّف على الكلام في هاتفك غير متاح هنا. على الآيفون: فعّل الإملاء (الإعدادات › عام › لوحة المفاتيح) وافتح التطبيق في Safari، أو استخدم الوضع الخاص.",
+  "Speech recognition needs an internet connection. Check it, or use private mode, which works offline.":
+    "التعرّف على الكلام يحتاج إلى اتصال بالإنترنت. تحقّق منه، أو استخدم الوضع الخاص الذي يعمل دون إنترنت.",
+  "No microphone was found.": "لم يُعثر على ميكروفون.",
+  "Use phone recognition instead": "استخدم التعرّف على الكلام في الهاتف بدلاً من ذلك",
+  "Recognized by your phone's speech recognition.": "تمّ التعرّف بواسطة خدمة التعرّف على الكلام في هاتفك.",
+  "Uses your phone's speech recognition (Google or Apple), like voice typing: nothing to download.":
+    "يستخدم التعرّف على الكلام في هاتفك (Google أو Apple)، مثل الكتابة بالصوت: لا شيء لتنزيله.",
+  "Private mode: everything stays on this device.": "الوضع الخاص: كل شيء يبقى على هذا الجهاز.",
+  "Use private mode": "استخدم الوضع الخاص",
   "I can't hear anything. Is the microphone allowed and not muted? Try speaking a little louder.":
     "لا أسمع شيئاً. هل الميكروفون مسموح به وغير مكتوم؟ جرّب أن تتكلم بصوت أعلى قليلاً.",
   "Ayah {n} of {total}": "الآية {n} من {total}",

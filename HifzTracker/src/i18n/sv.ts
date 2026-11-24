@@ -889,8 +889,21 @@ const sv: Dict = {
   "Listening and reciting": "Lyssna och recitera",
   "Recitation audio streams from EveryAyah (everyayah.com) when you press play.":
     "Reciteringsljudet strömmas från EveryAyah (everyayah.com) när du trycker på spela.",
-  "**Recite and check** listens through your microphone only while you recite, and the speech recognition runs on your device: your voice is never recorded or sent anywhere. The first time, the speech model (about 45–70 MB) downloads from Hugging Face.":
-    "**Recitera och kontrollera** lyssnar genom mikrofonen bara medan du reciterar, och taligenkänningen körs på din enhet: din röst spelas aldrig in och skickas aldrig någonstans. Första gången laddas talmodellen (ungefär 45–70 MB) ner från Hugging Face.",
+  "**Recite and check** listens through your microphone only while you recite. By default it uses your phone's own speech recognition (Google on Android and in Chrome, Apple on iPhone and in Safari): like voice typing, your recitation is sent to them to be turned into text. In private mode, the recognition runs on your device instead and your voice is never sent anywhere; the first time, its speech model (about 45–70 MB) downloads from Hugging Face. The app itself never records or keeps your voice.":
+    "**Recitera och kontrollera** lyssnar genom mikrofonen bara medan du reciterar. Som standard används telefonens egen taligenkänning (Google på Android och i Chrome, Apple på iPhone och i Safari): som vid röstinmatning skickas din recitation till dem för att bli text. I privat läge körs taligenkänningen i stället på din enhet och din röst skickas aldrig någonstans; första gången laddas talmodellen (ungefär 45–70 MB) ner från Hugging Face. Appen själv spelar aldrig in eller sparar din röst.",
+  "Speech recognition is blocked. Allow the microphone (and speech recognition) for this site in your settings, then try again.":
+    "Taligenkänningen är blockerad. Tillåt mikrofonen (och taligenkänning) för den här webbplatsen i inställningarna och försök igen.",
+  "Your phone's speech recognition isn't available here. On iPhone, turn on Dictation (Settings › General › Keyboard) and open the app in Safari, or use private mode.":
+    "Telefonens taligenkänning är inte tillgänglig här. På iPhone: slå på Diktering (Inställningar › Allmänt › Tangentbord) och öppna appen i Safari, eller använd privat läge.",
+  "Speech recognition needs an internet connection. Check it, or use private mode, which works offline.":
+    "Taligenkänningen behöver internet. Kontrollera anslutningen, eller använd privat läge, som fungerar offline.",
+  "No microphone was found.": "Ingen mikrofon hittades.",
+  "Use phone recognition instead": "Använd telefonens taligenkänning i stället",
+  "Recognized by your phone's speech recognition.": "Igenkänt av telefonens taligenkänning.",
+  "Uses your phone's speech recognition (Google or Apple), like voice typing: nothing to download.":
+    "Använder telefonens taligenkänning (Google eller Apple), som röstinmatning: inget att ladda ner.",
+  "Private mode: everything stays on this device.": "Privat läge: allt stannar på den här enheten.",
+  "Use private mode": "Använd privat läge",
   "I can't hear anything. Is the microphone allowed and not muted? Try speaking a little louder.":
     "Jag hör ingenting. Är mikrofonen tillåten och inte avstängd? Försök prata lite högre.",
   "Ayah {n} of {total}": "Vers {n} av {total}",

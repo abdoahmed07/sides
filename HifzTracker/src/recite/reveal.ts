@@ -1,0 +1,69 @@
+/**
+ * What the reciter sees while reciting: which words are revealed, and when a
+ * mistake shows. Pure, so it can be tested.
+ *
+ *  - Words are revealed strictly in order: nothing after the first word still
+ *    being listened for (a later word heard first waits for it).
+ *  - A word from a live (still changing) result shows as soon as it's heard
+ *    right; the last heard word only when (almost) exact, since it may be cut
+ *    off mid-word.
+ *  - A live mistake shows only once you've said a couple of right words after
+ *    it, so a word that's simply still coming isn't flagged.
+ */
+import type { Alignment, WordStatus } from "./match";
+
+/** Right words after a live mistake before it's shown. */
+export const FLAG_AFTER = 2;
+/** The last heard word of a live result is shown only when this close (it may be cut off). */
+export const LAST_WORD_SURE = 0.9;
+
+export type Live = { statuses: Alignment["statuses"]; heard: number };
+
+/**
+ * @param settled the words' settled statuses (from earlier parts)
+ * @param live the current live result (aligned from the first unsettled word), if any
+ * @param confirmed words already heard right by an earlier check (on-device mode)
+ * @returns what to show per word, and the first word still hidden
+ */
+export function reveal(settled: WordStatus[], live: Live | null, confirmed?: Set<number>): { status: WordStatus[]; next: number } {
+  const status = settled.map((s, i): WordStatus => (s === "pending" && confirmed?.has(i) ? "correct" : s));
+  if (live) {
+    const ok = live.statuses.map(
+      (s) => s.status === "correct" && (s.heard !== live.heard - 1 || s.score >= LAST_WORD_SURE),
+    );
+    let rightAfter = 0;
+    for (let k = live.statuses.length - 1; k >= 0; k--) {
+      const s = live.statuses[k];
+      if (status[s.index] === "pending") {
+        if (ok[k]) status[s.index] = "correct";
+        else if (s.status !== "correct" && rightAfter >= FLAG_AFTER) status[s.index] = s.status;
+      }
+      if (ok[k]) rightAfter++;
+    }
+  }
+  let next = 0;
+  while (next < status.length && status[next] !== "pending") next++;
+  for (let i = next + 1; i < status.length; i++) status[i] = "pending";
+  return { status, next };
+}
+
+/**
+ * The part of a live result that can be settled. A final result: all of it.
+ * Otherwise (the text has stopped changing, or listening stopped): all but a
+ * wrong last word, which may only have been cut off and can still change.
+ * `used`: how many heard words that covers.
+ */
+export function settleable(r: Alignment, heard: number, final: boolean): Alignment & { used: number } {
+  if (final || !r.statuses.length) return { ...r, used: heard };
+  const statuses = [...r.statuses];
+  const last = statuses[statuses.length - 1];
+  if (last.status !== "wrong" || last.heard !== heard - 1) return { ...r, used: heard };
+  statuses.pop();
+  // Skips just before it aren't mistakes yet either: those words may simply still be coming.
+  while (statuses.length && statuses[statuses.length - 1].status === "skipped") statuses.pop();
+  return {
+    statuses,
+    next: statuses.length ? statuses[statuses.length - 1].index + 1 : r.statuses[0].index,
+    used: statuses.reduce((m, s) => Math.max(m, s.heard + 1), 0),
+  };
+}

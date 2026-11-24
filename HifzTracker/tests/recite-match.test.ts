@@ -17,6 +17,18 @@ describe("comparing Uthmani text with what the model writes", () => {
     ikhlas.forEach((w, k) => expect(similarity(fold(w), fold(plain[k]))).toBeGreaterThanOrEqual(0.7));
   });
 
+  it("accepts the plain spelling of words the mushaf writes with a small alef", () => {
+    const score = (expected: string[], heard: string) => align(expected, [heard], 0).statuses[0].score;
+    expect(score(["إِلَـٰهِ"], "إله")).toBe(1);
+    expect(score(["هَـٰذَا"], "هذا")).toBe(1);
+    expect(score(["عَلَىٰ"], "على")).toBe(1);
+    expect(score(["ٱلصَّلَوٰةَ"], "الصلاة")).toBe(1);
+    expect(score(["إِبْرَٰهِـۧمَ"], "إبراهيم")).toBe(1);
+    // …and where plain Arabic writes the alef, that too.
+    expect(score(["مَـٰلِكِ"], "مالك")).toBe(1);
+    expect(score(["ٱلْكِتَـٰبُ"], "الكتاب")).toBe(1);
+  });
+
   it("leaves out stand-alone pause signs", () => {
     expect(ayahWords("ذَٰلِكَ ٱلْكِتَـٰبُ لَا رَيْبَ ۛ فِيهِ ۛ هُدًى")).toHaveLength(6);
   });

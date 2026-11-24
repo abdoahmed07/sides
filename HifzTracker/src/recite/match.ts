@@ -24,8 +24,18 @@ export function fold(word: string): string {
     .replace(/ة/g, "ه") // ta marbuta → ha
     .replace(/[ؤ]/g, "و") // waw hamza → waw
     .replace(/[ئ]/g, "ي") // ya hamza → ya
+    .replace(/ۧ/g, "ي") // small ya (إِبْرَٰهِـۧمَ = إبراهيم, ٱلنَّبِيِّـۧنَ = النبيين)
     .replace(/[ً-ٟۖ-ۭ࣓-ࣿؐ-ؚـ]/g, "") // vowel marks, Quranic marks, tatweel
     .replace(/[^ء-ي]/g, ""); // letters only
+}
+
+/**
+ * The plain spelling of words where the mushaf has a small alef that plain Arabic leaves out:
+ * إِلَـٰهِ = إله, هَـٰذَا = هذا, ذَٰلِكَ = ذلك, عَلَىٰ = على, ٱلصَّلَوٰةَ = الصلاة. Elsewhere plain Arabic
+ * does write it (مَـٰلِكِ = مالك), so a word matches either spelling.
+ */
+function foldPlain(word: string): string {
+  return fold(word.replace(/وٰ/g, "ا").replace(/ٰ/g, ""));
 }
 
 function editDistance(a: string, b: string): number {
@@ -89,8 +99,17 @@ const JOIN_SAME = 0.8;
 const JOIN = 0.15;
 
 export function align(expected: string[], heard: string[], from: number): Alignment {
-  const e = expected.slice(from, from + heard.length + 8).map(fold);
+  const window = expected.slice(from, from + heard.length + 8);
+  const e = window.map(fold);
+  const p = window.map(foldPlain);
   const h = heard.map(fold).filter(Boolean);
+  /** How alike expected word i (either spelling) and a heard word are. */
+  const sim = (i: number, x: string) => (p[i] === e[i] ? similarity(e[i], x) : Math.max(similarity(e[i], x), similarity(p[i], x)));
+  /** The same for expected words i and i+1 written together. */
+  const sim2 = (i: number, x: string) =>
+    p[i] === e[i] && p[i + 1] === e[i + 1]
+      ? similarity(e[i] + e[i + 1], x)
+      : Math.max(similarity(e[i] + e[i + 1], x), similarity(p[i] + p[i + 1], x));
   if (!h.length || !e.length) return { statuses: [], next: from };
   const n = e.length;
   const m = h.length;
@@ -110,7 +129,7 @@ export function align(expected: string[], heard: string[], from: number): Alignm
   for (let i = 1; i <= n; i++)
     for (let j = 1; j <= m; j++) {
       // A wrong word costs a bit more than a skipped one, so a later exact match pulls the alignment into place.
-      const diag = cost[i - 1][j - 1] + 1.3 * (1 - similarity(e[i - 1], h[j - 1]));
+      const diag = cost[i - 1][j - 1] + 1.3 * (1 - sim(i - 1, h[j - 1]));
       const skip = cost[i - 1][j] + 1;
       const extra = cost[i][j - 1] + EXTRA;
       let best = diag;
@@ -120,12 +139,12 @@ export function align(expected: string[], heard: string[], from: number): Alignm
       if (skip <= best) [best, mv] = [skip, 2];
       if (extra < best) [best, mv] = [extra, 3];
       if (i >= 2) {
-        const s = similarity(e[i - 2] + e[i - 1], h[j - 1]);
+        const s = sim2(i - 2, h[j - 1]);
         const c = cost[i - 2][j - 1] + 1.3 * (1 - s) + JOIN;
         if (s >= JOIN_SAME && c < best) [best, mv] = [c, 4];
       }
       if (j >= 2) {
-        const s = similarity(e[i - 1], h[j - 2] + h[j - 1]);
+        const s = sim(i - 1, h[j - 2] + h[j - 1]);
         const c = cost[i - 1][j - 2] + 1.3 * (1 - s) + JOIN;
         if (s >= JOIN_SAME && c < best) [best, mv] = [c, 5];
       }
@@ -141,7 +160,7 @@ export function align(expected: string[], heard: string[], from: number): Alignm
   while (i > 0 || j > 0) {
     const mv = move[i][j];
     if (mv === 1) {
-      const score = similarity(e[i - 1], h[j - 1]);
+      const score = sim(i - 1, h[j - 1]);
       statuses.push({ index: from + i - 1, status: score >= SAME ? "correct" : "wrong", score, heard: j - 1 });
       i--;
       j--;
@@ -149,13 +168,13 @@ export function align(expected: string[], heard: string[], from: number): Alignm
       statuses.push({ index: from + i - 1, status: "skipped", score: 0, heard: -1 });
       i--;
     } else if (mv === 4) {
-      const score = similarity(e[i - 2] + e[i - 1], h[j - 1]);
+      const score = sim2(i - 2, h[j - 1]);
       statuses.push({ index: from + i - 1, status: "correct", score, heard: j - 1 });
       statuses.push({ index: from + i - 2, status: "correct", score, heard: j - 1 });
       i -= 2;
       j--;
     } else if (mv === 5) {
-      const score = similarity(e[i - 1], h[j - 2] + h[j - 1]);
+      const score = sim(i - 1, h[j - 2] + h[j - 1]);
       statuses.push({ index: from + i - 1, status: "correct", score, heard: j - 1 });
       i--;
       j -= 2;
