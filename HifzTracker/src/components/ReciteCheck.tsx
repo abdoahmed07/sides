@@ -121,6 +121,12 @@ const PROBLEM: Record<Exclude<SpeechProblem, "interrupted">, string> = {
 
 /** A part the model couldn't make sense of is kept (up to this long) and heard again with the next part. */
 const CARRY_MAX_S = 12;
+/**
+ * Live checks of a long phrase (longer than this) re-read only its last few seconds once its first words
+ * are confirmed: each check is quicker, since the model writes out only what it heard.
+ */
+const TRIM_FROM_S = 7;
+const TRIM_TO_S = 5;
 /** The model reads at most 30 s at a time. */
 const MODEL_MAX_S = 28;
 
@@ -603,10 +609,14 @@ export function ReciteCheck({
     return r;
   };
 
+  /** A part with what's carried from before in front of it, if the model can still read it all at once. */
+  const withCarry = (audio: Float32Array) =>
+    carry.current && carry.current.length + audio.length <= MODEL_MAX_S * RATE ? concat([carry.current, audio]) : audio;
+
   const onPart = (part: Float32Array) => {
     busy.current++;
     chain.current = chain.current.then(async () => {
-      const audio = carry.current ? concat([carry.current, part]) : part;
+      const audio = withCarry(part);
       carry.current = null;
       const from = pointer.current;
       // A preview already heard all of it (all but the pause at its end): no need to check it again.
@@ -646,16 +656,25 @@ export function ReciteCheck({
     });
   };
 
-  const onPartial = (audio: Float32Array) => {
-    // Live preview: whenever the model is free (and not hopelessly slow), so it never falls behind.
-    if (busy.current > 0 || lastCheckMs.current > 4000) return;
+  const onPartial = (audio: Float32Array, stopping: boolean) => {
+    // Live preview: whenever the model is free (and not hopelessly slow), so it never falls behind. When
+    // you stop, it waits its turn instead: it may be the part's last check (and spare one when it ends).
+    if ((busy.current > 0 && !stopping) || busy.current > 1 || lastCheckMs.current > 4000) return;
     busy.current++;
     chain.current = chain.current.then(async () => {
       try {
-        const input = carry.current ? concat([carry.current, audio]) : audio;
-        const heard = await check(input);
-        preview.current = { samples: input.length, heard };
-        const r = align(expected, heard, pointer.current);
+        const input = withCarry(audio);
+        // The phrase's words confirmed so far, from where it started.
+        let sure = pointer.current;
+        while (seen.current.has(sure)) sure++;
+        // Midway through a long phrase whose first words are confirmed: only its last seconds, matched
+        // from a couple of words before the first not confirmed (they may be in those seconds too). When
+        // you stop, all of it: that check may be the phrase's last.
+        const trim = !stopping && input.length > TRIM_FROM_S * RATE && sure > pointer.current;
+        const from = trim ? Math.max(pointer.current, sure - 2) : pointer.current;
+        const heard = await check(trim ? input.slice(input.length - TRIM_TO_S * RATE) : input);
+        preview.current = trim ? null : { samples: input.length, heard };
+        const r = align(expected, heard, from);
         debug("preview", heard, r);
         remember(r, heard.length, true);
         setLive({ statuses: r.statuses, heard: heard.length });

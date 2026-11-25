@@ -9,8 +9,7 @@ import { levelOf } from "./level";
 export const RATE = 16000;
 
 /**
- * Pause length that ends a part (a breath between ayahs or at a pause sign), and the longest part:
- * the model handles up to 30 s, but shorter parts are checked sooner and heard more accurately.
+ * Pause length that ends a part (a breath between ayahs or at a pause sign).
  */
 export const PAUSE_S = 0.6;
 /**
@@ -18,7 +17,12 @@ export const PAUSE_S = 0.6;
  * away, so it may be done by the time the part ends (and needn't be checked again then).
  */
 const STOPPING_S = 0.25;
-const MAX_PART_S = 14;
+/**
+ * The longest part, cut mid-flow if you don't pause: long enough for a long ayah in one go (a cut leaves
+ * a fragment, like the drawn-out end of a word, that the model can't make sense of on its own). Live
+ * checks of a long part stay quick: they re-read only its last seconds (ReciteCheck).
+ */
+const MAX_PART_S = 20;
 /** How often the part so far is offered for a live preview (skipped while the model is busy). */
 const PARTIAL_EVERY_S = 0.8;
 /** Audio kept from just before the voice starts, so the soft start of the first word isn't cut off. */
@@ -28,7 +32,8 @@ const OVERLAP_S = 0.8;
 
 export type MicHandlers = {
   onPart: (audio: Float32Array) => void;
-  onPartial: (audio: Float32Array) => void;
+  /** `stopping`: the voice has just stopped (probably a pause: this one may be the part's last check). */
+  onPartial: (audio: Float32Array, stopping: boolean) => void;
   /** 0–1, for a level meter. */
   onLevel?: (level: number) => void;
 };
@@ -204,9 +209,10 @@ export class Mic {
 
     if (this.silentSamples >= PAUSE_S * RATE || this.partSamples >= MAX_PART_S * RATE) this.endPart();
     else if (this.sincePartial >= PARTIAL_EVERY_S * RATE || (!this.offeredAtStop && this.silentSamples >= STOPPING_S * RATE)) {
-      if (this.silentSamples >= STOPPING_S * RATE) this.offeredAtStop = true;
+      const stopping = this.silentSamples >= STOPPING_S * RATE;
+      if (stopping) this.offeredAtStop = true;
       this.sincePartial = 0;
-      this.h.onPartial(concat(this.part));
+      this.h.onPartial(concat(this.part), stopping);
     }
   }
 
