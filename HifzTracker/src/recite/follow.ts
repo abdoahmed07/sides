@@ -69,20 +69,25 @@ export function follow(expected: string[], heard: string[], from: number, { know
   let words = heard;
   /** Heard words before where you started, kept while that may still change. */
   let kept = 0;
+  /**
+   * Whether `words` still starts with the first word heard since the last pause, whose first sound (a و)
+   * the phone may have missed (see align's `clipped`).
+   */
+  let clipped = true;
 
   const found = findJump(expected, words, at, known, begun, mode, searchEnd);
   // Paused before it's clear where you started (the words so far are in more than one place): wait for more.
   if (found === "wait" && mode === "pause") return { settled, next: at, used, live: null };
   // Paused on a few words from further on: settle what came before, and wait for more of them.
   if (found && typeof found === "object" && "hold" in found) {
-    const r = align(expected, words.slice(0, found.hold), at, { known, stopped: "pause" });
+    const r = align(expected, words.slice(0, found.hold), at, { known, stopped: "pause", clipped });
     return { settled: r.statuses, next: Math.max(at, r.next), used: found.hold, live: null };
   }
   const jump = found === "wait" ? null : found;
   if (jump) {
     if (begun) {
       // What you said before going on from further on is settled; the words you went past are skipped.
-      const before = align(expected, words.slice(0, jump.heard), at, { known });
+      const before = align(expected, words.slice(0, jump.heard), at, { known, clipped });
       settled.push(...before.statuses);
       for (let i = before.next; i < jump.to; i++) settled.push({ index: i, status: "skipped", score: 0, heard: -1 });
     } else start = jump.to;
@@ -92,10 +97,11 @@ export function follow(expected: string[], heard: string[], from: number, { know
     if (!begun && mode === "live") kept = jump.heard;
     else used = jump.heard;
     words = words.slice(jump.heard);
+    clipped = clipped && !jump.heard;
   } else if (
     !begun &&
     mode === "pause" &&
-    !align(expected, words, at, { known }).statuses.some((s) => s.status === "correct" && s.score > LOOSE_SCORE)
+    !align(expected, words, at, { known, clipped }).statuses.some((s) => s.status === "correct" && s.score > LOOSE_SCORE)
   ) {
     // Not started yet, and what you've said doesn't tell where you are: wait for more before deciding anything.
     // (A guess at opening letters, like اللهم for الٓمٓ, needs what comes after it too.)
@@ -116,7 +122,7 @@ export function follow(expected: string[], heard: string[], from: number, { know
   };
 
   if (mode === "live") {
-    let live = align(expected, words, at, { known });
+    let live = align(expected, words, at, { known, clipped });
     live = { ...live, statuses: fromStart(live.statuses) };
     // A long stretch without a pause: the older words are settled (the ones after them confirm them).
     if (words.length > LIVE_MAX) {
@@ -140,7 +146,7 @@ export function follow(expected: string[], heard: string[], from: number, { know
 
   // Paused or finished: everything heard is settled. Going back to repeat yourself isn't a mistake: all of
   // what was heard (its first words may happen to fit where you are), or the words at the end.
-  const live = align(expected, words, at, { known });
+  const live = align(expected, words, at, { known, clipped });
   const paired = live.statuses.reduce((m, s) => Math.max(m, s.heard + 1), 0);
   const fits = paired === words.length && live.statuses.every((s) => s.status === "correct");
   const said = fits
@@ -150,7 +156,7 @@ export function follow(expected: string[], heard: string[], from: number, { know
       : words.length - paired >= 2 && repeats(expected, words.slice(paired), live.next, known)
         ? words.slice(0, paired)
         : words;
-  const r = align(expected, said, at, { known, stopped: mode });
+  const r = align(expected, said, at, { known, stopped: mode, clipped: clipped && said.length > 0 });
   settled.push(...fromStart(r.statuses));
   const rest = said === words ? (r.rest ?? 0) : 0;
   return { settled, next: Math.max(at, r.next), used: used + words.length - rest, live: null, start };
@@ -170,7 +176,8 @@ function findJump(
   searchEnd: number,
 ): { heard: number; to: number } | { hold: number } | "wait" | null {
   if (words.length < 2) return null;
-  const local = align(expected, words, from, { known });
+  // (The words heard since the last pause: the first may be missing its و.)
+  const local = align(expected, words, from, { known, clipped: true });
   /** Whether matching from where you are explains these heard words (two or more right, or all if fewer). */
   const explained = (a: number, b: number) =>
     local.statuses.filter((s) => s.status === "correct" && s.heard >= a && s.heard < b).length >= Math.min(2, b - a);

@@ -197,6 +197,18 @@ describe("checking the phone's recognition strictly", () => {
     );
   });
 
+  it("forgives what an iPhone wrote in a real recitation (Al-Baqarah 2:2–5)", () => {
+    const baqarah = words(2, 1, 5);
+    // لَا رَيْبَ فِيهِ, "rayba fih": the joined vowel written as ة.
+    expect(align(baqarah, "ذلك الكتاب لا ريبة فيه".split(" "), 1, strict).statuses.map((s) => s.status)).toEqual(Array(5).fill("correct"));
+    // The و of وَأُو۟لَـٰٓئِكَ not heard, after a pause…
+    const at = baqarah.length - 3;
+    const end = (clipped: boolean) => align(baqarah, "اولائك هم المفلحون".split(" "), at, { ...strict, stopped: "end", clipped }).statuses[0].status;
+    expect(end(true)).toBe("correct");
+    // …but in the middle of reciting it's a mistake.
+    expect(end(false)).toBe("wrong");
+  });
+
   it("doesn't call the letter names said again a mistake (the phone writing them once more)", () => {
     const baqarah = words(2, 1, 2);
     const r = align(baqarah, ["لام", "ميم"], 1, { ...strict, stopped: "pause" });

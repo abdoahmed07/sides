@@ -70,8 +70,28 @@ export function assemble(parts: string[]): string {
   return text;
 }
 
-/** The words of a transcript that have letters (no stray punctuation). */
-export const heardWords = (text: string) => text.split(/\s+/).filter((w) => fold(w));
+/**
+ * Numbers the phone writes in digits, as words: the "alif" of ألف لام ميم comes back as 1000 (ألف is
+ * also "a thousand"), and so may the Quran's numbers.
+ */
+const NUMBERS: Record<string, string> = {
+  "100": "مائة",
+  "200": "مائتين",
+  "300": "ثلاثمائة",
+  "1000": "ألف",
+  "2000": "ألفين",
+  "3000": "ثلاثة آلاف",
+  "5000": "خمسة آلاف",
+  "50000": "خمسين ألف",
+};
+
+/** The words of a transcript that have letters (no stray punctuation), numbers in digits as words. */
+export const heardWords = (text: string) =>
+  text.split(/\s+/).flatMap((w) => {
+    if (fold(w)) return [w];
+    const digits = w.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/\D/g, "");
+    return digits && NUMBERS[digits] ? NUMBERS[digits].split(" ") : [];
+  });
 
 /**
  * Why recognition stopped: blocked (permission), unavailable (not here: e.g. dictation off on an

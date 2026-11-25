@@ -115,13 +115,33 @@ const joined = (x: Forms, y: Forms): Forms => ({
 
 /**
  * A heard word: folded, and without hamza. `letters`: the letters it spells when it's letter names
- * ("لام ميم" = لم), as one heard word or several put together (see `joinLetters`).
+ * ("لام ميم" = لم), as one heard word or several put together (see `joinLetters`). `cut`: folded and
+ * without hamza, without a final ة the phone may have added (see `hear`). `clipped`: the first word after
+ * a pause, whose first sound the phone may have missed (see `fitOf`).
  */
-type Heard = { f: string; b: string; letters?: string[] };
+type Heard = { f: string; b: string; letters?: string[]; cut?: [string, string]; clipped?: boolean };
+
+/**
+ * A heard word, for comparing. A word's last vowel said joined to the next word (لَا رَيْبَ فِيهِ: "rayba
+ * fīh") the phone may write as ة (ريبة), so the word without it counts too.
+ */
+function hear(w: string): Heard {
+  const f = fold(w);
+  const b = bare(w);
+  return /ة[\u064B-\u0652]*$/.test(w) && f.length > 3 ? { f, b, cut: [f.slice(0, -1), b.slice(0, -1)] } : { f, b };
+}
 
 /** Whether a heard word is the expected word, in any of its spellings. */
 function sameWord(w: Forms, x: Heard): boolean {
-  return x.f === w.f || x.f === w.p || w.alts.includes(x.b);
+  if (x.f === w.f || x.f === w.p || w.alts.includes(x.b)) return true;
+  return !!x.cut && (x.cut[0] === w.f || x.cut[0] === w.p || w.alts.includes(x.cut[1]));
+}
+
+/** An expected word without the و ("and") it starts with, when there's a word left (وَأُو۟لَـٰٓئِكَ = أولئك). */
+function withoutWa(w: Forms): Forms | null {
+  if (w.f[0] !== "و" || w.f.length < 4) return null;
+  const cut = (s: string) => (s[0] === "و" ? s.slice(1) : s);
+  return { ...w, f: cut(w.f), p: cut(w.p), b: cut(w.b), bp: cut(w.bp), alts: w.alts.map(cut) };
 }
 
 /**
@@ -337,6 +357,8 @@ const SOME_LETTERS = 0.2;
 const LOOSE_LETTERS = 0.3;
 /** How alike such a guess counts as: under `SAME`, so on its own it doesn't show where you started (see follow). */
 export const LOOSE_SCORE = 0.4;
+/** The first word after a pause heard without its و: right, at a little cost (a plain match comes first). */
+const CLIPPED = 0.1;
 /** How far back a word you stopped on still counts as repeating yourself. */
 const RECENT = 12;
 /** Said around a recitation, not part of it: the isti'adha, the basmala, "sadaqa Allahu l-'azim", amin. */
@@ -356,6 +378,8 @@ export type AlignOptions = {
    * waits instead (`rest`).
    */
   stopped?: "pause" | "end";
+  /** The first heard word is the first after a pause (or the start): the phone may have missed its و. */
+  clipped?: boolean;
 };
 
 /** How a heard word fits an expected one: its cost in an alignment, how alike they are, and whether it's right. */
@@ -366,10 +390,15 @@ function fitOf(w: Forms, x: Heard, known: Set<string> | undefined): { cost: numb
     // Letter names: some of the letters count (the phone missed the others). One letter alone (لا, ميم)
     // is as unsure as a guess, though: on its own it doesn't show where you started.
     const some = letters.filter((l) => within(l, w.f));
-    if (some.length) return { cost: SOME_LETTERS, score: some.some((l) => l.length > 1) ? 0.8 : LOOSE_SCORE, ok: true };
+    if (some.length) return { cost: SOME_LETTERS, score: some.some((l) => l.length > 1) ? 0.9 : LOOSE_SCORE, ok: true };
     // Another surah's opening letters are a mistake: paired with these at no cost, so it isn't passed over.
     if (letters.some((l) => l.length > 1 && OPENINGS.has(l))) return { cost: 0, score: 0, ok: false };
     if (!AROUND.has(x.f)) return { cost: LOOSE_LETTERS, score: LOOSE_SCORE, ok: true, loose: true };
+  }
+  // The first word after a pause, its و not heard: phones often miss the first sound after a silence.
+  if (x.clipped) {
+    const v = withoutWa(w);
+    if (v && sameWord(v, x)) return { cost: CLIPPED, score: 0.9, ok: true };
   }
   const s = w.p === w.f ? similarity(w.f, x.f) : Math.max(similarity(w.f, x.f), similarity(w.p, x.f));
   if (!known) return { cost: 1.3 * (1 - s), score: s, ok: s >= SAME };
@@ -380,11 +409,10 @@ function fitOf(w: Forms, x: Heard, known: Set<string> | undefined): { cost: numb
 
 /** Whether a heard word is the expected word (strictly, with `known`, as phone recognition is checked). */
 export function wordFits(expected: string, heard: string, known?: Set<string>): boolean {
-  const f = fold(heard);
-  if (!f) return false;
-  const b = bare(heard);
-  const letters = nameLetters(b);
-  return fitOf(forms(expected), { f, b, ...(letters.length && { letters }) }, known).ok;
+  if (!fold(heard)) return false;
+  const x = hear(heard);
+  const letters = nameLetters(x.b);
+  return fitOf(forms(expected), { ...x, ...(letters.length && { letters }) }, known).ok;
 }
 
 /** Said around a recitation rather than in it (the isti'adha, the basmala…), so it doesn't tell where you are. */
@@ -453,13 +481,12 @@ export function findRun(expected: string[], run: string[], known: Set<string>): 
  * Words after the last heard one stay pending.
  */
 export function align(expected: string[], heard: string[], from: number, opts: AlignOptions = {}): Alignment {
-  const { known, stopped } = opts;
+  const { known, stopped, clipped } = opts;
   let h: Heard[] = [];
   let at: number[] = []; // which word of `heard` each one is
   heard.forEach((w, k) => {
-    const f = fold(w);
-    if (!f) return;
-    h.push({ f, b: bare(w) });
+    if (!fold(w)) return;
+    h.push({ ...hear(w), ...(clipped && !h.length && { clipped: true }) });
     at.push(k);
   });
   const n = Math.min(expected.length - from, h.length + 8);

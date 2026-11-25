@@ -24,6 +24,9 @@ describe("putting the phone's recognition results together", () => {
 
   it("ignores punctuation the recognizer adds", () => {
     expect(heardWords("قل أعوذ برب الناس . ؟")).toEqual(["قل", "أعوذ", "برب", "الناس"]);
+    // An iPhone writes the "alif" of alif lam mim as a number (ألف is also "a thousand").
+    expect(heardWords("\u200F1000 لام ميم")).toEqual(["ألف", "لام", "ميم"]);
+    expect(heardWords("١٠٠٠ سنة")).toEqual(["ألف", "سنة"]);
   });
 });
 
