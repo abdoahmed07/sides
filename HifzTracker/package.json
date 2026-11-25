@@ -11,7 +11,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build:layout": "tsx scripts/build-layout.ts",
-    "build:pages": "STATIC_EXPORT=1 next build"
+    "build:pages": "STATIC_EXPORT=1 next build",
+    "bench": "tsx bench/score.ts",
+    "bench:audio": "tsx bench/audio.ts",
+    "bench:hear": "tsx bench/hear.ts",
+    "bench:replay": "tsx bench/replay.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",

@@ -8,20 +8,17 @@ import { audioUrl, newAudio, reciterById } from "@/audio/recitation";
 import {
   align,
   ayahWords,
-  fold,
   hintText,
-  LOOSE_SCORE,
   quranWords,
   SURE,
   suggestRating,
   type Alignment,
   type Rating,
   type WordStatus,
-  wordFits,
 } from "@/recite/match";
 import { concat, Mic, RATE } from "@/recite/mic";
 import { loadModel, modelIsDownloaded, transcribe, type Engine } from "@/recite/recognizer";
-import { follow, type Step } from "@/recite/follow";
+import { Hearing } from "@/recite/hearing";
 import { LevelMeter, meterFits, meterOff, turnMeterOff } from "@/recite/level";
 import {
   forgetUnfinished,
@@ -33,7 +30,7 @@ import {
   type Recording,
 } from "@/recite/record";
 import { LAST_WORD_SURE, reveal, type Live } from "@/recite/reveal";
-import { heardWords, WebSpeech, webSpeechAvailable, type SpeechProblem } from "@/recite/webspeech";
+import { WebSpeech, webSpeechAvailable, type SpeechProblem } from "@/recite/webspeech";
 import { loadText } from "./AyahText";
 import { Button, Spinner } from "./ui";
 
@@ -41,8 +38,6 @@ const toArabicDigits = (n: number) =>
   String(n).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[Number(d)]);
 
 type Word = { ayah: number; text: string; last: boolean };
-/** Phone recognition: the session's words, how many of them are settled, and the words not settled yet. */
-type Hearing = { words: string[]; base: number; fresh: string[] };
 type Phase =
   | "check"
   | "intro"
@@ -103,15 +98,6 @@ const noteWorked = () => {
 const noteStarted = () => {
   workedBefore = saysStarted = true;
 };
-
-/** A step in a recording: where matching started, heard words used, what was settled (index + s/c/w), where it goes on. */
-const stepTrace = (from: number, s: Step) => ({
-  from,
-  used: s.used,
-  next: s.next,
-  ...(s.start !== undefined && { start: s.start }),
-  settled: s.settled.map((x) => `${x.index}${x.status[0]}`).join(" "),
-});
 
 /** Every word of the Quran, for checking phone recognition strictly: worked out once, when first needed. */
 let knownWords: { text: string[]; words: Set<string> } | null = null;
@@ -197,8 +183,6 @@ export function ReciteCheck({
   const [recording, setRecording] = useState<Recording | null>(null);
   /** The recording of a recitation left without finishing it (something went wrong), to save now. */
   const [leftover, setLeftover] = useState<Recording | null>(unfinished);
-  /** A wrong word you stopped on: if the phone then corrects itself to the right word, it's no mistake. */
-  const lastFlag = useRef<number | null>(null);
   /** Without a meter (phones), the rings follow the words coming in: their level as it eases down. */
   const activity = useRef({ level: 0, raf: 0 });
 
@@ -213,27 +197,14 @@ export function ReciteCheck({
   const [micOn, setMicOn] = useState(false);
   const micOnNow = useRef(false);
   const listenAt = useRef(0);
-  /** Words of the current recognition session already settled (what comes after them is new). */
-  const settledWords = useRef<string[]>([]);
-  /** For each of those: the word of the text it was taken for (-1: none), to check again if the phone rewrites it. */
-  const settledAt = useRef<number[]>([]);
-  /**
-   * Words the phone wrote right at some point. Its text changes as it goes (a guess, then its final
-   * version), and you said a word it once wrote right: it counts as right.
-   */
-  const heardRight = useRef<Set<number>>(new Set());
-  /** What's being heard and isn't settled yet. */
-  const pending = useRef<Hearing | null>(null);
+  /** Following what the phone writes (see hearing.ts): one per recitation. */
+  const hearing = useRef<Hearing | null>(null);
   /** Where you started reciting, when it isn't where the portion starts (found from your first words). */
   const [start, setStart] = useState<number | null>(null);
   const startAt = useRef<number | null>(null);
   /** Whether you've started: any word settled yet. */
   const begun = useRef(false);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  /** Words from an ended session that may be the start of the next word ("يا" of يا أيها): checked with what comes next. */
-  const waiting = useRef<string[]>([]);
-  /** All the words waiting so far (those from ended sessions and the current one's). */
-  const lastRest = useRef<string[]>([]);
 
   // On-device model (private mode).
   const mic = useRef<Mic | null>(null);
@@ -338,7 +309,7 @@ export function ReciteCheck({
     recorder.current?.add("page", k);
   };
   /** Where to look for you when you aren't where you were: no further than the end of the next page. */
-  const searchEnd = () => pages[Math.min(pages.length - 1, pageOf(pointer.current) + 1)]?.[1] ?? words.length;
+  const searchEnd = (from: number) => pages[Math.min(pages.length - 1, pageOf(from) + 1)]?.[1] ?? words.length;
 
   // Per-word state, sized to the words (fresh when the text arrives or after a reset).
   // (Memoized, so the word list below is only redrawn when a word really changes.)
@@ -358,15 +329,9 @@ export function ReciteCheck({
     carry.current = null;
     prev.current = null;
     seen.current = new Set();
-    settledWords.current = [];
-    settledAt.current = [];
-    heardRight.current = new Set();
-    pending.current = null;
-    waiting.current = [];
-    lastRest.current = [];
+    hearing.current = null;
     startAt.current = null;
     begun.current = false;
-    lastFlag.current = null;
     recorder.current = null;
     setRecording(null);
     setStart(null);
@@ -472,68 +437,48 @@ export function ReciteCheck({
     showLevel(0);
   };
 
-  /**
-   * Takes words off the front of what's being heard (they're settled, or let go): from the words
-   * waiting from an earlier session first, then from this session's text.
-   */
-  const consume = (p: Hearing, used: number): Hearing => {
-    const fromWaiting = Math.min(used, p.fresh.length - (p.words.length - p.base));
-    waiting.current = waiting.current.slice(fromWaiting);
-    const base = p.base + used - fromWaiting;
-    settledWords.current = p.words.slice(0, base);
-    settledAt.current = settledAt.current.slice(0, base);
-    while (settledAt.current.length < base) settledAt.current.push(-1);
-    return { words: p.words, base, fresh: p.fresh.slice(used) };
+  /** The phone's text is followed by a Hearing (hearing.ts), made when you first start reciting. */
+  const hearingNow = (): Hearing => {
+    hearing.current ??= new Hearing(
+      expected,
+      known(text!),
+      searchEnd,
+      {
+        statuses: (updates) =>
+          setStatus((prev) => {
+            const next = prev.length === expected.length ? [...prev] : expected.map((): WordStatus => "pending");
+            for (const [i, st] of updates) next[i] = st;
+            return next;
+          }),
+        start: (i) => {
+          startAt.current = i;
+          setStart(i);
+        },
+        live: setLive,
+        said: (said) => setHeardLog((l) => [...l.slice(-30), said.join(" ")]),
+        trace: (kind, data) => recorder.current?.add(kind, data),
+      },
+      pointer.current,
+    );
+    return hearing.current;
   };
 
-  /** Settles a step's words, moves on, and returns what's still being heard. */
-  const apply = (p: Hearing, step: Step): Hearing => {
-    if (step.start !== undefined) {
-      startAt.current = step.start;
-      setStart(step.start);
-    }
-    if (step.settled.length) {
-      begun.current = true;
-      // Which word of the session's text each one was (the words waiting from an earlier session come first).
-      const waited = p.fresh.length - (p.words.length - p.base);
-      for (const s of step.settled) if (s.heard >= waited) settledAt.current[p.base + s.heard - waited] = s.index;
-      const right = step.settled.filter((s) => s.status !== "correct" && heardRight.current.has(s.index)).map((s) => s.index);
-      if (right.length) recorder.current?.add("heard-right", right);
-      setStatus((prev) => {
-        const next = prev.length === expected.length ? [...prev] : expected.map((): WordStatus => "pending");
-        for (const s of step.settled) next[s.index] = heardRight.current.has(s.index) ? "correct" : s.status;
-        return next;
-      });
-    }
-    pointer.current = Math.max(pointer.current, step.next);
-    return consume(p, step.used);
+  /** Where the Hearing has got to, for the rest of the screen. */
+  const caughtUp = () => {
+    const h = hearing.current;
+    if (!h) return;
+    pointer.current = h.pointer;
+    begun.current = h.begun;
   };
 
   /**
    * Settles what was heard: you paused (or the phone says the words are final), so what you said last
-   * counts too, and a wrong word you stopped on shows as a mistake. `end`: you've finished. Returns the
-   * words that wait for what comes next (the start of a word, like "يا" of يا أيها).
+   * counts too. `end`: you've finished.
    */
-  const settle = (end: boolean): string[] => {
+  const settle = (end: boolean) => {
     clearTimeout(settleTimer.current);
-    let p =
-      pending.current ??
-      (waiting.current.length ? { words: settledWords.current, base: settledWords.current.length, fresh: waiting.current } : null);
-    pending.current = null;
-    if (!p || !text) return lastRest.current;
-    const from = pointer.current;
-    const step = follow(expected, p.fresh, from, { known: known(text), mode: end ? "end" : "pause", begun: begun.current, searchEnd: searchEnd() });
-    debug(end ? "phone: end" : "phone: settled", p.fresh, { statuses: step.settled, next: step.next });
-    recorder.current?.add(end ? "end-settle" : "settle", stepTrace(from, step));
-    // A wrong word you stopped on (last of what was settled): remembered in case the phone corrects itself.
-    const last = step.settled.reduce<Step["settled"][number] | null>((m, x) => (!m || x.index > m.index ? x : m), null);
-    if (last) lastFlag.current = last.status === "wrong" ? last.index : null;
-    const said = p.fresh.slice(0, step.used);
-    p = apply(p, step);
-    if (said.length) setHeardLog((l) => [...l.slice(-30), said.join(" ")]);
-    setLive(null);
-    lastRest.current = p.fresh;
-    return p.fresh;
+    hearing.current?.settle(end);
+    caughtUp();
   };
 
   const onText = (transcript: string, final: boolean) => {
@@ -544,57 +489,12 @@ export function ReciteCheck({
       micOnNow.current = true;
       setMicOn(true);
     }
-    const heard = heardWords(transcript);
-    // The words at the start that were already settled are skipped. If the recognizer started
-    // over or changed its mind, fewer words match, and the rest simply counts as new.
-    const done = settledWords.current;
-    let base = 0;
-    while (base < done.length && base < heard.length && fold(heard[base]) === fold(done[base])) base++;
-    // The phone changed its mind about the word you'd stopped on (a drawn-out word it caught late):
-    // if it's the right word now, it's no mistake.
-    const flagged = lastFlag.current;
-    if (flagged !== null && base < done.length && heard.slice(base, base + 2).some((w) => wordFits(expected[flagged], w, known(text)))) {
-      lastFlag.current = null;
-      setStatus((prev) => prev.map((v, k) => (k === flagged && v === "wrong" ? "correct" : v)));
-      recorder.current?.add("unflag", flagged);
-    }
-    if (base < done.length) recheck(heard, base);
-    let p: Hearing = { words: heard, base, fresh: [...waiting.current, ...heard.slice(base)] };
-    const from = pointer.current;
-    const step = follow(expected, p.fresh, from, { known: known(text), mode: "live", begun: begun.current, searchEnd: searchEnd() });
-    if (step.settled.length || step.start !== undefined) recorder.current?.add("step", stepTrace(from, step));
-    p = apply(p, step);
-    pending.current = p;
-    // Words written right (not the last, which may be cut off): they stay right whatever the phone writes later.
-    for (const s of step.live?.statuses ?? [])
-      if (s.status === "correct" && s.score > LOOSE_SCORE && s.heard >= 0 && s.heard < p.fresh.length - 1) heardRight.current.add(s.index);
-    setLive(step.live && { statuses: step.live.statuses, heard: p.fresh.length });
+    hearingNow().hear(transcript);
+    caughtUp();
     pulse(0.75);
     clearTimeout(settleTimer.current);
     if (final) settle(false);
     else settleTimer.current = setTimeout(() => settle(false), SETTLE_MS);
-  };
-
-  /**
-   * The phone rewrote words already settled (its final version of what you said, after a guess): those
-   * that are the right word now count as right (never the other way round).
-   */
-  const recheck = (heard: string[], base: number) => {
-    if (!text) return;
-    const at = settledAt.current;
-    let from = -1;
-    for (let k = base - 1; k >= 0 && from < 0; k--) if (at[k] >= 0) from = at[k] + 1;
-    for (let k = base; k < at.length && from < 0; k++) if (at[k] >= 0) from = at[k];
-    if (from < 0) return;
-    const r = align(expected, heard.slice(base), from, { known: known(text) });
-    const right = r.statuses.filter((s) => s.index < pointer.current && s.status === "correct" && s.score > LOOSE_SCORE).map((s) => s.index);
-    if (!right.length) return;
-    for (const i of right) heardRight.current.add(i);
-    setStatus((prev) => {
-      const fixed = right.filter((i) => prev[i] === "wrong" || prev[i] === "skipped");
-      if (fixed.length) recorder.current?.add("rewritten-right", fixed);
-      return fixed.length ? prev.map((v, k) => (fixed.includes(k) ? "correct" : v)) : prev;
-    });
   };
 
   const onProblem = (p: SpeechProblem) => {
@@ -768,6 +668,7 @@ export function ReciteCheck({
       pointer.current = pages[page][0];
       startAt.current = pages[page][0];
       setStart(pages[page][0]);
+      hearing.current?.startAt(pages[page][0]);
     }
     recorder.current ??= new Recorder({
       ua: navigator.userAgent,
@@ -791,11 +692,11 @@ export function ReciteCheck({
       if (old) {
         if (old.running) recorder.current.add("let-go");
         old.detach();
-        if (pending.current) waiting.current = settle(false);
+        hearing.current?.catchUp();
+        caughtUp();
       }
-      settledWords.current = [];
-      settledAt.current = [];
-      pending.current = null;
+      // (Before the text has loaded there's nothing to follow yet: it starts with the first words.)
+      if (text) hearingNow().newSession();
       micOnNow.current = false;
       setMicOn(false);
       listenAt.current = Date.now();
@@ -811,9 +712,9 @@ export function ReciteCheck({
         },
         onSessionEnd: () => {
           // The session's text is gone: words still waiting for what comes next go on to the next one.
-          waiting.current = pending.current ? settle(false) : lastRest.current;
-          settledWords.current = [];
-          settledAt.current = [];
+          clearTimeout(settleTimer.current);
+          hearing.current?.sessionEnded();
+          caughtUp();
         },
         onError: onProblem,
         onTrace: (kind, data) => recorder.current?.add(kind, data),

@@ -44,3 +44,6 @@ next-env.d.ts
 
 # recitation recordings saved while developing (pnpm dev)
 /recordings/
+
+# the recognition bench: downloaded audio, transcripts and reports (bench/README.md)
+/bench/.cache/

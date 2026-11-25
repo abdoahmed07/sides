@@ -153,14 +153,16 @@ const sounds = (s: string) => s.replace(/[طذضظزصثحقغعءن]/g, (c) => 
 
 /**
  * How alike a heard word that isn't a word of the Quran is to the expected one, by how they sound: the
- * phone's misspelling of what you said (خطم for خَتَمَ, قانون for قَالُوٓا۟). And a word whose ending (ون, ين)
- * the phone cut off, as it may on the word you stop on (مصلح for مُصْلِحُونَ), counts as alike.
+ * phone's misspelling of what you said (خطم for خَتَمَ, قانون for قَالُوٓا۟). And a word whose ending the phone
+ * cut off counts as alike (مصلح for مُصْلِحُونَ, as on the word you stop on; ويسار for وَيُسَـٰرِعُونَ).
  */
 function soundsAlike(w: Forms, x: Heard): number {
   let best = 0;
   for (const e of [w.f, w.p, ...w.alts])
     for (const h of [x.f, x.b]) {
       if (h.length >= 3 && e.length - h.length === 2 && e.startsWith(h) && /(ون|ين)$/.test(e)) return 1;
+      // Cut off short of its ending in general (ويسار for وَيُسَـٰرِعُونَ): close, but not the same.
+      if (h.length >= 3 && e.length > h.length && e.length - h.length <= 3 && e.startsWith(h)) best = Math.max(best, 0.8);
       best = Math.max(best, similarity(sounds(e), sounds(h)));
     }
   return best;
@@ -434,6 +436,9 @@ function fitOf(w: Forms, x: Heard, known: Set<string> | undefined): { cost: numb
   // Strict: another word of the Quran is a mistake; a spelling the Quran doesn't have (the phone's
   // misspelling of what you said) counts when it sounds close.
   if (known.has(x.f) || known.has(x.b)) return { cost: 1.3 * (1 - s) + WRONG, score: s, ok: false };
+  // "And" or "so" said in front of the word (وسوا for سَوَآءٌ): another word, not a misspelling.
+  if ((x.f[0] === "و" || x.f[0] === "ف") && w.f[0] !== x.f[0] && soundsAlike(w, { f: x.f.slice(1), b: x.b.slice(1) }) >= CLOSE)
+    return { cost: 1.3 * (1 - s) + WRONG, score: s, ok: false };
   const alike = Math.max(s, soundsAlike(w, x));
   const ok = alike >= CLOSE;
   return { cost: 1.3 * (1 - alike) + (ok ? 0 : WRONG), score: alike, ok };
