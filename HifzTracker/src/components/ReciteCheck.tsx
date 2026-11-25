@@ -16,7 +16,7 @@ import {
   type Rating,
   type WordStatus,
 } from "@/recite/match";
-import { concat, Mic, RATE } from "@/recite/mic";
+import { concat, Mic, PAUSE_S, RATE } from "@/recite/mic";
 import { loadModel, modelIsDownloaded, transcribe, type Engine } from "@/recite/recognizer";
 import { Hearing } from "@/recite/hearing";
 import { LevelMeter, meterFits, meterOff, turnMeterOff } from "@/recite/level";
@@ -215,6 +215,8 @@ export function ReciteCheck({
   const checkTimes = useRef<number[]>([]);
   /** Audio the model couldn't make sense of yet: checked again together with the next part. */
   const carry = useRef<Float32Array | null>(null);
+  /** The latest preview of the part being said: how much of it was heard, and what. */
+  const preview = useRef<{ samples: number; heard: string[] } | null>(null);
   /** The previous part and where in the text it started: context for a second listen. */
   const prev = useRef<{ audio: Float32Array; from: number } | null>(null);
 
@@ -328,6 +330,7 @@ export function ReciteCheck({
     pointer.current = 0;
     carry.current = null;
     prev.current = null;
+    preview.current = null;
     seen.current = new Set();
     hearing.current = null;
     startAt.current = null;
@@ -606,8 +609,13 @@ export function ReciteCheck({
       const audio = carry.current ? concat([carry.current, part]) : part;
       carry.current = null;
       const from = pointer.current;
+      // A preview already heard all of it (all but the pause at its end): no need to check it again.
+      const p = preview.current;
+      preview.current = null;
+      const heardAll = !!p && p.samples <= audio.length && p.samples >= audio.length - PAUSE_S * RATE;
       try {
-        const heard = await check(audio);
+        if (heardAll) recorder.current?.add("preview-was-enough");
+        const heard = heardAll ? p.heard : await check(audio);
         let r = align(expected, heard, from);
         debug("part", heard, r);
         remember(r, heard.length, false);
@@ -644,7 +652,9 @@ export function ReciteCheck({
     busy.current++;
     chain.current = chain.current.then(async () => {
       try {
-        const heard = await check(carry.current ? concat([carry.current, audio]) : audio);
+        const input = carry.current ? concat([carry.current, audio]) : audio;
+        const heard = await check(input);
+        preview.current = { samples: input.length, heard };
         const r = align(expected, heard, pointer.current);
         debug("preview", heard, r);
         remember(r, heard.length, true);

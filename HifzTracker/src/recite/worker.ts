@@ -6,6 +6,7 @@
  * download once and are kept in the browser's cache.
  */
 import { env, pipeline, type AutomaticSpeechRecognitionPipeline } from "@huggingface/transformers";
+import { skipPaddedSilence } from "./features";
 
 export const MODEL = "Sharjeelbaig/whisper-tiny-ar-quran-onnx";
 
@@ -64,6 +65,10 @@ function build(useGpu: boolean) {
       }
       post({ type: "progress", loaded, total });
     },
+  }).then((p) => {
+    // The first step skips the silence each phrase is padded with (same result, faster: features.ts).
+    skipPaddedSilence(p as AutomaticSpeechRecognitionPipeline);
+    return p;
   }) as Promise<AutomaticSpeechRecognitionPipeline>;
 }
 

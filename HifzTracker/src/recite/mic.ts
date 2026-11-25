@@ -12,7 +12,12 @@ export const RATE = 16000;
  * Pause length that ends a part (a breath between ayahs or at a pause sign), and the longest part:
  * the model handles up to 30 s, but shorter parts are checked sooner and heard more accurately.
  */
-const PAUSE_S = 0.6;
+export const PAUSE_S = 0.6;
+/**
+ * The voice stopping this long is probably a pause: the part so far is offered for a check straight
+ * away, so it may be done by the time the part ends (and needn't be checked again then).
+ */
+const STOPPING_S = 0.25;
 const MAX_PART_S = 14;
 /** How often the part so far is offered for a live preview (skipped while the model is busy). */
 const PARTIAL_EVERY_S = 0.8;
@@ -94,6 +99,8 @@ export class Mic {
   private silentSamples = 0;
   private speaking = false;
   private sincePartial = 0;
+  /** Whether the part so far was offered since the voice last stopped. */
+  private offeredAtStop = false;
   private floor = 0.01;
   private preRoll: Float32Array[] = [];
   private preRollSamples = 0;
@@ -192,10 +199,12 @@ export class Mic {
     this.part.push(frame);
     this.partSamples += frame.length;
     this.silentSamples = voice ? 0 : this.silentSamples + frame.length;
+    if (voice) this.offeredAtStop = false;
     this.sincePartial += frame.length;
 
     if (this.silentSamples >= PAUSE_S * RATE || this.partSamples >= MAX_PART_S * RATE) this.endPart();
-    else if (this.sincePartial >= PARTIAL_EVERY_S * RATE) {
+    else if (this.sincePartial >= PARTIAL_EVERY_S * RATE || (!this.offeredAtStop && this.silentSamples >= STOPPING_S * RATE)) {
+      if (this.silentSamples >= STOPPING_S * RATE) this.offeredAtStop = true;
       this.sincePartial = 0;
       this.h.onPartial(concat(this.part));
     }
@@ -210,6 +219,7 @@ export class Mic {
     this.partSamples = 0;
     this.silentSamples = 0;
     this.sincePartial = 0;
+    this.offeredAtStop = false;
     this.speaking = false;
   }
 

@@ -7,12 +7,14 @@
  *   apple         Apple's speech recognition, as on iPhone (Safari's phone mode): through Apple's servers
  *   apple-device  the same, on this computer
  *   tarteel       Tarteel's Quran model, as private mode runs it (whisper-tiny-ar-quran)
+ *   whisper       Whisper large-v3 turbo (the model Groq runs), here on this computer: no account needed
  *   groq          Whisper large-v3 turbo on Groq (needs GROQ_API_KEY)
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { BENCH, dir, fileOf, RECITATIONS } from "./common";
+import { skipPaddedSilence } from "../src/recite/features";
 import { neededAyahs } from "./pages";
 
 export type Heard = { text?: string; error?: string; seconds?: number };
@@ -70,14 +72,25 @@ function samples(mp3: string): Float32Array {
 }
 
 type Asr = (audio: Float32Array, opts: Record<string, unknown>) => Promise<{ text: string } | { text: string }[]>;
-let tarteelAsr: Promise<Asr> | null = null;
-async function tarteel(mp3: string): Promise<Heard> {
-  tarteelAsr ??= (async () => {
-    const { pipeline, env } = await import("@huggingface/transformers");
-    env.cacheDir = dir("models");
-    return (await pipeline("automatic-speech-recognition", "Sharjeelbaig/whisper-tiny-ar-quran-onnx", { dtype: "q8" })) as unknown as Asr;
-  })();
-  const asr = await tarteelAsr;
+/** Whisper models run here with transformers.js (as private mode runs Tarteel's in the browser). */
+const MODELS: Record<string, string> = {
+  tarteel: "Sharjeelbaig/whisper-tiny-ar-quran-onnx",
+  whisper: "onnx-community/whisper-large-v3-turbo",
+};
+let loaded: { id: string; asr: Promise<Asr> } | null = null;
+async function local(recognizer: string, mp3: string): Promise<Heard> {
+  if (loaded?.id !== recognizer)
+    loaded = {
+      id: recognizer,
+      asr: (async () => {
+        const { pipeline, env } = await import("@huggingface/transformers");
+        env.cacheDir = dir("models");
+        const asr = await pipeline("automatic-speech-recognition", MODELS[recognizer], { dtype: "q8" });
+        skipPaddedSilence(asr); // as the app does (src/recite/features.ts)
+        return asr as unknown as Asr;
+      })(),
+    };
+  const asr = await loaded.asr;
   const t0 = Date.now();
   const out = await asr(samples(mp3), { language: "arabic", task: "transcribe", chunk_length_s: 30, stride_length_s: 5 });
   return { text: (Array.isArray(out) ? out.map((o) => o.text).join(" ") : out.text).trim(), seconds: (Date.now() - t0) / 1000 };
@@ -116,12 +129,12 @@ async function main() {
       save();
       console.log(`  ${Math.min(k + 50, todo.length)}/${todo.length}`);
     }
-  } else if (recognizer === "tarteel" || recognizer === "groq") {
+  } else if (recognizer in MODELS || recognizer === "groq") {
     const key = process.env.GROQ_API_KEY;
     if (recognizer === "groq" && !key) throw new Error("Set GROQ_API_KEY (a free key from console.groq.com).");
     for (const [k, f] of todo.entries()) {
       const mp3 = join(audio, f + ".mp3");
-      heard[f] = recognizer === "groq" ? await groq(mp3, key!) : await tarteel(mp3);
+      heard[f] = recognizer === "groq" ? await groq(mp3, key!) : await local(recognizer, mp3);
       if (recognizer === "groq") await new Promise((r) => setTimeout(r, 3100)); // the free tier: 20 a minute
       if (k % 25 === 24) {
         save();

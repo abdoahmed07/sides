@@ -4,8 +4,9 @@
  * Three times per page: recited right (every word flagged is a false mistake), with an ayah skipped,
  * and with a look-alike ayah said in place of the right one (both should be caught).
  *
- *   tsx bench/score.ts [recognizer…]     (default: every recognizer heard so far)
- * Writes bench/.cache/report.md.
+ *   tsx bench/score.ts [recognizer…] [--pages-of=<recognizer>]
+ * (default: every recognizer heard so far; --pages-of: only the pages that recognizer has heard all of, to
+ * compare with one that's still hearing). Writes bench/.cache/report.md.
  */
 import { existsSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -120,9 +121,9 @@ function kinds(heard: HeardFile): string[] {
   return [...count].sort((a, b) => b[1].n - a[1].n).map(([k, v]) => `- ${pct(v.n, words_)} ${k}: ${v.examples.join(" · ")}`);
 }
 
-function report(recognizer: string, folder: string): { summary: string; detail: string } {
+function report(recognizer: string, folder: string, pages: number[]): { summary: string; detail: string } {
   const heard = loadHeard(recognizer, folder);
-  const scores = PAGES.map((p) => scorePage(p, heard)).filter((s): s is PageScore => !!s);
+  const scores = pages.map((p) => scorePage(p, heard)).filter((s): s is PageScore => !!s);
   const words = scores.reduce((n, s) => n + s.words, 0);
   const falseFlags = scores.reduce((n, s) => n + s.falseFlags.length, 0);
   const cleanPages = scores.filter((s) => !s.falseFlags.length && !s.notReached).length;
@@ -147,14 +148,19 @@ function report(recognizer: string, folder: string): { summary: string; detail: 
 }
 
 function main() {
-  const asked = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const asked = args.filter((a) => !a.startsWith("--"));
+  const pagesOf = args.find((a) => a.startsWith("--pages-of="))?.slice("--pages-of=".length);
   const recognizers = asked.length ? asked : existsSync(join(CACHE, "heard")) ? readdirSync(join(CACHE, "heard")) : [];
   const rows: string[] = [];
   const details: string[] = [];
   for (const r of recognizers)
     for (const folder of Object.values(RECITATIONS)) {
       if (!existsSync(join(CACHE, "heard", r, folder + ".json"))) continue;
-      const { summary, detail } = report(r, folder);
+      // Only pages the given recognizer has heard all of (and the look-alike in its place).
+      const only = pagesOf ? loadHeard(pagesOf, folder) : null;
+      const pages = only ? PAGES.filter((p) => pageAyahs(p).every((a) => only[fileOf(a)]?.text !== undefined)) : PAGES;
+      const { summary, detail } = report(r, folder, pages);
       rows.push(summary);
       details.push(detail);
     }
