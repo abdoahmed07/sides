@@ -19,6 +19,7 @@ import {
 } from "@/recite/match";
 import { concat, Mic, RATE } from "@/recite/mic";
 import { loadModel, modelIsDownloaded, transcribe, type Engine } from "@/recite/recognizer";
+import { follow, type Step } from "@/recite/follow";
 import { LAST_WORD_SURE, reveal, type Live } from "@/recite/reveal";
 import { heardWords, WebSpeech, webSpeechAvailable, type SpeechProblem } from "@/recite/webspeech";
 import { loadText } from "./AyahText";
@@ -28,6 +29,8 @@ const toArabicDigits = (n: number) =>
   String(n).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[Number(d)]);
 
 type Word = { ayah: number; text: string; last: boolean };
+/** Phone recognition: the session's words, how many of them are settled, and the words not settled yet. */
+type Hearing = { words: string[]; base: number; fresh: string[] };
 type Phase =
   | "check"
   | "intro"
@@ -148,8 +151,13 @@ export function ReciteCheck({
   const speech = useRef<WebSpeech | null>(null);
   /** Words of the current recognition session already settled (what comes after them is new). */
   const settledWords = useRef<string[]>([]);
-  /** The latest live result (the session's words, how many were settled, and the new ones), until it's settled. */
-  const pending = useRef<{ words: string[]; base: number; fresh: string[] } | null>(null);
+  /** What's being heard and isn't settled yet. */
+  const pending = useRef<Hearing | null>(null);
+  /** Where you started reciting, when it isn't where the portion starts (found from your first words). */
+  const [start, setStart] = useState<number | null>(null);
+  const startAt = useRef<number | null>(null);
+  /** Whether you've started: any word settled yet. */
+  const begun = useRef(false);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   /** Words from an ended session that may be the start of the next word ("يا" of يا أيها): checked with what comes next. */
   const waiting = useRef<string[]>([]);
@@ -219,8 +227,8 @@ export function ReciteCheck({
     () => (hintsRaw.length === words.length ? hintsRaw : words.map(() => 0)),
     [hintsRaw, words],
   );
-  /** What shows while reciting: settled words, then live ones, strictly in order. */
-  const view = useMemo(() => reveal(status, live, confirmed), [status, live, confirmed]);
+  /** What shows while reciting: settled words, then live ones, strictly in order (from where you started). */
+  const view = useMemo(() => reveal(status, live, confirmed, start ?? 0), [status, live, confirmed, start]);
 
   const reset = () => {
     pointer.current = 0;
@@ -231,6 +239,9 @@ export function ReciteCheck({
     pending.current = null;
     waiting.current = [];
     lastRest.current = [];
+    startAt.current = null;
+    begun.current = false;
+    setStart(null);
     setStatus(words.map(() => "pending"));
     setLive(null);
     setConfirmed(new Set());
@@ -311,30 +322,56 @@ export function ReciteCheck({
   };
 
   /**
+   * Takes words off the front of what's being heard (they're settled, or let go): from the words
+   * waiting from an earlier session first, then from this session's text.
+   */
+  const consume = (p: Hearing, used: number): Hearing => {
+    const fromWaiting = Math.min(used, p.fresh.length - (p.words.length - p.base));
+    waiting.current = waiting.current.slice(fromWaiting);
+    const base = p.base + used - fromWaiting;
+    settledWords.current = p.words.slice(0, base);
+    return { words: p.words, base, fresh: p.fresh.slice(used) };
+  };
+
+  /** Settles a step's words, moves on, and returns what's still being heard. */
+  const apply = (p: Hearing, step: Step): Hearing => {
+    if (step.start !== undefined) {
+      startAt.current = step.start;
+      setStart(step.start);
+    }
+    if (step.settled.length) {
+      begun.current = true;
+      setStatus((prev) => {
+        const next = prev.length === expected.length ? [...prev] : expected.map((): WordStatus => "pending");
+        for (const s of step.settled) next[s.index] = s.status;
+        return next;
+      });
+    }
+    pointer.current = Math.max(pointer.current, step.next);
+    return consume(p, step.used);
+  };
+
+  /**
    * Settles what was heard: you paused (or the phone says the words are final), so what you said last
    * counts too, and a wrong word you stopped on shows as a mistake. `end`: you've finished. Returns the
    * words that wait for what comes next (the start of a word, like "يا" of يا أيها).
    */
   const settle = (end: boolean): string[] => {
     clearTimeout(settleTimer.current);
-    const p =
+    let p =
       pending.current ??
       (waiting.current.length ? { words: settledWords.current, base: settledWords.current.length, fresh: waiting.current } : null);
     pending.current = null;
-    if (!p || !text) return [];
-    const r = align(expected, p.fresh, pointer.current, { known: known(text), stopped: end ? "end" : "pause" });
-    debug(end ? "phone: end" : "phone: settled", p.fresh, r);
-    commit(r);
-    const rest = p.fresh.slice(p.fresh.length - (r.rest ?? 0));
-    // Waiting words from this session's text come again with its next result; earlier ones are kept here.
-    const inText = Math.min(rest.length, p.words.length - p.base);
-    settledWords.current = p.words.slice(0, p.words.length - inText);
-    waiting.current = rest.slice(0, rest.length - inText);
-    const said = p.fresh.slice(0, p.fresh.length - rest.length);
+    if (!p || !text) return lastRest.current;
+    const from = pointer.current;
+    const step = follow(expected, p.fresh, from, { known: known(text), mode: end ? "end" : "pause", begun: begun.current });
+    debug(end ? "phone: end" : "phone: settled", p.fresh, { statuses: step.settled, next: step.next });
+    const said = p.fresh.slice(0, step.used);
+    p = apply(p, step);
     if (said.length) setHeardLog((l) => [...l.slice(-30), said.join(" ")]);
     setLive(null);
-    lastRest.current = rest;
-    return rest;
+    lastRest.current = p.fresh;
+    return p.fresh;
   };
 
   const onText = (transcript: string, final: boolean) => {
@@ -345,10 +382,11 @@ export function ReciteCheck({
     const done = settledWords.current;
     let base = 0;
     while (base < done.length && base < heard.length && fold(heard[base]) === fold(done[base])) base++;
-    const fresh = [...waiting.current, ...heard.slice(base)];
-    const r = align(expected, fresh, pointer.current, { known: known(text) });
-    pending.current = { words: heard, base, fresh };
-    setLive({ statuses: r.statuses, heard: fresh.length });
+    let p: Hearing = { words: heard, base, fresh: [...waiting.current, ...heard.slice(base)] };
+    const step = follow(expected, p.fresh, pointer.current, { known: known(text), mode: "live", begun: begun.current });
+    p = apply(p, step);
+    pending.current = p;
+    setLive(step.live && { statuses: step.live.statuses, heard: p.fresh.length });
     pulse();
     clearTimeout(settleTimer.current);
     if (final) settle(false);
@@ -359,7 +397,7 @@ export function ReciteCheck({
     speech.current = null;
     if (p === "interrupted") return setPhase("paused");
     setErrorMsg(t(PROBLEM[p]));
-    setPhase(pointer.current > 0 ? "paused" : "ready");
+    setPhase(begun.current || pointer.current > 0 ? "paused" : "ready");
   };
 
   // The phone's recognition has no sound level: warn when nothing has been heard for a while.
@@ -584,14 +622,39 @@ export function ReciteCheck({
     [],
   );
 
-  // Results (while reciting: what's shown so far).
+  // Keep your place in view: when it nears the bottom of the screen (or is under the pinned controls), scroll.
+  useEffect(() => {
+    if (phase !== "listening" && phase !== "paused") return;
+    const el = document.querySelector<HTMLElement>(`[data-w="${nextHidden}"]`);
+    if (!el) return;
+    const top = slot?.getBoundingClientRect().bottom ?? 0;
+    const bottom = window.innerHeight;
+    const room = bottom - top;
+    const r = el.getBoundingClientRect();
+    // Far off (you started further on): straight there. Close by: a gentle scroll.
+    if (r.top > bottom * 2 || r.bottom < top - bottom) el.scrollIntoView({ block: "center" });
+    else if (r.bottom > bottom - room * 0.3 || r.top < top) window.scrollBy({ top: r.top - (top + room * 0.3), behavior: "smooth" });
+  }, [nextHidden, phase, slot]);
+
+  // Results (while reciting: what's shown so far). A portion you were given counts whole (what you didn't
+  // get to is "not reached"); reciting freely (from the Quran tab), what counts is the stretch you recited.
+  const assigned = !!onRate;
+  const scope = useMemo((): [number, number] => {
+    if (assigned) return [0, words.length];
+    const a = start ?? 0;
+    let b = a;
+    status.forEach((s, i) => {
+      if (s !== "pending" && i >= a) b = i + 1;
+    });
+    return b > a ? [a, b] : [0, words.length];
+  }, [assigned, start, status, words.length]);
   const counted = done ? status : view.status;
   const wrong = counted.filter((s) => s === "wrong").length;
   const skipped = counted.filter((s) => s === "skipped").length;
-  const notReached = done ? status.filter((s) => s === "pending").length : 0;
+  const notReached = done ? status.slice(scope[0], scope[1]).filter((s) => s === "pending").length : 0;
   const hinted = hints.filter((h) => h > 0).length;
   const mistakes = wrong + skipped;
-  const suggestion = suggestRating(words.length, mistakes + notReached, hinted);
+  const suggestion = suggestRating(scope[1] - scope[0], mistakes + notReached, hinted);
   const chosen = rating ?? suggestion;
   const currentAyah = words[Math.min(nextHidden, words.length - 1)]?.ayah;
   const ayahNo = currentAyah === undefined ? 0 : ayahs.indexOf(currentAyah) + 1;
@@ -673,6 +736,7 @@ export function ReciteCheck({
           ayahs={ayahs}
           status={status}
           notReached={notReached}
+          scope={scope}
           hinted={hinted}
           suggestion={suggestion}
           chosen={chosen}
@@ -831,9 +895,14 @@ export function ReciteCheck({
   );
 }
 
+/** A word's state in one letter, so a page can tell whether anything on it changed. */
+const CODE: Record<WordStatus, string> = { pending: "p", correct: "c", wrong: "w", skipped: "s" };
+const STATUS: Record<string, WordStatus> = { p: "pending", c: "correct", w: "wrong", s: "skipped" };
+
 /**
- * The portion's words: hidden bars, revealed words, hints and mistakes. Kept apart and memoized:
- * long portions have hundreds of words, and redrawing them all on every result keeps a phone busy.
+ * The portion's words: hidden bars, revealed words, hints and mistakes. One block per mushaf page,
+ * redrawn only when a word on it changes, and pages off screen aren't laid out at all: even a whole
+ * Al-Baqarah (over 6,000 words) stays quick on a phone while you recite.
  */
 const RecitedText = memo(function RecitedText({
   words,
@@ -852,14 +921,79 @@ const RecitedText = memo(function RecitedText({
   started: boolean;
   onFix: (i: number) => void;
 }) {
-  useLang();
+  const lang = useLang();
+  const pages = useMemo(() => {
+    const out: [number, number][] = [];
+    words.forEach((w, i) => {
+      const last = out[out.length - 1];
+      if (last && q.pageOf[words[last[0]].ayah] === q.pageOf[w.ayah]) last[1] = i + 1;
+      else out.push([i, i + 1]);
+    });
+    return out;
+  }, [words]);
   return (
-    <p className="quran text-justify" lang="ar" dir="rtl">
-      {words.map((w, i) => {
-        const st = status[i];
+    <div className="space-y-2">
+      {pages.map(([a, b]) => (
+        <TextPage
+          key={a}
+          words={words}
+          from={a}
+          to={b}
+          states={status.slice(a, b).map((s) => CODE[s]).join("")}
+          hints={hints.slice(a, b).join(",")}
+          done={done}
+          next={next >= a && next < b ? next : -1}
+          started={started}
+          onFix={onFix}
+          lang={lang}
+        />
+      ))}
+    </div>
+  );
+});
+
+/** One mushaf page of the portion's words. */
+const TextPage = memo(function TextPage({
+  words,
+  from,
+  to,
+  states,
+  hints,
+  done,
+  next,
+  started,
+  onFix,
+}: {
+  words: Word[];
+  from: number;
+  to: number;
+  /** Each word's state, one letter per word (`CODE`). */
+  states: string;
+  /** Hint presses per word, comma-separated. */
+  hints: string;
+  done: boolean;
+  /** The word you're at, if it's on this page (else -1). */
+  next: number;
+  started: boolean;
+  onFix: (i: number) => void;
+  /** Redraws the page when the language changes (its tooltip). */
+  lang: string;
+}) {
+  const hint = hints.split(",").map(Number);
+  return (
+    <p
+      className="quran text-justify [content-visibility:auto]"
+      // Until it's drawn, a page off screen takes about the room it will.
+      style={{ containIntrinsicSize: `auto ${(to - from) * 14}px` }}
+      lang="ar"
+      dir="rtl"
+    >
+      {words.slice(from, to).map((w, k) => {
+        const i = from + k;
+        const st = STATUS[states[k]];
         const isShown = done || st !== "pending";
         const fixable = done && (st === "wrong" || st === "skipped");
-        const hintShown = !isShown && hints[i] > 0;
+        const hintShown = !isShown && hint[k] > 0;
         const cls = hintShown
           ? "text-muted"
           : st === "wrong"
@@ -880,11 +1014,12 @@ const RecitedText = memo(function RecitedText({
           <span key={i}>
             <span
               className={`transition-colors duration-500 ${cls} ${fixable ? "cursor-pointer" : ""}`}
+              data-w={i}
               data-hidden={!isShown && !hintShown ? "" : undefined}
               title={fixable ? t("Tap if you said it right") : undefined}
               onClick={fixable ? () => onFix(i) : undefined}
             >
-              {hintShown ? hintText(w.text, hints[i]) : w.text}
+              {hintShown ? hintText(w.text, hint[k]) : w.text}
             </span>
             {w.last && (
               <span className="ayah-num">
@@ -951,6 +1086,8 @@ function Summary(p: {
   words: Word[];
   ayahs: number[];
   status: WordStatus[];
+  /** The words that count: all of them, or (reciting freely) the stretch recited. */
+  scope: [number, number];
   notReached: number;
   hinted: number;
   suggestion: Rating;
@@ -962,8 +1099,9 @@ function Summary(p: {
   speed?: string;
   onAgain: () => void;
 }) {
-  const total = p.words.length;
-  const right = p.status.filter((s) => s === "correct").length;
+  const counted = p.status.slice(p.scope[0], p.scope[1]);
+  const total = counted.length;
+  const right = counted.filter((s) => s === "correct").length;
   const pct = total ? Math.round((right / total) * 100) : 0;
   const wrong = p.status.filter((s) => s === "wrong").length;
   const skipped = p.status.filter((s) => s === "skipped").length;

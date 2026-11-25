@@ -93,6 +93,10 @@ export function HelpFooter() {
         {t("Contact us")}
       </Link>
       <span aria-hidden> · </span>
+      <Link href="/guide/" className="underline-offset-2 hover:underline">
+        {t("Guide")}
+      </Link>
+      <span aria-hidden> · </span>
       <Link href="/privacy/" className="underline-offset-2 hover:underline">
         {t("Privacy")}
       </Link>

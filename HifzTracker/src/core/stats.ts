@@ -119,6 +119,70 @@ export function heatmap(logs: DayLogLike[]): Map<IsoDate, number> {
   return m;
 }
 
+/** A day log with what's needed to see what it added. */
+export type GainLog = { date: IsoDate; items: { kind: string; done: boolean; rating?: Strength | null; ayahs?: number[] }[] };
+
+export type Gains = {
+  /** New ayahs memorized. */
+  ayahs: number;
+  /** Pages that became whole. */
+  pages: number;
+  /** Revision done (sabqi and manzil pages). */
+  revised: number;
+  /** Days with something done. */
+  days: number;
+  /** Surahs finished. */
+  surahs: number[];
+  /** Juz finished. */
+  juz: number[];
+  /** Ratings given. */
+  ratings: Record<Strength, number>;
+  /** Ratings of the new portions. */
+  sabaqRatings: Record<Strength, number>;
+};
+
+/** What the days from `from` to `to` (both included) added: new ayahs, whole pages, surahs and juz finished, revision. */
+export function gains(units: MemUnit[], logs: GainLog[], q: QuranIndex, from: IsoDate, to: IsoDate): Gains {
+  const learned = (l: GainLog) => l.items.filter((i) => i.kind === "sabaq" && i.done).flatMap((i) => i.ayahs ?? []);
+  const days = logs.filter((l) => l.date >= from && l.date <= to);
+  const added = new Set(days.flatMap(learned));
+  const later = new Set(logs.filter((l) => l.date > to).flatMap(learned));
+  // Memorized at the end of `to`, and before these days.
+  const after = new Uint8Array(q.count);
+  for (const u of units) for (const a of u.ayahs) if (!later.has(a)) after[a] = 1;
+  const before = after.slice();
+  for (const a of added) before[a] = 0;
+  const whole = (m: Uint8Array, [a, b]: [number, number]) => {
+    for (let i = a; i <= b; i++) if (!m[i]) return false;
+    return true;
+  };
+  const finished = (ids: Set<number>, range: (id: number) => [number, number]) =>
+    [...ids].filter((id) => whole(after, range(id)) && !whole(before, range(id))).sort((x, y) => x - y);
+  const touched = (of: ArrayLike<number>) => new Set([...added].map((a) => of[a]));
+  const ratings = { strong: 0, okay: 0, weak: 0 };
+  const sabaqRatings = { strong: 0, okay: 0, weak: 0 };
+  let revised = 0;
+  for (const l of days)
+    for (const i of l.items) {
+      if (!i.done) continue;
+      if (i.kind === "sabqi" || i.kind === "manzil") revised++;
+      if (i.rating) {
+        ratings[i.rating]++;
+        if (i.kind === "sabaq") sabaqRatings[i.rating]++;
+      }
+    }
+  return {
+    ayahs: added.size,
+    pages: finished(touched(q.pageOf), (p) => q.pageRange(p)).length,
+    revised,
+    days: days.filter((l) => l.items.some((i) => i.done)).length,
+    surahs: finished(touched(q.surahOf), (s) => q.surahRange(s)),
+    juz: finished(touched(q.juzOf), (j) => q.juzRange(j)),
+    ratings,
+    sabaqRatings,
+  };
+}
+
 /** Compact aggregate stats for the weekly check-in (the only thing sent to the AI). */
 export function weeklySummary(
   config: PlanConfig,

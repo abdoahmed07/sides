@@ -1,13 +1,15 @@
 "use client";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { portionOrder } from "@/audio/recitation";
 import { isRtl, t, tp } from "@/i18n";
 import { useLang } from "@/i18n/react";
 import { q, updateItem } from "@/lib/app";
 import { parseTarget, readHref, type ReadTarget } from "@/lib/read";
-import { AyahText } from "./AyahText";
+import { useUnits } from "@/data/hooks";
+import { ayahWords } from "@/recite/match";
+import { AyahText, loadText } from "./AyahText";
 import { ListenPlayer } from "./Listen";
 import { ReciteCheck } from "./ReciteCheck";
 
@@ -82,6 +84,9 @@ function ReaderView({ target, from }: { target: Exclude<ReadTarget, { kind: "ind
   const [tab, setTab] = useState<Tab>("read");
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const view = useMemo(() => describe(target), [target]);
+  useEffect(() => {
+    if (target.kind !== "ayahs") saveLastRead(target);
+  }, [target]);
   // Only memorization portions get a rating (a weekly reading like Al-Kahf doesn't).
   const onRate =
     from && !from.item.startsWith("reading-")
@@ -95,7 +100,7 @@ function ReaderView({ target, from }: { target: Exclude<ReadTarget, { kind: "ind
 
   return (
     <div>
-      <div className="sticky top-0 z-20 -mx-4 border-b border-border bg-bg/95 px-4 pb-2 pt-2 backdrop-blur sm:top-[53px]">
+      <div className="sticky top-[env(safe-area-inset-top)] z-20 -mx-4 border-b border-border bg-bg/95 px-4 pb-2 pt-2 backdrop-blur sm:top-[57px]">
         <div className="flex items-center gap-1">
           <IconLink onClick={back} label={t("Back")} path={isRtl() ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6"} />
           <div className="min-w-0 flex-1 px-1">
@@ -160,11 +165,83 @@ function IconLink({ href, onClick, label, path }: { href?: string; onClick?: () 
   );
 }
 
-/** The list of surahs, the 30 juz and "go to page": the way in for anyone who wants to read. */
+const LAST_READ = "hifz:lastRead";
+const INDEX_VIEW = "hifz:quranView";
+type Place = Exclude<ReadTarget, { kind: "index" } | { kind: "ayahs" }>;
+
+function saveLastRead(target: Place) {
+  try {
+    localStorage.setItem(LAST_READ, JSON.stringify(target));
+  } catch {
+    /* not saved; fine */
+  }
+}
+
+function lastRead(): Place | null {
+  try {
+    const p = JSON.parse(localStorage.getItem(LAST_READ) ?? "null") as Place | null;
+    return p && ["page", "surah", "juz"].includes(p.kind) ? p : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A number in a ring that fills with how much of it you've memorized. */
+function Ring({ value, children }: { value: number; children: ReactNode }) {
+  const r = 16;
+  const c = 2 * Math.PI * r;
+  return (
+    <span className="relative flex h-9 w-9 shrink-0 items-center justify-center text-xs tabular-nums">
+      <svg viewBox="0 0 36 36" className="absolute inset-0 h-9 w-9 -rotate-90" aria-hidden>
+        <circle cx="18" cy="18" r={r} fill="none" stroke="var(--surface-2)" strokeWidth="3" />
+        {value > 0 && (
+          <circle cx="18" cy="18" r={r} fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeDasharray={`${Math.max(2, c * value)} ${c}`} />
+        )}
+      </svg>
+      <span className={value >= 1 ? "font-semibold text-accent" : "text-muted"}>{children}</span>
+    </span>
+  );
+}
+
+/** The list of surahs and the 30 juz (each with how much you've memorized), "go to page", and where you left off. */
 function QuranIndex() {
   const router = useRouter();
+  const units = useUnits();
   const [query, setQuery] = useState("");
   const [page, setPage] = useState("");
+  const [view, setViewState] = useState<"surahs" | "juz">(() => {
+    try {
+      return localStorage.getItem(INDEX_VIEW) === "juz" ? "juz" : "surahs";
+    } catch {
+      return "surahs";
+    }
+  });
+  const [text, setText] = useState<string[] | null>(null);
+  useEffect(() => {
+    loadText().then(setText, () => {});
+  }, []);
+  const [last] = useState(lastRead);
+  const setView = (v: "surahs" | "juz") => {
+    setViewState(v);
+    try {
+      localStorage.setItem(INDEX_VIEW, v);
+    } catch {
+      /* fine */
+    }
+  };
+
+  // Share of each range you've memorized.
+  const memorized = useMemo(() => {
+    const m = new Uint8Array(q.count);
+    for (const u of units ?? []) for (const a of u.ayahs) m[a] = 1;
+    return m;
+  }, [units]);
+  const share = ([a, b]: [number, number]) => {
+    let n = 0;
+    for (let i = a; i <= b; i++) n += memorized[i];
+    return n / (b - a + 1);
+  };
+
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9ء-ي]/g, "");
   const shown = q.surahs.filter((s) => {
     if (!query.trim()) return true;
@@ -175,6 +252,7 @@ function QuranIndex() {
     const n = Number(page);
     if (Number.isInteger(n) && n >= 1 && n <= 604) router.push(readHref({ kind: "page", page: n }));
   };
+  const lastTitle = last && (last.kind === "page" ? t("Page {n}", { n: last.page }) : last.kind === "juz" ? t("Juz {n}", { n: last.juz }) : `${last.surah}. ${q.surahName(last.surah)}`);
 
   return (
     <div className="space-y-4">
@@ -183,11 +261,31 @@ function QuranIndex() {
         <p className="mt-1 text-sm text-muted">{t("Read, listen and recite any part of the Quran.")}</p>
       </header>
 
+      {last && lastTitle && (
+        <Link href={readHref(last)} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:bg-surface-2">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent" aria-hidden>
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 6.5C10.5 5 8 4.5 4 4.5v13c4 0 6.5.5 8 2 1.5-1.5 4-2 8-2v-13c-4 0-6.5.5-8 2zM12 6.5v13" />
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs text-muted">{t("Continue where you left off")}</span>
+            <span className="block truncate text-sm font-medium">{lastTitle}</span>
+          </span>
+          <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-muted rtl:rotate-180" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </Link>
+      )}
+
       <div className="flex gap-2">
         <input
           type="search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (e.target.value) setView("surahs");
+          }}
           placeholder={t("Search a surah")}
           aria-label={t("Search a surah")}
           className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-sm"
@@ -213,30 +311,31 @@ function QuranIndex() {
         </form>
       </div>
 
-      {!query && (
-        <section>
-          <h2 className="mb-2 text-sm font-semibold">{t("Juz")}</h2>
-          <div className="grid grid-cols-10 gap-1">
-            {range(1, 30).map((j) => (
-              <Link
-                key={j}
-                href={readHref({ kind: "juz", juz: j })}
-                className="flex aspect-square items-center justify-center rounded-lg border border-border text-xs tabular-nums hover:border-accent hover:text-accent"
-              >
-                {j}
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1" role="tablist">
+        {(
+          [
+            ["surahs", t("Surahs")],
+            ["juz", t("Juz")],
+          ] as const
+        ).map(([v, label]) => (
+          <button
+            key={v}
+            role="tab"
+            aria-selected={view === v}
+            onClick={() => setView(v)}
+            className={`rounded-lg py-1.5 text-sm font-medium transition ${view === v ? "bg-surface text-text shadow-sm" : "text-muted hover:text-text"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-      <section>
-        <h2 className="mb-2 text-sm font-semibold">{t("Surahs")}</h2>
+      {view === "surahs" ? (
         <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
           {shown.map((s) => (
             <li key={s.n}>
               <Link href={readHref({ kind: "surah", surah: s.n })} className="flex items-center gap-3 px-3 py-2.5 hover:bg-surface-2">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs tabular-nums text-muted">{s.n}</span>
+                <Ring value={share(q.surahRange(s.n))}>{s.n}</Ring>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{q.surahName(s.n)}</span>
                   <span className="block text-xs text-muted">{tp({ one: "{n} ayah", other: "{n} ayahs" }, s.ayahs)}</span>
@@ -249,7 +348,32 @@ function QuranIndex() {
           ))}
           {!shown.length && <li className="px-3 py-4 text-sm text-muted">{t("No surah found.")}</li>}
         </ul>
-      </section>
+      ) : (
+        <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
+          {range(1, 30).map((j) => {
+            const [a] = q.juzRange(j);
+            const [p1, p2] = q.juzPages(j);
+            return (
+              <li key={j}>
+                <Link href={readHref({ kind: "juz", juz: j })} className="flex items-center gap-3 px-3 py-2.5 hover:bg-surface-2">
+                  <Ring value={share(q.juzRange(j))}>{j}</Ring>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">{t("Juz {n}", { n: j })}</span>
+                    <span className="block truncate text-xs text-muted">
+                      {q.surahName(q.surahOf[a])} {q.ayahOf[a]} · {t("pages {from}–{to}", { from: p1, to: p2 })}
+                    </span>
+                  </span>
+                  {text && (
+                    <span className="quran max-w-[42%] shrink-0 truncate leading-normal" style={{ fontSize: "1.2rem" }} lang="ar" dir="rtl">
+                      {ayahWords(text[a]).slice(0, 2).join(" ")}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

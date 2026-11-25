@@ -2,7 +2,7 @@
  * App services: glue between storage (Repo), the pure core and the UI.
  * Every multi-step write goes through repo.commit so it is atomic.
  */
-import { nextRamadanStart, weekdayOf, type IsoDate } from "@/core/dates";
+import { addDays, nextRamadanStart, weekdayOf, type IsoDate } from "@/core/dates";
 import { memorizeNew, markPrior, unmark } from "@/core/memorize";
 import type { Forecast } from "@/core/plan/engine";
 import {
@@ -14,8 +14,8 @@ import {
 import { PlanConfigSchema, readingsOf, type MemorizedSelection, type PlanConfig, type PlanPatch } from "@/core/plan/schema";
 import { buildSequence, continuation, selectionIndices, type ContinuationStep } from "@/core/plan/sequence";
 import { getQuran } from "@/core/quran";
-import { buildDay, memorizedFromUnits, unitLines } from "@/core/schedule/day";
-import { applyRating, type MemUnit, type Strength } from "@/core/srs";
+import { buildDay, memorizedFromUnits, unitLines, type DayOptions } from "@/core/schedule/day";
+import { applyRating, rateInSabqi, type MemUnit, type Strength } from "@/core/srs";
 import { pagesLabel, totals } from "@/core/stats";
 import { repo } from "@/data/dexie";
 import type { DayItem, DayLog, PlanVersion } from "@/data/types";
@@ -96,8 +96,8 @@ export async function unmarkMemorized(selections: MemorizedSelection[], today: I
 
 /* ---------------- today's plan ---------------- */
 
-function itemsFromDay(config: PlanConfig, units: MemUnit[], date: IsoDate): { items: DayItem[]; note: string | null } {
-  const day = buildDay(config, q, units, date);
+function itemsFromDay(config: PlanConfig, units: MemUnit[], date: IsoDate, opts: DayOptions = {}): { items: DayItem[]; note: string | null } {
+  const day = buildDay(config, q, units, date, opts);
   const byPage = new Map(units.map((u) => [u.page, u]));
   const items: DayItem[] = [];
   if (day.sabaq)
@@ -169,10 +169,19 @@ async function ensureDayLogInner(date: IsoDate): Promise<DayLog | null> {
     });
     planVersionId = r.planVersionId ?? plan.id;
   }
-  const { items, note } = itemsFromDay(config, units, date);
+  const { items, note } = itemsFromDay(config, units, date, { lighterSabaq: await lastSabaqWeak(date) });
   const log: DayLog = { date, planVersionId, items, note };
   await repo.putDayLog(log);
   return log;
+}
+
+/** Whether the last new portion before this day (in the last few days) was rated weak. */
+async function lastSabaqWeak(date: IsoDate): Promise<boolean> {
+  for (const k of [1, 2, 3]) {
+    const sabaq = (await repo.getDayLog(addDays(date, -k)))?.items.filter((i) => i.kind === "sabaq" && i.done) ?? [];
+    if (sabaq.length) return sabaq.some((i) => i.rating === "weak");
+  }
+  return false;
 }
 
 async function refreshTodayIfUntouched(today: IsoDate) {
@@ -209,6 +218,8 @@ function applyItem(units: MemUnit[], item: DayItem, date: IsoDate, rating: Stren
   if (rating) {
     const pages = itemPages(item);
     next = next.map((u) => (pages.includes(u.page) ? applyRating(u, rating, date, cycle) : u));
+    // In sabqi, a weak page stays a few days longer.
+    if (item.kind === "sabqi") next = next.map((u) => (u.page === item.page ? rateInSabqi(u, rating, date) : u));
   } else if (item.kind !== "sabaq") {
     next = next.map((u) => (u.page === item.page ? { ...u, lastRevised: date } : u));
   }

@@ -25,9 +25,15 @@ export type Live = { statuses: Alignment["statuses"]; heard: number };
  * @param settled the words' settled statuses (from earlier parts)
  * @param live the current live result (aligned from the first unsettled word), if any
  * @param confirmed words already heard right by an earlier check (on-device mode)
+ * @param start where you started reciting (the words before it aren't part of it)
  * @returns what to show per word, and the first word still hidden
  */
-export function reveal(settled: WordStatus[], live: Live | null, confirmed?: Set<number>): { status: WordStatus[]; next: number } {
+export function reveal(
+  settled: WordStatus[],
+  live: Live | null,
+  confirmed?: Set<number>,
+  start = 0,
+): { status: WordStatus[]; next: number } {
   const status = settled.map((s, i): WordStatus => (s === "pending" && confirmed?.has(i) ? "correct" : s));
   if (live) {
     const ok = live.statuses.map(
@@ -43,7 +49,7 @@ export function reveal(settled: WordStatus[], live: Live | null, confirmed?: Set
       if (ok[k]) rightAfter++;
     }
   }
-  let next = 0;
+  let next = Math.min(start, status.length);
   while (next < status.length && status[next] !== "pending") next++;
   for (let i = next + 1; i < status.length; i++) status[i] = "pending";
   return { status, next };

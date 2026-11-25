@@ -24,6 +24,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // Use the whole screen; the tab bar keeps clear of the iPhone's home bar (env(safe-area-inset-bottom)).
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f7f5f0" },
     { media: "(prefers-color-scheme: dark)", color: "#121614" },
@@ -43,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-full">
         <ServiceWorker />
         <LanguageStarter />
-        <div className="mx-auto flex min-h-dvh max-w-2xl flex-col px-4 pb-24 pt-4 sm:pb-8 sm:pt-20">
+        <div className="mx-auto flex min-h-dvh max-w-2xl flex-col px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-[calc(1rem+env(safe-area-inset-top))] sm:pb-8 sm:pt-20">
           <Nav />
           <main className="flex-1">
             <MovedBanner />

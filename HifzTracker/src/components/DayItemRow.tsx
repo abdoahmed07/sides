@@ -18,10 +18,13 @@ export function DayItemRow({
   onOpen,
   disabled,
   rateable = true,
+  note,
 }: {
   item: DayItem;
   title: string;
   detail: string;
+  /** What the rating does (when the page comes back), shown under it. */
+  note?: string | null;
   onToggle: (done: boolean) => void;
   onRate: (r: Strength) => void;
   onOpen: () => void;
@@ -70,6 +73,7 @@ export function DayItemRow({
           ))}
         </div>
       )}
+      {item.done && rateable && note && <p className="mt-1.5 ms-9 text-xs text-muted">{note}</p>}
     </li>
   );
 }

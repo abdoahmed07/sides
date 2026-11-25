@@ -283,6 +283,80 @@ export type AlignOptions = {
   stopped?: "pause" | "end";
 };
 
+/** How a heard word fits an expected one: its cost in an alignment, how alike they are, and whether it's right. */
+function fitOf(w: Forms, x: Heard, known: Set<string> | undefined) {
+  if (sameWord(w, x)) return { cost: 0, score: 1, ok: true };
+  const s = w.p === w.f ? similarity(w.f, x.f) : Math.max(similarity(w.f, x.f), similarity(w.p, x.f));
+  if (!known) return { cost: 1.3 * (1 - s), score: s, ok: s >= SAME };
+  // Strict: another word of the Quran is a mistake; a spelling the Quran doesn't have counts when close.
+  const ok = s >= CLOSE && !known.has(x.f) && !known.has(x.b);
+  return { cost: 1.3 * (1 - s) + (ok ? 0 : WRONG), score: s, ok };
+}
+
+/** Whether a heard word is the expected word (strictly, with `known`, as phone recognition is checked). */
+export function wordFits(expected: string, heard: string, known?: Set<string>): boolean {
+  const f = fold(heard);
+  return !!f && fitOf(forms(expected), { f, b: bare(heard) }, known).ok;
+}
+
+/** Said around a recitation rather than in it (the isti'adha, the basmala…), so it doesn't tell where you are. */
+export const isAround = (word: string) => AROUND.has(fold(word));
+
+/** Where each spelling of each word is in a text (worked out once per text). */
+const placesCache = new WeakMap<string[], Map<string, number[]>>();
+function wordPlaces(expected: string[]): Map<string, number[]> {
+  let places = placesCache.get(expected);
+  if (!places) {
+    const map = new Map<string, number[]>();
+    expected.forEach((w, i) => {
+      const x = forms(w);
+      for (const s of new Set([x.f, x.p, ...x.alts])) {
+        const l = map.get(s);
+        if (l) l.push(i);
+        else map.set(s, [i]);
+      }
+    });
+    placesCache.set(expected, map);
+    places = map;
+  }
+  return places;
+}
+
+/**
+ * Every place in the text where some heard words are said in a row (checked strictly, as phone
+ * recognition is), as the index of the first: to find where someone is who didn't go on from where
+ * they were (started further on, skipped ahead, went back).
+ */
+export function findRun(expected: string[], run: string[], known: Set<string>): number[] {
+  const h = run.filter((w) => fold(w));
+  if (h.length < 2) return [];
+  const places = wordPlaces(expected);
+  // Candidates: where the rarest of the first few words is, and where two of them are written as one
+  // (يا أهل = يَـٰٓأَهْلَ: the words after such a pair aren't where their own spelling is).
+  let best: Set<number> | null = null;
+  const pairs = new Set<number>();
+  for (let k = 0; k < Math.min(3, h.length); k++) {
+    const found = new Set<number>();
+    for (const key of [fold(h[k]), bare(h[k])]) for (const p of places.get(key) ?? []) found.add(Math.max(0, p - k));
+    if (found.size && (!best || found.size < best.size)) best = found;
+    if (k + 1 < h.length)
+      for (const key of [fold(h[k]) + fold(h[k + 1]), bare(h[k]) + bare(h[k + 1])])
+        for (const p of places.get(key) ?? []) pairs.add(Math.max(0, p - k));
+  }
+  const starts = new Set<number>();
+  for (const c of new Set([...(best ?? []), ...pairs])) {
+    const r = align(expected, h, Math.max(0, c - 1), { known });
+    let a = 0;
+    while (a < r.statuses.length && r.statuses[a].status === "skipped") a++;
+    const said = r.statuses.slice(a);
+    // All right, all of it (one word may be two written as one, or a stray word), from its first word.
+    if (!said.length || said.some((s) => s.status !== "correct")) continue;
+    if (said.length < h.length - 1 || said[said.length - 1].heard !== h.length - 1 || said[0].heard > 1) continue;
+    starts.add(said[0].index);
+  }
+  return [...starts].sort((x, y) => x - y);
+}
+
 /**
  * Aligns heard words to the expected words starting at `from` (edit-distance
  * alignment). Extra heard words (repeating yourself, "a'udhu billah") are
@@ -309,15 +383,7 @@ export function align(expected: string[], heard: string[], from: number, opts: A
   [h, at] = joinLetters(h, at, new Set(ex.slice(off).filter((w) => w.letters).map((w) => w.f)));
   const m = h.length;
 
-  /** How a heard word fits an expected one: its cost in the alignment, how alike they are, and whether it's right. */
-  const fit = (w: Forms, x: Heard) => {
-    if (sameWord(w, x)) return { cost: 0, score: 1, ok: true };
-    const s = w.p === w.f ? similarity(w.f, x.f) : Math.max(similarity(w.f, x.f), similarity(w.p, x.f));
-    if (!known) return { cost: 1.3 * (1 - s), score: s, ok: s >= SAME };
-    // Strict: another word of the Quran is a mistake; a spelling the Quran doesn't have counts when close.
-    const ok = s >= CLOSE && !known.has(x.f) && !known.has(x.b);
-    return { cost: 1.3 * (1 - s) + (ok ? 0 : WRONG), score: s, ok };
-  };
+  const fit = (w: Forms, x: Heard) => fitOf(w, x, known);
   /** Words joined or split differently: they must match as written (strict) or nearly. */
   const joinFit = (w: Forms, x: Heard) => {
     if (sameWord(w, x)) return { cost: JOIN, score: 1 };

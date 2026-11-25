@@ -272,7 +272,7 @@ export function PlanChat({
         </Card>
       ) : (
         <form
-          className="sticky bottom-20 flex gap-2 rounded-2xl border border-border bg-surface p-2 shadow-sm sm:bottom-4"
+          className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] flex gap-2 rounded-2xl border border-border bg-surface p-2 shadow-sm sm:bottom-4"
           onSubmit={(e) => {
             e.preventDefault();
             send();

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyRating, newUnit, unitStatus, EASE_MIN } from "../src/core/srs";
+import { applyRating, newUnit, rateInSabqi, unitStatus, EASE_MIN, OKAY_DAYS, SABQI_HOLD_DAYS } from "../src/core/srs";
 import { buildDay } from "../src/core/schedule/day";
 import { markPrior, memorizeNew, unmark } from "../src/core/memorize";
 import { detectMissed, recommendMissed, missedChoicePatch } from "../src/core/missed";
-import { streaks, pageStatuses } from "../src/core/stats";
+import { gains, streaks, pageStatuses } from "../src/core/stats";
 import { addDays } from "../src/core/dates";
 import { targetIndices } from "../src/core/plan/sequence";
 import { cfg, q, TODAY } from "./helpers";
@@ -18,6 +18,13 @@ describe("spaced repetition", () => {
     expect(weak.nextDue).toBe(addDays(TODAY, 1));
     expect(weak.ease).toBeLessThan(u.ease);
     expect(strong.ease).toBeGreaterThan(u.ease);
+  });
+
+  it("okay brings a page back in a few days, however long its interval was", () => {
+    let x = u;
+    for (let k = 0; k < 4; k++) x = applyRating(x, "strong", TODAY, 30);
+    expect(x.intervalDays).toBeGreaterThan(OKAY_DAYS);
+    expect(applyRating(x, "okay", TODAY, 30).nextDue).toBe(addDays(TODAY, OKAY_DAYS));
   });
 
   it("repeated strong ratings grow the interval but never past the manzil cycle", () => {
@@ -40,6 +47,45 @@ describe("spaced repetition", () => {
     expect(unitStatus(applyRating(u, "weak", TODAY, 30), TODAY)).toBe("weak");
     expect(unitStatus(u, addDays(TODAY, 5))).toBe("due");
     expect(unitStatus(applyRating(u, "strong", TODAY, 30), TODAY)).toBe("strong");
+  });
+});
+
+describe("what a rating changes", () => {
+  const c = cfg({ manzilCycleDays: 30, sabqiWindowDays: 7 });
+  // Juz 30, memorized long ago and spread over the cycle; nothing due before next week.
+  const juz30 = targetIndices({ type: "juz", juz: [30] }, q);
+  const old = markPrior([], juz30, q, addDays(TODAY, -100), 30).map((u) => ({ ...u, nextDue: addDays(TODAY, 7 + (u.page % 20)) }));
+  const tomorrow = addDays(TODAY, 1);
+  const rate = (page: number, r: "weak" | "okay" | "strong", d = TODAY) => old.map((u) => (u.page === page ? applyRating(u, r, d, 30) : u));
+
+  it("manzil: a weak page is back tomorrow and an okay one in 3 days, ahead of the rest", () => {
+    expect(buildDay(c, q, rate(590, "weak"), tomorrow).manzil[0]).toBe(590);
+    const okay = rate(590, "okay");
+    expect(buildDay(c, q, okay, tomorrow).manzil).not.toContain(590);
+    expect(buildDay(c, q, okay, addDays(TODAY, OKAY_DAYS)).manzil[0]).toBe(590);
+  });
+
+  it("manzil: pages that come back are added even when the day's slice is full", () => {
+    const weak = old.map((u) => (u.page >= 582 && u.page <= 591 ? applyRating(u, "weak", TODAY, 30) : u));
+    const day = buildDay(c, q, weak, tomorrow);
+    for (let p = 582; p <= 591; p++) expect(day.manzil).toContain(p);
+  });
+
+  it("sabqi: a weak page stays a few days longer, an okay or strong one moves on", () => {
+    const page = newUnit(600, [6200], addDays(TODAY, -6), "plan"); // its last sabqi day is today
+    const weak = rateInSabqi(applyRating(page, "weak", TODAY, 30), "weak", TODAY);
+    expect(buildDay(c, q, [weak], addDays(TODAY, SABQI_HOLD_DAYS)).sabqi).toEqual([600]);
+    expect(buildDay(c, q, [weak], addDays(TODAY, SABQI_HOLD_DAYS + 1)).sabqi).toEqual([]);
+    const strong = rateInSabqi(applyRating(page, "strong", TODAY, 30), "strong", TODAY);
+    expect(buildDay(c, q, [strong], tomorrow).sabqi).toEqual([]);
+  });
+
+  it("sabaq: after a weak new portion, the next one is lighter", () => {
+    const plan = cfg({ target: { type: "juz", juz: [29] }, direction: "backward", start: { surah: 77, ayah: 1 } });
+    const usual = buildDay(plan, q, old, tomorrow);
+    const lighter = buildDay(plan, q, old, tomorrow, { lighterSabaq: true });
+    expect(lighter.sabaq!.lines).toBeLessThan(usual.sabaq!.lines);
+    expect(lighter.sabaqNote).toMatch(/lighter/);
   });
 });
 
@@ -144,6 +190,26 @@ describe("stats", () => {
     // Missing Wed 11 breaks an earlier run
     const active2 = new Set(["2026-11-09", "2026-11-10", "2026-11-12"]);
     expect(streaks(c, active2, "2026-11-13")).toEqual({ current: 1, longest: 2 });
+  });
+
+  it("counts what a day added: ayahs, whole pages, surahs finished and revision", () => {
+    const [a113, b114] = [q.surahRange(113)[0], q.surahRange(114)[1]];
+    const before = markPrior([], Array.from({ length: b114 - a113 + 1 }, (_, k) => a113 + k), q, addDays(TODAY, -30), 30);
+    const [a, b] = q.surahRange(112); // Al-Ikhlas finishes page 604 (with 113 and 114 known already)
+    const ikhlas = Array.from({ length: b - a + 1 }, (_, k) => a + k);
+    const units = memorizeNew(before, ikhlas, q, TODAY);
+    const log = {
+      date: TODAY,
+      items: [
+        { kind: "sabaq", done: true, rating: "strong" as const, ayahs: ikhlas },
+        { kind: "manzil", done: true, rating: "weak" as const },
+        { kind: "manzil", done: false },
+      ],
+    };
+    const g = gains(units, [log], q, TODAY, TODAY);
+    expect(g).toMatchObject({ ayahs: 4, pages: 1, revised: 1, days: 1, surahs: [112], ratings: { strong: 1, okay: 0, weak: 1 } });
+    // The day before, nothing yet.
+    expect(gains(units, [log], q, addDays(TODAY, -1), addDays(TODAY, -1)).ayahs).toBe(0);
   });
 
   it("colours pages by status", () => {

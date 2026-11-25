@@ -176,9 +176,17 @@ export function Guide() {
       <Section id="rate" title={t("How to rate a page")}>
         <dl className="space-y-3">
           <Term word={t("Strong")} text={t("No mistakes, or one tiny slip you corrected yourself. The page comes back later each time.")} />
-          <Term word={t("Okay")} text={t("A few hesitations or small mistakes, but you got through. The page comes back a little later.")} />
+          <Term word={t("Okay")} text={t("A few hesitations or small mistakes, but you got through. The page comes back in 3 days.")} />
           <Term word={t("Weak")} text={t("You had to look, got stuck, or made several mistakes. The page comes back tomorrow.")} />
         </dl>
+        <p>{t("What a rating changes:")}</p>
+        <Bullets
+          items={[
+            t("**Manzil:** the page comes back when the rating says, ahead of the rest."),
+            t("**Sabqi:** a weak page stays in sabqi 3 more days before it moves on to manzil."),
+            t("**Sabaq:** if a new portion felt weak, the next one is lighter, so you can make it solid first."),
+          ]}
+        />
         <p className="text-muted">
           {t(
             "Be honest. If you rate Strong after only reading a page, the app spaces it out too far and it slips without you noticing. Even Strong pages come back at least once per manzil cycle.",

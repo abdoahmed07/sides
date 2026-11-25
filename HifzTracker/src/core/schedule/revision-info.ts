@@ -5,9 +5,8 @@
  */
 import { addDays, diffDays, type IsoDate } from "../dates";
 import type { PlanConfig } from "../plan/schema";
-import type { QuranIndex } from "../quran";
 import type { MemUnit } from "../srs";
-import { unitLines } from "./day";
+import { comesBack, inSabqi } from "./day";
 
 export type SabqiDay = {
   /** 1 = the day after it was memorized. */
@@ -16,12 +15,17 @@ export type SabqiDay = {
   of: number;
   /** First day it is part of manzil instead. */
   manzilFrom: IsoDate;
+  /** Kept in sabqi past its usual days, after a weak rating. */
+  kept: boolean;
 };
 
 /** Where a page is in its sabqi days (it shows on days 1 … window−1 after it was memorized). */
 export function sabqiDay(u: MemUnit, windowDays: number, today: IsoDate): SabqiDay {
   const of = Math.max(1, windowDays - 1);
-  return { day: Math.min(of, Math.max(1, diffDays(u.lastAdded, today))), of, manzilFrom: addDays(u.lastAdded, windowDays) };
+  const usual = addDays(u.lastAdded, windowDays);
+  const kept = !!u.holdUntil && u.holdUntil >= today && today >= usual;
+  const manzilFrom = u.holdUntil && u.holdUntil >= usual ? addDays(u.holdUntil, 1) : usual;
+  return { day: Math.min(of, Math.max(1, diffDays(u.lastAdded, today))), of, manzilFrom, kept };
 }
 
 export type ManzilRound = {
@@ -33,15 +37,12 @@ export type ManzilRound = {
   revised: { page: number; date: IsoDate }[];
   /** Not revised in that time, in the order they will come up. */
   coming: number[];
-  /** Roughly how many pages a day manzil gives (0 when there is no manzil yet). */
-  pagesPerDay: number;
 };
 
 const strengthOrder = (u: MemUnit) => (u.strength === "weak" ? 0 : u.strength === "okay" ? 1 : u.strength === null ? 2 : 3);
 
-export function manzilRound(config: PlanConfig, units: MemUnit[], q: QuranIndex, today: IsoDate): ManzilRound {
-  const windowStart = addDays(today, -config.sabqiWindowDays);
-  const pool = units.filter((u) => u.lastAdded < today && !(u.lastAdded > windowStart));
+export function manzilRound(config: PlanConfig, units: MemUnit[], today: IsoDate): ManzilRound {
+  const pool = units.filter((u) => u.lastAdded < today && !inSabqi(u, today, config.sabqiWindowDays));
   const cycleDays = config.manzilCycleDays;
   const recent = (u: MemUnit) => u.lastRevised !== null && diffDays(u.lastRevised, today) < cycleDays;
 
@@ -51,10 +52,14 @@ export function manzilRound(config: PlanConfig, units: MemUnit[], q: QuranIndex,
     .sort((a, b) => b.date.localeCompare(a.date) || a.page - b.page);
   const coming = pool
     .filter((u) => !recent(u))
-    .sort((a, b) => a.nextDue.localeCompare(b.nextDue) || strengthOrder(a) - strengthOrder(b) || a.page - b.page)
+    .sort(
+      (a, b) =>
+        Number(comesBack(b, today)) - Number(comesBack(a, today)) ||
+        a.nextDue.localeCompare(b.nextDue) ||
+        strengthOrder(a) - strengthOrder(b) ||
+        a.page - b.page,
+    )
     .map((u) => u.page);
 
-  const lines = pool.reduce((s, u) => s + unitLines(u, q), 0);
-  const pagesPerDay = lines ? Math.max(0.5, Math.round((lines / cycleDays / 15) * 2) / 2) : 0;
-  return { cycleDays, total: pool.length, revised, coming, pagesPerDay };
+  return { cycleDays, total: pool.length, revised, coming };
 }

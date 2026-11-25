@@ -2,22 +2,24 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { addDays, formatDate } from "@/core/dates";
+import { addDays, diffDays, formatDate } from "@/core/dates";
 import { useDayLog, useDayLogs, useMeta, usePlan, useToday, useUnits } from "@/data/hooks";
 import { ensureDayLog, extraOptions, forecastFor, q, recordExtra, updateItem } from "@/lib/app";
-import { AI_ENABLED, AI_NEEDS_SIGN_IN } from "@/lib/ai-client";
+import { AI_ENABLED } from "@/lib/ai-client";
 import type { DayItem } from "@/data/types";
 import { Button, Card, Notice, PageTitle } from "@/components/ui";
 import { DayItemRow } from "@/components/DayItemRow";
 import { Sheet } from "@/components/AyahText";
 import { readHref } from "@/lib/read";
 import { MissedDays } from "@/components/MissedDays";
-import { SignInNudge, useSyncStatus } from "@/components/Account";
-import { activeDatesOf, streaks } from "@/core/stats";
+import { SignInNudge } from "@/components/Account";
+import { activeDatesOf, gains, streaks, totals, type Gains } from "@/core/stats";
 import { t, tp, tx } from "@/i18n";
 import { useLang } from "@/i18n/react";
 import { Rich } from "@/components/Language";
 import { manzilRound, sabqiDay, type ManzilRound } from "@/core/schedule/revision-info";
+import { ayahOfDay } from "@/lib/encourage";
+import { loadText } from "@/components/AyahText";
 
 /** Rough reading speed for weekly readings (looking at the mushaf). */
 const READING_MINUTES_PER_PAGE = 2;
@@ -25,11 +27,10 @@ const READING_MINUTES_PER_PAGE = 2;
 export default function TodayPage() {
   const today = useToday();
   const plan = usePlan();
-  const sync = useSyncStatus();
   const log = useDayLog(today);
   const units = useUnits();
   const logs = useDayLogs();
-  const lastCheckin = useMeta<string>("lastCheckin");
+  const weekSeen = useMeta<string>("weekSeen");
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [extraOpen, setExtraOpen] = useState(false);
@@ -43,7 +44,10 @@ export default function TodayPage() {
   const forecast = useMemo(() => (plan && units ? forecastFor(plan.config, units, today) : null), [plan, units, today]);
   const streak = useMemo(() => (logs ? streaks(plan?.config ?? null, activeDatesOf(logs), today) : null), [logs, plan, today]);
 
-  const round = useMemo(() => (plan && units ? manzilRound(plan.config, units, q, today) : null), [plan, units, today]);
+  const round = useMemo(() => (plan && units ? manzilRound(plan.config, units, today) : null), [plan, units, today]);
+  // What today added, for the card when the day is done.
+  const todayGains = useMemo(() => (units && logs ? gains(units, logs, q, today, today) : null), [units, logs, today]);
+  const total = useMemo(() => (units ? totals(units, q) : null), [units]);
   const extra = useMemo(() => (plan && units && log ? extraOptions(plan.config, units, log) : []), [plan, units, log]);
 
   if (plan === undefined) return null;
@@ -80,9 +84,27 @@ export default function TodayPage() {
     let detail = `${t("Page {n}", { n: i.page! })} · ${lines}`;
     if (i.kind === "sabqi" && u) {
       const d = sabqiDay(u, config.sabqiWindowDays, today);
-      detail += " · " + (d.day >= d.of ? t("last day in sabqi") : t("day {day} of {of}", { day: d.day, of: d.of }));
+      detail +=
+        " · " +
+        (d.kept ? t("kept a few days longer") : d.day >= d.of ? t("last day in sabqi") : t("day {day} of {of}", { day: d.day, of: d.of }));
     }
     return { title: u ? q.rangeLabel(u.ayahs) : t("Page {n}", { n: i.page! }), detail };
+  };
+  /** What a rating does, said under it: when the page comes back, or what changes tomorrow. */
+  const ratingNote = (i: DayItem): string | null => {
+    if (!i.done || !i.rating) return null;
+    if (i.kind === "sabaq") return i.rating === "weak" ? t("Your next new portion will be lighter, so you can make this one solid.") : null;
+    const u = unitByPage.get(i.page!);
+    if (!u) return null;
+    if (i.kind === "sabqi") {
+      const left = u.holdUntil ? diffDays(today, u.holdUntil) : 0;
+      return i.rating === "weak" && left > 0 ? tp({ one: "It stays in sabqi {n} more day.", other: "It stays in sabqi {n} more days." }, left) : null;
+    }
+    const days = diffDays(today, u.nextDue);
+    if (days <= 1) return t("It comes back tomorrow.");
+    return i.rating === "strong"
+      ? tp({ one: "Next time in {n} day.", other: "Next time in about {n} days." }, days)
+      : tp({ one: "It comes back in {n} day.", other: "It comes back in {n} days." }, days);
   };
   /** Opens the portion in the Quran reader (Read, Listen, Recite); Recite can save it as done here. */
   const openItem = (i: DayItem) => {
@@ -138,6 +160,7 @@ export default function TodayPage() {
                     item={i}
                     title={d.title}
                     detail={d.detail}
+                    note={ratingNote(i)}
                     disabled={busy}
                     rateable={i.kind !== "reading"}
                     onToggle={(done) => act(() => updateItem(today, i.id, { done }))}
@@ -162,7 +185,8 @@ export default function TodayPage() {
     );
   };
 
-  const checkinDue = AI_ENABLED && (!AI_NEEDS_SIGN_IN || sync.email !== null) && plan && today >= addDays(lastCheckin ?? plan.createdAt.slice(0, 10), 7);
+  const checkinDue = weekSeen !== undefined && today >= addDays(weekSeen ?? plan.createdAt.slice(0, 10), 7);
+  const allDone = items.length > 0 && doneCount === items.length;
 
   return (
     <div className="space-y-4">
@@ -181,15 +205,26 @@ export default function TodayPage() {
         }
       />
 
+      {items.length > 0 && (
+        <div className="-mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-label={t("Done today")} aria-valuemin={0} aria-valuemax={items.length} aria-valuenow={doneCount}>
+          <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${Math.round((doneCount / items.length) * 100)}%` }} />
+        </div>
+      )}
+
       <MissedDays config={config} logs={logs ?? []} units={units ?? []} today={today} />
 
       {(logs?.length ?? 0) >= 2 && <SignInNudge />}
 
+
+      {allDone && todayGains && total && (
+        <DayDone gains={todayGains} streak={streak?.current ?? 0} today={today} ayahs={total.ayahs} pages={total.fullPages} />
+      )}
+
       {checkinDue && (
         <Notice>
-          {t("Your weekly check-in is ready.")}{" "}
+          {t("Your week in review is ready: what you learned and revised.")}{" "}
           <Link href="/checkin/" className="font-medium text-accent underline underline-offset-2">
-            {t("Review the week")}
+            {t("See your week")}
           </Link>
         </Notice>
       )}
@@ -342,10 +377,7 @@ function ManzilProgress({ round, onOpen }: { round: ManzilRound; onOpen: () => v
       </span>
       <span className="mt-1.5 block text-xs text-muted">
         {round.coming.length
-          ? t("{n} still to come, about {pace} a day.", {
-              n: round.coming.length,
-              pace: round.pagesPerDay === 0.5 ? t("half a page") : tp({ one: "{n} page", other: "{n} pages" }, round.pagesPerDay),
-            })
+          ? tp({ one: "{n} page still to come in this round.", other: "{n} pages still to come in this round." }, round.coming.length)
           : t("Every manzil page has been revised in this time.")}
       </span>
     </button>
@@ -375,7 +407,7 @@ function ManzilDetails({
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted">
-        {t("Manzil brings every older page round about once every {days}, a few pages a day. Weak and overdue pages come first.", {
+        {t("Manzil brings every older page round at least once every {days}. A page you rate weak comes back the next day, and one you rate okay after 3 days; overdue pages come first.", {
           days: tp({ one: "{n} day", other: "{n} days" }, round.cycleDays),
         })}
       </p>
@@ -396,5 +428,69 @@ function ManzilDetails({
         )}
       </section>
     </div>
+  );
+}
+
+const arabicDigits = (n: number) => String(n).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[Number(d)]);
+
+/** When everything today is done: what the day added, and an ayah to end on. */
+function DayDone({ gains: g, streak, today, ayahs, pages }: { gains: Gains; streak: number; today: string; ayahs: number; pages: number }) {
+  const [text, setText] = useState<string[] | null>(null);
+  useEffect(() => {
+    loadText().then(setText, () => {});
+  }, []);
+  const a = ayahOfDay(today);
+  const meaning = t(a.meaning);
+  // A round number passed today: every 100 ayahs, every 10 whole pages.
+  const passed = (now: number, added: number, step: number) => (Math.floor(now / step) > Math.floor((now - added) / step) ? Math.floor(now / step) * step : 0);
+  const ayahMark = passed(ayahs, g.ayahs, 100);
+  const pageMark = passed(pages, g.pages, 10);
+  const parts = [
+    g.ayahs > 0 && tp({ one: "+{n} ayah", other: "+{n} ayahs" }, g.ayahs),
+    g.pages > 0 && tp({ one: "+{n} whole page", other: "+{n} whole pages" }, g.pages),
+    g.revised > 0 && tp({ one: "{n} page revised", other: "{n} pages revised" }, g.revised),
+  ].filter(Boolean);
+  return (
+    <section className="space-y-3 rounded-2xl bg-accent-soft p-4">
+      <div className="flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-text" aria-hidden>
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12l5 5L20 7" />
+          </svg>
+        </span>
+        <div className="min-w-0">
+          <p className="font-semibold">{t("Today is done. Masha'Allah!")}</p>
+          {(parts.length > 0 || streak > 1) && (
+            <p className="text-sm text-muted">
+              {[...parts, streak > 1 && tp({ one: "{n} day in a row", other: "{n} days in a row" }, streak)].filter(Boolean).join(" · ")}
+            </p>
+          )}
+          {g.surahs.map((n) => (
+            <p key={`s${n}`} className="mt-1 text-sm font-medium text-accent">
+              {t("You finished Surah {name}!", { name: q.surahName(n) })}
+            </p>
+          ))}
+          {g.juz.map((n) => (
+            <p key={`j${n}`} className="mt-1 text-sm font-medium text-accent">
+              {t("You finished Juz {n}!", { n })}
+            </p>
+          ))}
+          {pageMark > 0 && (
+            <p className="mt-1 text-sm font-medium text-accent">{tp({ one: "You've reached {n} whole page!", other: "You've reached {n} whole pages!" }, pageMark)}</p>
+          )}
+          {ayahMark > 0 && <p className="mt-1 text-sm font-medium text-accent">{tp({ one: "You've reached {n} ayah!", other: "You've reached {n} ayahs!" }, ayahMark)}</p>}
+        </div>
+      </div>
+      {text && (
+        <figure className="border-t border-accent/20 pt-3 text-center">
+          <p className="quran leading-loose" style={{ fontSize: "1.3rem" }} lang="ar" dir="rtl">
+            {text[q.indexOf(a.surah, a.ayah)]} <span className="ayah-num">﴿{arabicDigits(a.ayah)}﴾</span>
+          </p>
+          <figcaption className="mt-1 text-xs text-muted">
+            {meaning && <>{meaning} </>}({q.surahName(a.surah)} {a.ayah})
+          </figcaption>
+        </figure>
+      )}
+    </section>
   );
 }

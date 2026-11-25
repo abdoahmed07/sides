@@ -62,6 +62,7 @@ const MemUnitSchema = z.object({
   ease: z.number(),
   nextDue: z.string(),
   origin: z.enum(["plan", "prior"]),
+  holdUntil: z.string().nullable().optional(),
 });
 export const BackupSchema = z.object({
   app: z.literal("hifz-tracker"),

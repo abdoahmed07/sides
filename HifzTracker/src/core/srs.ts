@@ -4,9 +4,11 @@
  * Each memorized page is one revision unit. After every revision you rate it:
  *   - Strong: the interval grows by the page's ease (≈ ×2.3 at first) and the
  *             ease rises a little, so strong pages come back less often.
- *   - Okay:   the interval grows gently (×1.3); ease drops slightly.
+ *   - Okay:   the page comes back in OKAY_DAYS days (it needs another look
+ *             soon); ease drops slightly.
  *   - Weak:   the interval resets to 1 day and the ease drops, so the page
  *             comes back tomorrow and grows more slowly afterwards.
+ * A page rated weak in sabqi also stays in sabqi a few days longer (holdUntil).
  *
  * Intervals are capped at the manzil cycle length, which guarantees every
  * memorized page is revised at least once per cycle no matter how strong it is.
@@ -29,9 +31,15 @@ export type MemUnit = {
   ease: number;
   nextDue: IsoDate;
   origin: "plan" | "prior";
+  /** Kept in sabqi until this day (rated weak there), even after its sabqi days are over. */
+  holdUntil?: IsoDate | null;
 };
 
 export const EASE_START = 2.3;
+/** A page rated okay comes back after this many days. */
+export const OKAY_DAYS = 3;
+/** A page rated weak in sabqi stays there this many more days. */
+export const SABQI_HOLD_DAYS = 3;
 export const EASE_MIN = 1.3;
 export const EASE_MAX = 3.0;
 
@@ -68,7 +76,7 @@ export function applyRating(unit: MemUnit, rating: Strength, date: IsoDate, cycl
       ease = Math.min(EASE_MAX, ease + 0.1);
       break;
     case "okay":
-      intervalDays = Math.max(1, Math.round(intervalDays * 1.3));
+      intervalDays = OKAY_DAYS;
       ease = Math.max(EASE_MIN, ease - 0.05);
       break;
     case "weak":
@@ -78,6 +86,11 @@ export function applyRating(unit: MemUnit, rating: Strength, date: IsoDate, cycl
   }
   intervalDays = Math.min(intervalDays, cycleDays);
   return { ...unit, intervalDays, ease: round2(ease), strength: rating, lastRevised: date, nextDue: addDays(date, intervalDays) };
+}
+
+/** A sabqi rating: weak keeps the page in sabqi a few more days; okay or strong lets it move on as usual. */
+export function rateInSabqi(unit: MemUnit, rating: Strength, date: IsoDate): MemUnit {
+  return { ...unit, holdUntil: rating === "weak" ? addDays(date, SABQI_HOLD_DAYS) : null };
 }
 
 /** Adds newly memorized ayahs to a page's unit (or creates it). */

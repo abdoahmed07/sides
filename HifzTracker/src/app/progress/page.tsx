@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { addDays, diffDays, formatDate, weekdayOf, WEEKDAYS } from "@/core/dates";
-import { activeDatesOf, heatmap, juzProgress, pageStatuses, streaks, surahProgress, totals, type PageStatus } from "@/core/stats";
+import { activeDatesOf, gains, heatmap, juzProgress, pageStatuses, streaks, surahProgress, totals, type PageStatus } from "@/core/stats";
 import { useDayLogs, usePlan, useToday, useUnits } from "@/data/hooks";
 import { forecastFor, q } from "@/lib/app";
 import { memorizeDaysFor } from "@/core/plan/preview";
@@ -12,6 +12,7 @@ import { Rich } from "@/components/Language";
 import { Card, PageTitle } from "@/components/ui";
 import { readHref } from "@/lib/read";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type MapStatus = PageStatus | "ahead";
 
@@ -51,6 +52,8 @@ export default function ProgressPage() {
       streak: streaks(plan?.config ?? null, activeDatesOf(logs), today),
       heat: heatmap(logs),
       forecast: plan ? forecastFor(plan.config, units, today) : null,
+      today: gains(units, logs, q, today, today),
+      week: gains(units, logs, q, addDays(today, -6), today),
     };
   }, [units, logs, plan, today]);
 
@@ -90,9 +93,10 @@ export default function ProgressPage() {
         <Tile
           label={t("Pages memorized")}
           value={`${data.totals.fullPages}`}
+          gain={data.today.pages}
           sub={data.totals.partialPages ? t("of 604 · +part of {n}", { n: data.totals.partialPages }) : t("of 604")}
         />
-        <Tile label={t("Ayahs")} value={`${data.totals.ayahs}`} sub={t("of 6236")} />
+        <Tile label={t("Ayahs")} value={`${data.totals.ayahs}`} gain={data.today.ayahs} sub={t("of 6236")} />
         <Tile label={t("Streak")} value={`${data.streak.current}`} sub={t("longest {n}", { n: data.streak.longest })} />
         <Tile
           label={t("Estimated finish")}
@@ -100,6 +104,25 @@ export default function ProgressPage() {
           sub={data.forecast?.completionDate ? data.forecast.completionDate.slice(0, 4) : t("target")}
         />
       </div>
+
+      {(data.week.ayahs > 0 || data.week.revised > 0) && (
+        <Link href="/checkin/" className="block rounded-2xl border border-border bg-surface p-4 hover:bg-surface-2">
+          <span className="flex items-baseline justify-between gap-3">
+            <span className="font-semibold">{t("This week")}</span>
+            <span className="text-xs font-medium text-accent">{t("See your week")}</span>
+          </span>
+          <span className="mt-1 block text-sm text-muted">
+            {[
+              data.week.ayahs > 0 && tp({ one: "+{n} ayah", other: "+{n} ayahs" }, data.week.ayahs),
+              data.week.pages > 0 && tp({ one: "+{n} whole page", other: "+{n} whole pages" }, data.week.pages),
+              data.week.revised > 0 && tp({ one: "{n} page revised", other: "{n} pages revised" }, data.week.revised),
+              tp({ one: "{n} day", other: "{n} days" }, data.week.days),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+        </Link>
+      )}
 
       <Card>
         <h2 className="mb-1 font-semibold">{t("Mushaf map")}</h2>
@@ -125,7 +148,7 @@ export default function ProgressPage() {
           ))}
         </div>
         {look && (
-          <div className="sticky bottom-24 z-10 mt-3 rounded-xl border border-border bg-surface-2 p-3 shadow-lg sm:bottom-4">
+          <div className="sticky bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-10 mt-3 rounded-xl border border-border bg-surface-2 p-3 shadow-lg sm:bottom-4">
             <div className="flex items-baseline justify-between gap-3 text-sm">
               <label htmlFor="look-ahead" className="font-medium">
                 {t("Look ahead")}
@@ -213,11 +236,14 @@ export default function ProgressPage() {
   );
 }
 
-function Tile({ label, value, sub }: { label: string; value: string; sub: string }) {
+function Tile({ label, value, sub, gain = 0 }: { label: string; value: string; sub: string; gain?: number }) {
   return (
     <Card className="p-3">
       <p className="text-xs text-muted">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
+      <p className="mt-1 flex items-baseline gap-1.5">
+        <span className="text-xl font-semibold tabular-nums">{value}</span>
+        {gain > 0 && <span className="text-sm font-medium text-accent tabular-nums">{t("+{n} today", { n: gain })}</span>}
+      </p>
       <p className="text-xs text-muted">{sub}</p>
     </Card>
   );

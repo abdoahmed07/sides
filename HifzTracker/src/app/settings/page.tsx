@@ -38,7 +38,7 @@ function applyTheme(t: Theme) {
 }
 
 const THEMES: { value: Theme; label: string }[] = [
-  { value: "system", label: tx("Same as phone") },
+  { value: "system", label: tx("Same as device") },
   { value: "light", label: tx("Light") },
   { value: "dark", label: tx("Dark") },
 ];
@@ -143,12 +143,18 @@ export default function SettingsPage() {
               <Button>{t("Change it with the assistant")}</Button>
             </Link>
           )}
-          {plan && AI_ENABLED && (
+          {plan && (
             <Link href="/checkin/">
-              <Button variant="ghost">{t("Weekly check-in")}</Button>
+              <Button variant="ghost">{t("Your week")}</Button>
             </Link>
           )}
         </div>
+      </Section>
+
+      <Section title={tx("Guide")} hint={tx("How the app works: sabaq, sabqi and manzil, how to memorize and revise, and what each rating does.")}>
+        <Link href="/guide/">
+          <Button>{t("Open the guide")}</Button>
+        </Link>
       </Section>
 
       <Section title={tx("Language and appearance")}>
@@ -175,7 +181,7 @@ export default function SettingsPage() {
           ) : (
             <Rich
               text={t(
-                "Saved **only in this browser**. If you clear your browser data or lose this phone, it's gone. [Make an account](#account) to keep it safe, or download a copy now and then.",
+                "Saved **only in this browser**. If you clear your browser data or lose this device, it's gone. [Make an account](#account) to keep it safe, or download a copy now and then.",
               )}
             />
           )}

@@ -12,19 +12,9 @@ const sv: Dict = {
     "Att chatta med assistenten fungerar när du kör appen på din dator. Här kan du [ändra planen själv](/plan/).",
   "No plan yet.": "Ingen plan än.",
   "Weekly check-in": "Veckoavstämning",
-  "A look at the last 7 days, with up to 3 suggestions you can take or leave.":
-    "En titt på de senaste 7 dagarna, med upp till 3 förslag som du kan ta eller låta bli.",
   "This week": "Den här veckan",
-  "Active days": "Aktiva dagar",
-  "Items done": "Klara uppgifter",
   Streak: "Svit",
-  "Strong / okay / weak": "Stark / okej / svag",
-  "Overdue pages": "Försenade sidor",
-  "Weak pages": "Svaga sidor",
-  "Check-in suggestions come from the AI, which works when the app runs locally. You can always [adjust the plan by hand](/plan/).":
-    "Förslagen i veckoavstämningen kommer från AI:n, som fungerar när appen körs lokalt. Du kan alltid [ändra planen själv](/plan/).",
   "Asking…": "Frågar…",
-  "Get suggestions": "Få förslag",
   "No changes suggested. Keep going.": "Inga ändringar föreslås. Fortsätt så.",
   Accepted: "Godkänd",
   Dismissed: "Avfärdad",
@@ -53,8 +43,6 @@ const sv: Dict = {
   Today: "Idag",
   "about {n} min": "ungefär {n} min",
   "{done}/{total} done": "{done}/{total} klart",
-  "Your weekly check-in is ready.": "Din veckoavstämning är klar.",
-  "Review the week": "Gå igenom veckan",
   Sabaq: "Sabaq",
   New: "Nytt",
   "Memorize this, then recite it from memory before you tick it.":
@@ -87,9 +75,6 @@ const sv: Dict = {
   "AI planning is available when you run the app on your computer. Everything else works here. You can also import a backup in Settings.":
     "AI-planering finns när du kör appen på din dator. Allt annat fungerar här. Du kan också importera en säkerhetskopia under Inställningar.",
   Details: "Detaljer",
-  "{n} still to come, about {pace} a day.":
-    "{n} kvar, ungefär {pace} om dagen.",
-  "half a page": "en halv sida",
   "Every manzil page has been revised in this time.":
     "Alla manzil-sidor har repeterats under den här tiden.",
   today: "idag",
@@ -176,7 +161,6 @@ const sv: Dict = {
     one: "**{n} sida** memorerad (+{more}) om du följer planen.",
     other: "**{n} sidor** memorerade (+{more}) om du följer planen.",
   },
-  "Same as phone": "Samma som telefonen",
   Light: "Ljust",
   Dark: "Mörkt",
   "This file isn't a Hifz Tracker backup.":
@@ -205,8 +189,8 @@ const sv: Dict = {
   "Your data": "Dina data",
   "✓ Saved on this device **and in your account**, so you can use it on other devices too.":
     "✓ Sparat på den här enheten **och i ditt konto**, så du kan använda det på andra enheter också.",
-  "Saved **only in this browser**. If you clear your browser data or lose this phone, it's gone. [Make an account](#account) to keep it safe, or download a copy now and then.":
-    "Sparat **bara i den här webbläsaren**. Rensar du webbläsardata eller tappar bort telefonen är det borta. [Skapa ett konto](#account) för att hålla det säkert, eller ladda ner en kopia då och då.",
+  "Saved **only in this browser**. If you clear your browser data or lose this device, it's gone. [Make an account](#account) to keep it safe, or download a copy now and then.":
+    "Sparat **bara i den här webbläsaren**. Rensar du webbläsardata eller tappar bort enheten är det borta. [Skapa ett konto](#account) för att hålla det säkert, eller ladda ner en kopia då och då.",
   "Download a copy": "Ladda ner en kopia",
   "Restore from a copy": "Återställ från en kopia",
   "What's stored where": "Vad som sparas var",
@@ -376,8 +360,6 @@ const sv: Dict = {
     "Allra bäst är att recitera för någon som kan följa med: en lärare, en vän eller någon i familjen. Finns ingen till hands, spela in dig själv och jämför inspelningen med texten.",
   "No mistakes, or one tiny slip you corrected yourself. The page comes back later each time.":
     "Inga fel, eller en liten miss som du rättade själv. Sidan kommer tillbaka senare för varje gång.",
-  "A few hesitations or small mistakes, but you got through. The page comes back a little later.":
-    "Några tvekanden eller små fel, men du tog dig igenom. Sidan kommer tillbaka lite senare.",
   "You had to look, got stuck, or made several mistakes. The page comes back tomorrow.":
     "Du var tvungen att titta, fastnade eller gjorde flera fel. Sidan kommer tillbaka i morgon.",
   "Be honest. If you rate Strong after only reading a page, the app spaces it out too far and it slips without you noticing. Even Strong pages come back at least once per manzil cycle.":
@@ -783,8 +765,6 @@ const sv: Dict = {
     one: "Manzil: den senaste {n} dagen",
     other: "Manzil: de senaste {n} dagarna",
   },
-  "Manzil brings every older page round about once every {days}, a few pages a day. Weak and overdue pages come first.":
-    "Manzil tar upp varje äldre sida ungefär en gång på {days}, några sidor om dagen. Svaga och försenade sidor kommer först.",
   "[Read the full privacy page](/privacy/)":
     "[Läs hela integritetssidan](/privacy/)",
   Privacy: "Integritet",
@@ -944,6 +924,89 @@ const sv: Dict = {
     "Läs, lyssna och recitera vilken del av Koranen som helst.",
   "Search a surah": "Sök en sura",
   "{n} ayahs": { one: "{n} vers", other: "{n} verser" },
+  "{n} more than last week": "{n} fler än förra veckan",
+  "{n} fewer than last week": "{n} färre än förra veckan",
+  "same as last week": "samma som förra veckan",
+  "Your week": "Din vecka",
+  "study days": "studiedagar",
+  "Finished this week:": "Klart den här veckan:",
+  "How revision went": "Så gick repetitionen",
+  "A page you rate weak comes back the next day, and one you rate okay after 3 days, so nothing slips.":
+    "En sida du ger betyget svag kommer tillbaka nästa dag, och en du ger betyget okej efter 3 dagar, så att inget glider undan.",
+  "A word on your week": "Några ord om din vecka",
+  "So far": "Hittills",
+  "Ask the assistant for suggestions": "Be assistenten om förslag",
+  "You didn't miss a single study day this week. Masha'Allah!": "Du missade inte en enda studiedag den här veckan. Masha'Allah!",
+  "Some days were missed. Even a few minutes keeps the streak and the pages alive.":
+    "Några dagar blev av. Även några minuter håller både sviten och sidorna levande.",
+  "You learned more than last week. Keep it up!": "Du lärde dig mer än förra veckan. Fortsätt så!",
+  "Your new portions were strong all week. If it feels easy, you could take a little more each day.":
+    "Dina nya delar var starka hela veckan. Om det känns lätt kan du ta lite mer varje dag.",
+  "Many new portions felt weak. A smaller daily portion for a while can make them stick.":
+    "Många nya delar kändes svaga. En mindre daglig del en tid kan få dem att fastna.",
+  "Quite a few pages felt weak. They come back sooner by themselves; give revision a little extra care.":
+    "En hel del sidor kändes svaga. De kommer tillbaka tidigare av sig själva; ge repetitionen lite extra omsorg.",
+  "Some revision is overdue. Today's list puts it first, so nothing slips.":
+    "En del repetition är försenad. Dagens lista tar den först, så att inget glider undan.",
+  "Steady steps. A little every day is how the Quran stays with you.": "Stadiga steg. Lite varje dag är så Koranen stannar hos dig.",
+  "No ratings this week yet. Rating each page after reciting it decides when it comes back.":
+    "Inga betyg den här veckan än. Betyget du ger varje sida när du har reciterat den avgör när den kommer tillbaka.",
+  "ayahs learned": { one: "vers inlärd", other: "verser inlärda" },
+  "whole pages": { one: "hel sida", other: "hela sidor" },
+  "pages revised": { one: "sida repeterad", other: "sidor repeterade" },
+  "{n} pages are weak right now.": { one: "{n} sida är svag just nu.", other: "{n} sidor är svaga just nu." },
+  "{n} whole pages": { one: "{n} hel sida", other: "{n} hela sidor" },
+  "{n} whole surahs": { one: "{n} hel sura", other: "{n} hela suror" },
+  "kept a few days longer": "kvar några dagar till",
+  "Your next new portion will be lighter, so you can make this one solid.": "Din nästa nya del blir lättare, så att du kan befästa den här.",
+  "It comes back tomorrow.": "Den kommer tillbaka i morgon.",
+  "Done today": "Klart idag",
+  "Your week in review is ready: what you learned and revised.": "Din vecka i sammandrag är klar: vad du har lärt dig och repeterat.",
+  "See your week": "Se din vecka",
+  "Manzil brings every older page round at least once every {days}. A page you rate weak comes back the next day, and one you rate okay after 3 days; overdue pages come first.":
+    "Manzil tar upp varje äldre sida minst en gång på {days}. En sida du ger betyget svag kommer tillbaka nästa dag, och en du ger betyget okej efter 3 dagar; försenade sidor kommer först.",
+  "Today is done. Masha'Allah!": "Dagens pass är klart. Masha'Allah!",
+  "You finished Surah {name}!": "Du kan nu hela suran {name}!",
+  "You finished Juz {n}!": "Du kan nu hela juz {n}!",
+  "It stays in sabqi {n} more days.": { one: "Den stannar i sabqi {n} dag till.", other: "Den stannar i sabqi {n} dagar till." },
+  "Next time in about {n} days.": { one: "Nästa gång om {n} dag.", other: "Nästa gång om ungefär {n} dagar." },
+  "It comes back in {n} days.": { one: "Den kommer tillbaka om {n} dag.", other: "Den kommer tillbaka om {n} dagar." },
+  "{n} pages still to come in this round.": { one: "{n} sida kvar i den här omgången.", other: "{n} sidor kvar i den här omgången." },
+  "+{n} ayahs": { one: "+{n} vers", other: "+{n} verser" },
+  "+{n} whole pages": { one: "+{n} hel sida", other: "+{n} hela sidor" },
+  "{n} pages revised": { one: "{n} sida repeterad", other: "{n} sidor repeterade" },
+  "{n} days in a row": { one: "{n} dag i rad", other: "{n} dagar i rad" },
+  "+{n} today": "+{n} idag",
+  "Same as device": "Samma som enheten",
+  "How the app works: sabaq, sabqi and manzil, how to memorize and revise, and what each rating does.":
+    "Så fungerar appen: sabaq, sabqi och manzil, hur du memorerar och repeterar, och vad varje betyg gör.",
+  "Open the guide": "Öppna guiden",
+  "A few hesitations or small mistakes, but you got through. The page comes back in 3 days.":
+    "Några tvekanden eller små fel, men du tog dig igenom. Sidan kommer tillbaka om 3 dagar.",
+  "What a rating changes:": "Det här ändrar betyget:",
+  "**Manzil:** the page comes back when the rating says, ahead of the rest.": "**Manzil:** sidan kommer tillbaka när betyget säger, före resten.",
+  "**Sabqi:** a weak page stays in sabqi 3 more days before it moves on to manzil.":
+    "**Sabqi:** en svag sida stannar i sabqi 3 dagar till innan den går vidare till manzil.",
+  "**Sabaq:** if a new portion felt weak, the next one is lighter, so you can make it solid first.":
+    "**Sabaq:** om en ny del kändes svag blir nästa lättare, så att du kan befästa den först.",
+  "Continue where you left off": "Fortsätt där du slutade",
+  "Your last new portion felt weak, so today's is lighter. Make it solid in sabqi first.":
+    "Din senaste nya del kändes svag, så dagens är lättare. Befäst den i sabqi först.",
+  "We have made the Quran easy to remember. So is there anyone who will take heed?":
+    "Vi har gjort Koranen lätt att minnas. Finns det då någon som tar lärdom?",
+  "It is We who sent down the Reminder, and it is We who will preserve it.":
+    "Det är Vi som har sänt ned påminnelsen, och det är Vi som ska bevara den.",
+  "Those who believe and whose hearts find peace in the remembrance of Allah. Truly, in the remembrance of Allah hearts find peace.":
+    "De som tror och vars hjärtan finner ro i hågkomsten av Allah. Sannerligen, i hågkomsten av Allah finner hjärtan ro.",
+  "So remember Me, and I will remember you. Be grateful to Me, and do not be ungrateful.":
+    "Minns Mig, så ska Jag minnas er. Var tacksamma mot Mig och var inte otacksamma.",
+  "Surely, with hardship comes ease.": "Sannerligen, med svårigheten kommer lättnad.",
+  "A blessed Book We have sent down to you, so that they reflect on its verses and people of understanding take heed.":
+    "En välsignad Bok som Vi har sänt ned till dig, så att de begrundar dess verser och så att de förståndiga tar lärdom.",
+  "This is the Book in which there is no doubt, a guidance for those mindful of Allah.":
+    "Detta är Boken som det inte råder något tvivel om, en vägledning för dem som fruktar Allah.",
+  "You've reached {n} whole pages!": { one: "Du har nått {n} hel sida!", other: "Du har nått {n} hela sidor!" },
+  "You've reached {n} ayahs!": { one: "Du har nått {n} vers!", other: "Du har nått {n} verser!" },
 };
 
 export default sv;

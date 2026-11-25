@@ -12,19 +12,9 @@ const ar: Dict = {
     "الدردشة مع المساعد تعمل عند تشغيل التطبيق على حاسوبك. هنا يمكنك [تعديل الخطة يدوياً](/plan/).",
   "No plan yet.": "لا توجد خطة بعد.",
   "Weekly check-in": "المراجعة الأسبوعية",
-  "A look at the last 7 days, with up to 3 suggestions you can take or leave.":
-    "نظرة على آخر 7 أيام، مع ما يصل إلى 3 اقتراحات يمكنك قبولها أو تركها.",
   "This week": "هذا الأسبوع",
-  "Active days": "أيام النشاط",
-  "Items done": "المهام المنجزة",
   Streak: "أيام متتالية",
-  "Strong / okay / weak": "قوي / مقبول / ضعيف",
-  "Overdue pages": "صفحات متأخرة",
-  "Weak pages": "صفحات ضعيفة",
-  "Check-in suggestions come from the AI, which works when the app runs locally. You can always [adjust the plan by hand](/plan/).":
-    "اقتراحات المراجعة الأسبوعية تأتي من الذكاء الاصطناعي، وهو يعمل عند تشغيل التطبيق محلياً. يمكنك دائماً [تعديل الخطة يدوياً](/plan/).",
   "Asking…": "جارٍ السؤال…",
-  "Get suggestions": "احصل على اقتراحات",
   "No changes suggested. Keep going.": "لا تغييرات مقترحة. واصل على هذا.",
   Accepted: "مقبول",
   Dismissed: "مرفوض",
@@ -53,8 +43,6 @@ const ar: Dict = {
   Today: "اليوم",
   "about {n} min": "حوالي {n} دقيقة",
   "{done}/{total} done": "{done}/{total} منجز",
-  "Your weekly check-in is ready.": "مراجعتك الأسبوعية جاهزة.",
-  "Review the week": "راجع الأسبوع",
   Sabaq: "الحفظ الجديد",
   New: "جديد",
   "Memorize this, then recite it from memory before you tick it.":
@@ -87,8 +75,6 @@ const ar: Dict = {
   "AI planning is available when you run the app on your computer. Everything else works here. You can also import a backup in Settings.":
     "التخطيط بالذكاء الاصطناعي متاح عند تشغيل التطبيق على حاسوبك. كل شيء آخر يعمل هنا. يمكنك أيضاً استيراد نسخة احتياطية من الإعدادات.",
   Details: "التفاصيل",
-  "{n} still to come, about {pace} a day.": "{n} متبقية، حوالي {pace} يومياً.",
-  "half a page": "نصف صفحة",
   "Every manzil page has been revised in this time.":
     "تمت مراجعة كل صفحات المراجعة البعيدة خلال هذه المدة.",
   today: "اليوم",
@@ -204,7 +190,6 @@ const ar: Dict = {
     many: "**{n} صفحة** محفوظة (+{more}) إذا التزمت بخطتك.",
     other: "**{n} صفحة** محفوظة (+{more}) إذا التزمت بخطتك.",
   },
-  "Same as phone": "مثل الهاتف",
   Light: "فاتح",
   Dark: "داكن",
   "This file isn't a Hifz Tracker backup.":
@@ -232,8 +217,8 @@ const ar: Dict = {
   "Your data": "بياناتك",
   "✓ Saved on this device **and in your account**, so you can use it on other devices too.":
     "✓ محفوظة على هذا الجهاز **وفي حسابك**، لذا يمكنك استخدامها على أجهزة أخرى أيضاً.",
-  "Saved **only in this browser**. If you clear your browser data or lose this phone, it's gone. [Make an account](#account) to keep it safe, or download a copy now and then.":
-    "محفوظة **في هذا المتصفح فقط**. إذا مسحت بيانات المتصفح أو فقدت هذا الهاتف، ستضيع. [أنشئ حساباً](#account) لحمايتها، أو نزّل نسخة من حين لآخر.",
+  "Saved **only in this browser**. If you clear your browser data or lose this device, it's gone. [Make an account](#account) to keep it safe, or download a copy now and then.":
+    "محفوظة **في هذا المتصفح فقط**. إذا مسحت بيانات المتصفح أو فقدت هذا الجهاز، ستضيع. [أنشئ حساباً](#account) لحمايتها، أو نزّل نسخة من حين لآخر.",
   "Download a copy": "تنزيل نسخة",
   "Restore from a copy": "الاستعادة من نسخة",
   "What's stored where": "ما الذي يُحفظ وأين",
@@ -410,8 +395,6 @@ const ar: Dict = {
     "الأفضل على الإطلاق أن تسمّع لشخص يتابعك: معلم أو صديق أو أحد أفراد العائلة. إن لم يكن أحد موجوداً، سجّل صوتك وقارن التسجيل بالنص.",
   "No mistakes, or one tiny slip you corrected yourself. The page comes back later each time.":
     "بلا أخطاء، أو زلة صغيرة صححتها بنفسك. الصفحة تعود بعد مدة أطول في كل مرة.",
-  "A few hesitations or small mistakes, but you got through. The page comes back a little later.":
-    "بعض التردد أو أخطاء صغيرة، لكنك أكملت. الصفحة تعود بعد مدة أطول قليلاً.",
   "You had to look, got stuck, or made several mistakes. The page comes back tomorrow.":
     "اضطررت للنظر، أو توقفت، أو أخطأت عدة مرات. الصفحة تعود غداً.",
   "Be honest. If you rate Strong after only reading a page, the app spaces it out too far and it slips without you noticing. Even Strong pages come back at least once per manzil cycle.":
@@ -887,8 +870,6 @@ const ar: Dict = {
     many: "المراجعة البعيدة: آخر {n} يوماً",
     other: "المراجعة البعيدة: آخر {n} يوم",
   },
-  "Manzil brings every older page round about once every {days}, a few pages a day. Weak and overdue pages come first.":
-    "المراجعة البعيدة تمرّ على كل صفحة قديمة مرة كل {days} تقريباً، بضع صفحات يومياً. الصفحات الضعيفة والمتأخرة تأتي أولاً.",
   "[Read the full privacy page](/privacy/)":
     "[اقرأ صفحة الخصوصية كاملة](/privacy/)",
   Privacy: "الخصوصية",
@@ -1084,6 +1065,174 @@ const ar: Dict = {
     few: "{n} آيات",
     many: "{n} آية",
     other: "{n} آية",
+  },
+  "{n} more than last week": "{n} أكثر من الأسبوع الماضي",
+  "{n} fewer than last week": "{n} أقل من الأسبوع الماضي",
+  "same as last week": "مثل الأسبوع الماضي",
+  "Your week": "أسبوعك",
+  "study days": "أيام الحفظ",
+  "Finished this week:": "أتممت هذا الأسبوع:",
+  "How revision went": "كيف كانت المراجعة",
+  "A page you rate weak comes back the next day, and one you rate okay after 3 days, so nothing slips.":
+    "الصفحة التي تقيّمها ضعيفة تعود في اليوم التالي، والتي تقيّمها مقبولة تعود بعد 3 أيام، فلا يفلت منك شيء.",
+  "A word on your week": "كلمة عن أسبوعك",
+  "So far": "حتى الآن",
+  "Ask the assistant for suggestions": "اطلب اقتراحات من المساعد",
+  "You didn't miss a single study day this week. Masha'Allah!": "لم يفُتك يوم حفظ واحد هذا الأسبوع. ما شاء الله!",
+  "Some days were missed. Even a few minutes keeps the streak and the pages alive.":
+    "فاتتك بعض الأيام. حتى دقائق قليلة تحفظ سلسلتك وتُبقي الصفحات حيّة.",
+  "You learned more than last week. Keep it up!": "حفظت أكثر من الأسبوع الماضي. واصل!",
+  "Your new portions were strong all week. If it feels easy, you could take a little more each day.":
+    "كان حفظك الجديد قوياً طوال الأسبوع. إن كان ذلك سهلاً عليك، يمكنك أن تزيد قليلاً كل يوم.",
+  "Many new portions felt weak. A smaller daily portion for a while can make them stick.":
+    "كان كثير من الحفظ الجديد ضعيفاً. مقدار يومي أصغر لفترة يساعد على تثبيته.",
+  "Quite a few pages felt weak. They come back sooner by themselves; give revision a little extra care.":
+    "كانت صفحات عديدة ضعيفة. ستعود أسرع من تلقاء نفسها؛ أعطِ المراجعة عناية إضافية.",
+  "Some revision is overdue. Today's list puts it first, so nothing slips.": "بعض المراجعة متأخرة. قائمة اليوم تضعها أولاً، فلا يفلت منك شيء.",
+  "Steady steps. A little every day is how the Quran stays with you.": "خطوات ثابتة. القليل كل يوم هو ما يُبقي القرآن معك.",
+  "No ratings this week yet. Rating each page after reciting it decides when it comes back.":
+    "لا تقييمات هذا الأسبوع بعد. تقييم كل صفحة بعد تسميعها يحدد متى تعود.",
+  "ayahs learned": { zero: "آية محفوظة", one: "آية محفوظة", two: "آيتان محفوظتان", few: "آيات محفوظة", many: "آية محفوظة", other: "آية محفوظة" },
+  "whole pages": { zero: "صفحة كاملة", one: "صفحة كاملة", two: "صفحتان كاملتان", few: "صفحات كاملة", many: "صفحة كاملة", other: "صفحة كاملة" },
+  "pages revised": {
+    zero: "صفحة مراجَعة",
+    one: "صفحة مراجَعة",
+    two: "صفحتان مراجَعتان",
+    few: "صفحات مراجَعة",
+    many: "صفحة مراجَعة",
+    other: "صفحة مراجَعة",
+  },
+  "{n} pages are weak right now.": {
+    zero: "{n} صفحة ضعيفة الآن.",
+    one: "صفحة واحدة ضعيفة الآن.",
+    two: "صفحتان ضعيفتان الآن.",
+    few: "{n} صفحات ضعيفة الآن.",
+    many: "{n} صفحة ضعيفة الآن.",
+    other: "{n} صفحة ضعيفة الآن.",
+  },
+  "{n} whole pages": {
+    zero: "{n} صفحة كاملة",
+    one: "صفحة كاملة واحدة",
+    two: "صفحتان كاملتان",
+    few: "{n} صفحات كاملة",
+    many: "{n} صفحة كاملة",
+    other: "{n} صفحة كاملة",
+  },
+  "{n} whole surahs": {
+    zero: "{n} سورة كاملة",
+    one: "سورة كاملة واحدة",
+    two: "سورتان كاملتان",
+    few: "{n} سور كاملة",
+    many: "{n} سورة كاملة",
+    other: "{n} سورة كاملة",
+  },
+  "kept a few days longer": "باقية بضعة أيام إضافية",
+  "Your next new portion will be lighter, so you can make this one solid.": "سيكون حفظك الجديد التالي أخفّ، لتتمكن من تثبيت هذا.",
+  "It comes back tomorrow.": "تعود غداً.",
+  "Done today": "المنجز اليوم",
+  "Your week in review is ready: what you learned and revised.": "ملخص أسبوعك جاهز: ما حفظته وما راجعته.",
+  "See your week": "اطّلع على أسبوعك",
+  "Manzil brings every older page round at least once every {days}. A page you rate weak comes back the next day, and one you rate okay after 3 days; overdue pages come first.":
+    "المراجعة البعيدة تمرّ على كل صفحة قديمة مرة على الأقل كل {days}. الصفحة التي تقيّمها ضعيفة تعود في اليوم التالي، والمقبولة بعد 3 أيام؛ والمتأخرة تأتي أولاً.",
+  "Today is done. Masha'Allah!": "أنجزت ورد اليوم. ما شاء الله!",
+  "You finished Surah {name}!": "أتممت حفظ سورة {name}!",
+  "You finished Juz {n}!": "أتممت حفظ الجزء {n}!",
+  "It stays in sabqi {n} more days.": {
+    zero: "تبقى في المراجعة القريبة {n} يوم إضافي.",
+    one: "تبقى في المراجعة القريبة يوماً إضافياً.",
+    two: "تبقى في المراجعة القريبة يومين إضافيين.",
+    few: "تبقى في المراجعة القريبة {n} أيام إضافية.",
+    many: "تبقى في المراجعة القريبة {n} يوماً إضافياً.",
+    other: "تبقى في المراجعة القريبة {n} يوم إضافي.",
+  },
+  "Next time in about {n} days.": {
+    zero: "المرة القادمة بعد {n} يوم تقريباً.",
+    one: "المرة القادمة بعد يوم واحد.",
+    two: "المرة القادمة بعد يومين.",
+    few: "المرة القادمة بعد {n} أيام تقريباً.",
+    many: "المرة القادمة بعد {n} يوماً تقريباً.",
+    other: "المرة القادمة بعد {n} يوم تقريباً.",
+  },
+  "It comes back in {n} days.": {
+    zero: "تعود بعد {n} يوم.",
+    one: "تعود بعد يوم واحد.",
+    two: "تعود بعد يومين.",
+    few: "تعود بعد {n} أيام.",
+    many: "تعود بعد {n} يوماً.",
+    other: "تعود بعد {n} يوم.",
+  },
+  "{n} pages still to come in this round.": {
+    zero: "{n} صفحة متبقية في هذه الدورة.",
+    one: "صفحة واحدة متبقية في هذه الدورة.",
+    two: "صفحتان متبقيتان في هذه الدورة.",
+    few: "{n} صفحات متبقية في هذه الدورة.",
+    many: "{n} صفحة متبقية في هذه الدورة.",
+    other: "{n} صفحة متبقية في هذه الدورة.",
+  },
+  "+{n} ayahs": { zero: "+{n} آية", one: "+آية واحدة", two: "+آيتان", few: "+{n} آيات", many: "+{n} آية", other: "+{n} آية" },
+  "+{n} whole pages": {
+    zero: "+{n} صفحة كاملة",
+    one: "+صفحة كاملة",
+    two: "+صفحتان كاملتان",
+    few: "+{n} صفحات كاملة",
+    many: "+{n} صفحة كاملة",
+    other: "+{n} صفحة كاملة",
+  },
+  "{n} pages revised": {
+    zero: "{n} صفحة مراجَعة",
+    one: "صفحة واحدة مراجَعة",
+    two: "صفحتان مراجَعتان",
+    few: "{n} صفحات مراجَعة",
+    many: "{n} صفحة مراجَعة",
+    other: "{n} صفحة مراجَعة",
+  },
+  "{n} days in a row": {
+    zero: "{n} يوم متتالٍ",
+    one: "يوم واحد",
+    two: "يومان متتاليان",
+    few: "{n} أيام متتالية",
+    many: "{n} يوماً متتالياً",
+    other: "{n} يوم متتالٍ",
+  },
+  "+{n} today": "+{n} اليوم",
+  "Same as device": "مثل الجهاز",
+  "How the app works: sabaq, sabqi and manzil, how to memorize and revise, and what each rating does.":
+    "كيف يعمل التطبيق: الحفظ الجديد والمراجعة القريبة والبعيدة، وكيف تحفظ وتراجع، وماذا يفعل كل تقييم.",
+  "Open the guide": "افتح الدليل",
+  "A few hesitations or small mistakes, but you got through. The page comes back in 3 days.":
+    "بعض التردد أو أخطاء صغيرة، لكنك أكملت. تعود الصفحة بعد 3 أيام.",
+  "What a rating changes:": "ما الذي يغيّره التقييم:",
+  "**Manzil:** the page comes back when the rating says, ahead of the rest.":
+    "**المراجعة البعيدة:** تعود الصفحة في الموعد الذي يحدده التقييم، قبل غيرها.",
+  "**Sabqi:** a weak page stays in sabqi 3 more days before it moves on to manzil.":
+    "**المراجعة القريبة:** تبقى الصفحة الضعيفة فيها 3 أيام إضافية قبل أن تنتقل إلى المراجعة البعيدة.",
+  "**Sabaq:** if a new portion felt weak, the next one is lighter, so you can make it solid first.":
+    "**الحفظ الجديد:** إن كان المقطع الجديد ضعيفاً، يكون التالي أخفّ لتثبّته أولاً.",
+  "Continue where you left off": "تابع من حيث توقفت",
+  "Your last new portion felt weak, so today's is lighter. Make it solid in sabqi first.":
+    "كان حفظك الجديد الأخير ضعيفاً، لذا مقدار اليوم أخفّ. ثبّته في المراجعة القريبة أولاً.",
+  "We have made the Quran easy to remember. So is there anyone who will take heed?": "",
+  "It is We who sent down the Reminder, and it is We who will preserve it.": "",
+  "Those who believe and whose hearts find peace in the remembrance of Allah. Truly, in the remembrance of Allah hearts find peace.": "",
+  "So remember Me, and I will remember you. Be grateful to Me, and do not be ungrateful.": "",
+  "Surely, with hardship comes ease.": "",
+  "A blessed Book We have sent down to you, so that they reflect on its verses and people of understanding take heed.": "",
+  "This is the Book in which there is no doubt, a guidance for those mindful of Allah.": "",
+  "You've reached {n} whole pages!": {
+    zero: "وصلت إلى {n} صفحة كاملة!",
+    one: "وصلت إلى صفحة كاملة!",
+    two: "وصلت إلى صفحتين كاملتين!",
+    few: "وصلت إلى {n} صفحات كاملة!",
+    many: "وصلت إلى {n} صفحة كاملة!",
+    other: "وصلت إلى {n} صفحة كاملة!",
+  },
+  "You've reached {n} ayahs!": {
+    zero: "وصلت إلى {n} آية!",
+    one: "وصلت إلى آية واحدة!",
+    two: "وصلت إلى آيتين!",
+    few: "وصلت إلى {n} آيات!",
+    many: "وصلت إلى {n} آية!",
+    other: "وصلت إلى {n} آية!",
   },
 };
 
