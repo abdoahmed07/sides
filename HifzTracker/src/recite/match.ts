@@ -113,8 +113,11 @@ const joined = (x: Forms, y: Forms): Forms => ({
   letters: false,
 });
 
-/** A heard word: folded, and without hamza. */
-type Heard = { f: string; b: string };
+/**
+ * A heard word: folded, and without hamza. `letters`: the letters it spells when it's letter names
+ * ("لام ميم" = لم), as one heard word or several put together (see `joinLetters`).
+ */
+type Heard = { f: string; b: string; letters?: string[] };
 
 /** Whether a heard word is the expected word, in any of its spellings. */
 function sameWord(w: Forms, x: Heard): boolean {
@@ -139,11 +142,13 @@ export function quranWords(text: string[]): Set<string> {
 
 /**
  * The opening letters of some surahs (الٓمٓ, كٓهيعٓصٓ, حمٓ…) are recited by their names, "alif lam
- * mim", and recognition writes the names: ألف لام ميم, or joined, ياسين.
+ * mim", and recognition writes the names: ألف لام ميم, or joined, ياسين. (لا: the drawn-out "laaam"
+ * the phone wrote before it heard the m, which it then writes as part of ميم.)
  */
 const LETTER_NAMES: [name: string, letter: string][] = [
   ["الف", "ا"],
   ["لام", "ل"],
+  ["لا", "ل"],
   ["ميم", "م"],
   ["صاد", "ص"],
   ["را", "ر"],
@@ -161,36 +166,85 @@ const LETTER_NAMES: [name: string, letter: string][] = [
 /** The letters of the opening letters, which recognition may also write one by one ("ا ل م"). */
 const OPENING_LETTERS = new Set("المصركهيعطسحقن");
 
-/** The letters some letter names (or the letters themselves) spell, written together without hamza; "" if they aren't. */
-function spelled(names: string): string {
-  let out = "";
-  for (let k = 0; k < names.length; ) {
-    const hit = LETTER_NAMES.find(([name]) => names.startsWith(name, k));
-    if (hit) {
-      out += hit[1];
-      k += hit[0].length;
-    } else if (OPENING_LETTERS.has(names[k])) out += names[k++];
-    else return "";
+/** Every surah's opening letters (the only words of the Quran written without vowel marks), folded. */
+const OPENINGS = new Set(["الم", "المص", "الر", "المر", "كهيعص", "طه", "طسم", "طس", "يس", "ص", "حم", "عسق", "ق", "ن"]);
+
+const spellCache = new Map<string, string[]>();
+/**
+ * The letters a heard word (without hamza) spells as letter names, one after another (ألف, لام, ياسين
+ * = ي + س): more than one when it reads more ways (لاميم: لا + ميم; لام + يم isn't names), none when it
+ * isn't names. A single letter on its own is itself.
+ */
+function nameLetters(b: string): string[] {
+  let out = spellCache.get(b);
+  if (!out) {
+    const found = new Set<string>();
+    const read = (k: number, sofar: string) => {
+      if (found.size > 8) return;
+      if (k === b.length) return void found.add(sofar);
+      for (const [name, letter] of LETTER_NAMES) if (b.startsWith(name, k)) read(k + name.length, sofar + letter);
+    };
+    if (b.length === 1) {
+      if (OPENING_LETTERS.has(b)) found.add(b);
+    } else if (b) read(0, "");
+    out = [...found];
+    if (spellCache.size > 5000) spellCache.clear();
+    spellCache.set(b, out);
   }
   return out;
 }
 
-/** Puts heard letter names together into the opening letters they spell, where those are expected. */
+/** What a heard word may spell as opening letters: as names, or as the letters themselves (الم, ا). */
+function spellings(b: string): string[] {
+  const out = nameLetters(b);
+  return b.length > 1 && [...b].every((c) => OPENING_LETTERS.has(c)) ? [...out, b] : out;
+}
+
+/** Every way some words' spellings put together read (a few at most). */
+function together(each: string[][]): string[] {
+  let out = [""];
+  for (const ways of each) out = out.flatMap((a) => ways.map((w) => a + w)).slice(0, 32);
+  return out;
+}
+
+/** Whether all of `part`'s letters are in `whole`, in order (some of the letters, the others not heard). */
+function within(part: string, whole: string): boolean {
+  let k = 0;
+  for (const c of whole) if (c === part[k]) k++;
+  return !!part && k === part.length;
+}
+
+/**
+ * Puts heard letter names together, where opening letters are expected: names that spell them
+ * (ألف لام ميم, ا ل م) become one heard word, the letters themselves; other names next to each other
+ * (ألف لام, the phone missing ميم; ألف لام را) one word that spells what they spell, for the check
+ * (some of the letters count, another surah's letters are a mistake: see `fitOf`).
+ */
 function joinLetters(h: Heard[], at: number[], wanted: Set<string>): [Heard[], number[]] {
   if (!wanted.size) return [h, at];
   const out: Heard[] = [];
   const outAt: number[] = [];
   for (let t = 0; t < h.length; ) {
+    // The names here, and the longest start of them that spells opening letters expected.
+    let run = 0;
+    while (run < 5 && t + run < h.length && nameLetters(h[t + run].b).length) run++;
+    const spelled = together(h.slice(t, t + run).map((x) => nameLetters(x.b)));
     let len = 0;
     let letters = "";
     for (let l = Math.min(5, h.length - t); l > 0 && !len; l--) {
-      const s = spelled(h.slice(t, t + l).map((x) => x.b).join(""));
-      if (s && wanted.has(s)) [len, letters] = [l, s];
+      const s = together(h.slice(t, t + l).map((x) => spellings(x.b))).find((x) => wanted.has(x));
+      if (s) [len, letters] = [l, s];
     }
-    if (len) {
+    // (Unless all the names say another surah's letters: ألف لام ميم صاد where الٓمٓ is.)
+    if (len && !(run > len && spelled.some((s) => OPENINGS.has(s) && !wanted.has(s)))) {
       out.push({ f: letters, b: letters });
       outAt.push(at[t + len - 1]);
       t += len;
+    } else if (run) {
+      const names = h.slice(t, t + run);
+      out.push(run === 1 ? { ...h[t], letters: spelled } : { f: names.map((x) => x.f).join(""), b: names.map((x) => x.b).join(""), letters: spelled });
+      outAt.push(at[t + run - 1]);
+      t += run;
     } else {
       out.push(h[t]);
       outAt.push(at[t]);
@@ -273,6 +327,16 @@ const UNEXPLAINED = 2;
  * heard they count as said.
  */
 const LETTERS_SKIP = 0.1;
+/** Some of the opening letters, as names (the phone missed the others): right, at a little cost. */
+const SOME_LETTERS = 0.2;
+/**
+ * Anything else heard where opening letters are (اللهم, علم: the phone's guess at the drawn-out names)
+ * counts as them too, at a little more cost, so letters not heard at all and the words after them still
+ * come first. Not the isti'adha or basmala, nor another surah's opening letters (that's a mistake).
+ */
+const LOOSE_LETTERS = 0.3;
+/** How alike such a guess counts as: under `SAME`, so on its own it doesn't show where you started (see follow). */
+export const LOOSE_SCORE = 0.4;
 /** How far back a word you stopped on still counts as repeating yourself. */
 const RECENT = 12;
 /** Said around a recitation, not part of it: the isti'adha, the basmala, "sadaqa Allahu l-'azim", amin. */
@@ -295,8 +359,18 @@ export type AlignOptions = {
 };
 
 /** How a heard word fits an expected one: its cost in an alignment, how alike they are, and whether it's right. */
-function fitOf(w: Forms, x: Heard, known: Set<string> | undefined) {
+function fitOf(w: Forms, x: Heard, known: Set<string> | undefined): { cost: number; score: number; ok: boolean; loose?: boolean } {
   if (sameWord(w, x)) return { cost: 0, score: 1, ok: true };
+  if (w.letters) {
+    const letters = x.letters ?? (OPENINGS.has(x.f) ? [x.f] : []);
+    // Letter names: some of the letters count (the phone missed the others). One letter alone (لا, ميم)
+    // is as unsure as a guess, though: on its own it doesn't show where you started.
+    const some = letters.filter((l) => within(l, w.f));
+    if (some.length) return { cost: SOME_LETTERS, score: some.some((l) => l.length > 1) ? 0.8 : LOOSE_SCORE, ok: true };
+    // Another surah's opening letters are a mistake: paired with these at no cost, so it isn't passed over.
+    if (letters.some((l) => l.length > 1 && OPENINGS.has(l))) return { cost: 0, score: 0, ok: false };
+    if (!AROUND.has(x.f)) return { cost: LOOSE_LETTERS, score: LOOSE_SCORE, ok: true, loose: true };
+  }
   const s = w.p === w.f ? similarity(w.f, x.f) : Math.max(similarity(w.f, x.f), similarity(w.p, x.f));
   if (!known) return { cost: 1.3 * (1 - s), score: s, ok: s >= SAME };
   // Strict: another word of the Quran is a mistake; a spelling the Quran doesn't have counts when close.
@@ -307,7 +381,10 @@ function fitOf(w: Forms, x: Heard, known: Set<string> | undefined) {
 /** Whether a heard word is the expected word (strictly, with `known`, as phone recognition is checked). */
 export function wordFits(expected: string, heard: string, known?: Set<string>): boolean {
   const f = fold(heard);
-  return !!f && fitOf(forms(expected), { f, b: bare(heard) }, known).ok;
+  if (!f) return false;
+  const b = bare(heard);
+  const letters = nameLetters(b);
+  return fitOf(forms(expected), { f, b, ...(letters.length && { letters }) }, known).ok;
 }
 
 /** Said around a recitation rather than in it (the isti'adha, the basmala…), so it doesn't tell where you are. */
@@ -391,7 +468,8 @@ export function align(expected: string[], heard: string[], from: number, opts: A
   const lo = Math.max(0, from - RECENT);
   const ex = expected.slice(lo, from + n).map(forms);
   const off = from - lo;
-  [h, at] = joinLetters(h, at, new Set(ex.slice(off).filter((w) => w.letters).map((w) => w.f)));
+  // (Opening letters just before `from` too: their names said again are you repeating yourself.)
+  [h, at] = joinLetters(h, at, new Set(ex.filter((w) => w.letters).map((w) => w.f)));
   const m = h.length;
 
   const fit = (w: Forms, x: Heard) => fitOf(w, x, known);
@@ -469,7 +547,12 @@ export function align(expected: string[], heard: string[], from: number, opts: A
   if (!stopped) {
     for (let i = 1; i <= n; i++) if (cost[i][m] < cost[endI][m]) endI = i;
   } else {
-    const firstFit = h.map((x) => ex.findIndex((w) => fit(w, x).ok));
+    const firstFit = h.map((x) =>
+      ex.findIndex((w) => {
+        const p = fit(w, x);
+        return p.ok && !p.loose;
+      }),
+    );
     let best = Infinity;
     for (let i = 0; i <= n; i++) {
       let tail = 0;

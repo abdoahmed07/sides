@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import text from "../data/quran-text.json";
-import { align, ayahWords, fold, hintText, quranWords, similarity, suggestRating } from "../src/recite/match";
+import { align, ayahWords, fold, hintText, LOOSE_SCORE, quranWords, similarity, suggestRating } from "../src/recite/match";
 import { q } from "./helpers";
 
 const quran = text as unknown as string[];
@@ -167,8 +167,40 @@ describe("checking the phone's recognition strictly", () => {
       expect(r.statuses[0]).toMatchObject({ index: 0, status: "correct" });
       expect(r.statuses.every((s) => s.status === "correct"), heard).toBe(true);
     }
-    // Not before what comes after them is heard.
-    expect(align(baqarah, ["اللهم"], 0, { ...strict, stopped: "pause" }).statuses.filter((s) => s.index === 0 && s.status === "correct")).toEqual([]);
+    // On its own, a guess like that only counts as a guess (it doesn't show where you started: see follow).
+    expect(align(baqarah, ["اللهم"], 0, { ...strict, stopped: "pause" }).statuses[0]).toMatchObject({ index: 0, status: "correct", score: LOOSE_SCORE });
+  });
+
+  it("forgives the phone's spelling of the drawn-out letter names", () => {
+    const baqarah = words(2, 1, 2);
+    const next = " ذلك الكتاب لا ريب فيه";
+    // Some of the names (the phone missed one), the names cut short, or a word that sounds like them.
+    for (const alm of ["ألف لام", "الف لا ميم", "الف لا م", "الف لاميم", "لام ميم", "الف", "ميم", "علم", "عالم", "اليم", "آلام"]) {
+      const r = align(baqarah, (alm + next).split(" "), 0, strict);
+      expect(r.statuses.map((s) => s.status), alm).toEqual(baqarah.slice(0, 6).map(() => "correct"));
+    }
+    // The isti'adha and basmala before them aren't taken for them.
+    const r = align(baqarah, `أعوذ بالله من الشيطان الرجيم بسم الله الرحمن الرحيم${next}`.split(" "), 0, strict);
+    expect(r.statuses[0]).toMatchObject({ index: 0, status: "correct", heard: -1 });
+  });
+
+  it("still calls another surah's opening letters a mistake", () => {
+    const baqarah = words(2, 1, 2);
+    for (const other of ["ألف لام را", "الر", "حا ميم", "ألف لام ميم صاد"]) {
+      const r = align(baqarah, `${other} ذلك الكتاب لا ريب`.split(" "), 0, strict);
+      expect(r.statuses.map((s) => s.status), other).toEqual(["wrong", "correct", "correct", "correct", "correct"]);
+    }
+    // …but not the letters of the next one, said in the right place (Ash-Shura 42:1–2).
+    const shura = words(42, 1, 3);
+    expect(align(shura, "حا ميم عين سين قاف كذلك يوحي".split(" "), 0, strict).statuses.slice(0, 4).map((s) => s.status)).toEqual(
+      ["correct", "correct", "correct", "correct"],
+    );
+  });
+
+  it("doesn't call the letter names said again a mistake (the phone writing them once more)", () => {
+    const baqarah = words(2, 1, 2);
+    const r = align(baqarah, ["لام", "ميم"], 1, { ...strict, stopped: "pause" });
+    expect(r.statuses.filter((s) => s.status !== "correct")).toEqual([]);
   });
 });
 

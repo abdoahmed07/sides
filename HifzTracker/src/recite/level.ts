@@ -6,9 +6,19 @@
  * for a quiet voice and jumps to the top for a loud one.)
  *
  * With the phone's speech recognition the browser gives no level at all, so `LevelMeter` listens to
- * the microphone alongside it. Should that ever upset the recognition (some phones only let one thing
- * use the microphone), the app turns the meter off for that device (`meterOff`).
+ * the microphone alongside it, on computers. Not on phones: iPhone and Android let one thing use the
+ * microphone at a time, so listening for the level there can leave the speech recognition hearing
+ * nothing. (Should it ever upset the recognition on a computer, the app turns the meter off for that
+ * device: `meterOff`.)
  */
+
+/** Whether the meter can listen alongside the speech recognition here: not on phones and tablets. */
+export function meterFits(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  // (iPads say they're Macs; they have touch.)
+  return !/iPhone|iPad|iPod|Android/i.test(ua) && !(/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
 
 /** 0–1 from a frame's RMS: −55 dB (a quiet room) is 0, −15 dB (speaking up close) is 1. */
 export function levelOf(rms: number): number {

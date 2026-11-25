@@ -893,6 +893,8 @@ const sv: Dict = {
   "Listen to {ayah}": "Lyssna på {ayah}",
   "Listening… recite at your normal pace.":
     "Lyssnar… recitera i din vanliga takt.",
+  "Starting the microphone…": "Startar mikrofonen…",
+  "The microphone didn't start. Tap it to try again.": "Mikrofonen startade inte. Tryck på den för att försöka igen.",
   "Paused. Tap the microphone to continue.":
     "Pausad. Tryck på mikrofonen för att fortsätta.",
   "Tap the microphone and start reciting. Use the bulb if you get stuck.":

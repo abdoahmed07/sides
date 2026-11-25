@@ -1,5 +1,5 @@
 "use client";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { q } from "@/lib/app";
 import { getLang, t, tp, tx } from "@/i18n";
@@ -21,7 +21,7 @@ import {
 import { concat, Mic, RATE } from "@/recite/mic";
 import { loadModel, modelIsDownloaded, transcribe, type Engine } from "@/recite/recognizer";
 import { follow, type Step } from "@/recite/follow";
-import { LevelMeter, meterOff, turnMeterOff } from "@/recite/level";
+import { LevelMeter, meterFits, meterOff, turnMeterOff } from "@/recite/level";
 import { keepWhileDeveloping, Recorder, saveRecording, type Recording } from "@/recite/record";
 import { LAST_WORD_SURE, reveal, type Live } from "@/recite/reveal";
 import { heardWords, WebSpeech, webSpeechAvailable, type SpeechProblem } from "@/recite/webspeech";
@@ -77,6 +77,15 @@ const RATING_LABEL: Record<Rating, string> = {
 const SETTLE_MS = 1800;
 /** Problems this soon after the level meter started may be the meter's doing (see level.ts). */
 const METER_TRIAL_MS = 8000;
+/**
+ * The phone's recognition hasn't said it started this long after a tap: it's stuck. (Only once it has
+ * said so on this page before: then it's allowed, and isn't waiting for you to allow it.)
+ */
+const STUCK_MS = 6000;
+/** Whether the phone's recognition has worked on this page (it's allowed: a start that fails is something else). */
+let workedBefore = false;
+/** Whether it has said it started on this page (some browsers may not say; a start that doesn't come only counts where they do). */
+let saysStarted = false;
 
 /** A step in a recording: where matching started, heard words used, what was settled (index + s/c/w), where it goes on. */
 const stepTrace = (from: number, s: Step) => ({
@@ -171,9 +180,20 @@ export function ReciteCheck({
   const [recording, setRecording] = useState<Recording | null>(null);
   /** A wrong word you stopped on: if the phone then corrects itself to the right word, it's no mistake. */
   const lastFlag = useRef<number | null>(null);
+  /** Without a meter (phones), the rings follow the words coming in: their level as it eases down. */
+  const activity = useRef({ level: 0, raf: 0 });
 
   // Phone recognition.
   const speech = useRef<WebSpeech | null>(null);
+  /**
+   * The recognition stopped when you paused. An iPhone can take a while to end it, and its last words
+   * would mix with the next session's: it's let go of when you go on.
+   */
+  const stopping = useRef<WebSpeech | null>(null);
+  /** Whether the recognition has started listening since the tap (it takes a moment), and when the tap was. */
+  const [micOn, setMicOn] = useState(false);
+  const micOnNow = useRef(false);
+  const listenAt = useRef(0);
   /** Words of the current recognition session already settled (what comes after them is new). */
   const settledWords = useRef<string[]>([]);
   /** What's being heard and isn't settled yet. */
@@ -206,7 +226,9 @@ export function ReciteCheck({
     return () => {
       mic.current?.stop();
       meter.current?.stop();
+      cancelAnimationFrame(activity.current.raf);
       void speech.current?.stop();
+      stopping.current?.detach();
       clearTimeout(settleTimer.current);
     };
   }, []);
@@ -373,19 +395,27 @@ export function ReciteCheck({
       halo.current.style.opacity = String(0.25 + l * 0.75);
     }
     if (l > 0.3) lastSound.current = Date.now();
-    recorder.current?.level(l);
   };
 
-  /** Without a level to show, the rings pulse with each word heard. */
-  const pulse = () => {
+  /** Without a level to show (phones), the rings follow the words heard: up with each, easing down after. */
+  const pulse = (amount: number) => {
     if (meter.current) return;
-    showLevel(0.7);
-    setTimeout(() => showLevel(0), 180);
+    const a = activity.current;
+    a.level = Math.max(a.level, amount);
+    if (a.raf) return;
+    const ease = () => {
+      a.level = a.level < 0.02 ? 0 : a.level * 0.95;
+      showLevel(a.level);
+      a.raf = a.level ? requestAnimationFrame(ease) : 0;
+    };
+    a.raf = requestAnimationFrame(ease);
   };
 
   const stopMeter = () => {
     meter.current?.stop();
     meter.current = null;
+    cancelAnimationFrame(activity.current.raf);
+    activity.current = { level: 0, raf: 0 };
     showLevel(0);
   };
 
@@ -448,6 +478,12 @@ export function ReciteCheck({
 
   const onText = (transcript: string, final: boolean) => {
     if (!text) return;
+    // Words coming in: it's listening (whether or not the browser said it started).
+    workedBefore = true;
+    if (!micOnNow.current) {
+      micOnNow.current = true;
+      setMicOn(true);
+    }
     const heard = heardWords(transcript);
     // The words at the start that were already settled are skipped. If the recognizer started
     // over or changed its mind, fewer words match, and the rest simply counts as new.
@@ -469,7 +505,7 @@ export function ReciteCheck({
     p = apply(p, step);
     pending.current = p;
     setLive(step.live && { statuses: step.live.statuses, heard: p.fresh.length });
-    pulse();
+    pulse(0.75);
     clearTimeout(settleTimer.current);
     if (final) settle(false);
     else settleTimer.current = setTimeout(() => settle(false), SETTLE_MS);
@@ -488,14 +524,31 @@ export function ReciteCheck({
       return setPhase("paused");
     }
     if (p === "interrupted") return setPhase("paused");
-    setErrorMsg(t(PROBLEM[p]));
+    // It worked a moment ago on this page: it isn't unavailable, it just didn't start this time.
+    setErrorMsg(p === "unavailable" && workedBefore ? t("The microphone didn't start. Tap it to try again.") : t(PROBLEM[p]));
     setPhase(begun.current || pointer.current > 0 ? "paused" : "ready");
   };
 
-  // The phone's recognition has no sound level: warn when nothing has been heard for a while.
+  /** The recognition didn't start after a tap: let it go, and say so (a tap tries again). */
+  const stuck = () => {
+    recorder.current?.add("stuck");
+    const s = speech.current;
+    speech.current = null;
+    s?.detach();
+    stopMeter();
+    setErrorMsg(t("The microphone didn't start. Tap it to try again."));
+    setPhase("paused");
+  };
+
+  // The phone's recognition has no sound level: warn when nothing has been heard for a while. And a
+  // start that never came is stuck.
+  const checkListening = useEffectEvent(() => {
+    setQuiet(Date.now() - lastSound.current > 8000);
+    if (!micOnNow.current && saysStarted && Date.now() - listenAt.current > STUCK_MS) stuck();
+  });
   useEffect(() => {
     if (phase !== "listening" || mode !== "phone") return;
-    const id = setInterval(() => setQuiet(Date.now() - lastSound.current > 8000), 1000);
+    const id = setInterval(() => checkListening(), 1000);
     return () => clearInterval(id);
   }, [phase, mode]);
 
@@ -641,16 +694,33 @@ export function ReciteCheck({
       page: q.pageOf[words[pages[page]?.[0] ?? 0]?.ayah ?? ayahs[0]],
       build: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? process.env.NODE_ENV,
       date: new Date().toISOString(),
-      meter: mode === "phone" && !meterOff(),
+      meter: mode === "phone" && meterFits() && !meterOff(),
     });
     recorder.current.add("listen", { from: pointer.current });
     if (mode === "phone") {
+      // The session stopped when you paused may still be ending (an iPhone can take a while): let it go,
+      // so its last words don't mix with the new session's, and settle what it heard.
+      const old = stopping.current;
+      stopping.current = null;
+      if (old) {
+        if (old.running) recorder.current.add("let-go");
+        old.detach();
+        if (pending.current) waiting.current = settle(false);
+      }
       settledWords.current = [];
       pending.current = null;
+      micOnNow.current = false;
+      setMicOn(false);
+      listenAt.current = Date.now();
       const s = new WebSpeech({
         onText,
         onActivity: () => {
           lastSound.current = Date.now();
+        },
+        onStart: () => {
+          workedBefore = saysStarted = true;
+          micOnNow.current = true;
+          setMicOn(true);
         },
         onSessionEnd: () => {
           // The session's text is gone: words still waiting for what comes next go on to the next one.
@@ -663,10 +733,16 @@ export function ReciteCheck({
       speech.current = s;
       // Straight from the tap: browsers only start recognition from one.
       s.start();
+      // It couldn't start at all (and has said why): not listening.
+      if (speech.current !== s) return;
       setPhase("listening");
-      // The level, from the microphone alongside the recognition (unless that got in the way before).
-      if (!meterOff()) {
-        const m = new LevelMeter(showLevel);
+      // The level, from the microphone alongside the recognition: on computers (phones let one thing use
+      // the microphone at a time), and unless it got in the way before.
+      if (meterFits() && !meterOff()) {
+        const m = new LevelMeter((l) => {
+          showLevel(l);
+          recorder.current?.level(l);
+        });
         meter.current = m;
         meterSince.current = Date.now();
         m.start().catch(() => {
@@ -681,6 +757,7 @@ export function ReciteCheck({
       onPartial,
       onLevel: (l) => {
         showLevel(l);
+        recorder.current?.level(l);
         setQuiet(Date.now() - lastSound.current > 4000);
       },
     });
@@ -704,6 +781,7 @@ export function ReciteCheck({
     if (mode === "phone") {
       const s = speech.current;
       speech.current = null;
+      stopping.current = s;
       void s?.stop();
     } else {
       mic.current?.stop();
@@ -721,6 +799,13 @@ export function ReciteCheck({
       const s = speech.current;
       speech.current = null;
       await s?.stop();
+      // Finished while paused: the session stopped then may still be sending its last words.
+      const old = stopping.current;
+      stopping.current = null;
+      if (old) {
+        await old.stop();
+        old.detach();
+      }
       settle(true);
     } else {
       mic.current?.stop();
@@ -1000,6 +1085,8 @@ export function ReciteCheck({
                     "I can't hear anything. Is the microphone allowed and not muted? Try speaking a little louder.",
                   )}
                 </span>
+              ) : listening && mode === "phone" && !micOn ? (
+                t("Starting the microphone…")
               ) : listening ? (
                 t("Listening… recite at your normal pace.")
               ) : phase === "paused" ? (

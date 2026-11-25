@@ -11,7 +11,7 @@
  *    word takes as little checking however long you go on.
  *  - When you pause or finish, everything heard is settled (`align`'s `stopped`).
  */
-import { align, findRun, isAround, wordFits, type Alignment } from "./match";
+import { align, findRun, isAround, LOOSE_SCORE, wordFits, type Alignment } from "./match";
 
 /** Words in a row it takes to tell where you are, when it isn't where you were. */
 export const JUMP_RUN = 4;
@@ -92,8 +92,13 @@ export function follow(expected: string[], heard: string[], from: number, { know
     if (!begun && mode === "live") kept = jump.heard;
     else used = jump.heard;
     words = words.slice(jump.heard);
-  } else if (!begun && mode === "pause" && !align(expected, words, at, { known }).statuses.some((s) => s.status === "correct")) {
+  } else if (
+    !begun &&
+    mode === "pause" &&
+    !align(expected, words, at, { known }).statuses.some((s) => s.status === "correct" && s.score > LOOSE_SCORE)
+  ) {
     // Not started yet, and what you've said doesn't tell where you are: wait for more before deciding anything.
+    // (A guess at opening letters, like اللهم for الٓمٓ, needs what comes after it too.)
     return { settled, next: at, used, live: null };
   }
 

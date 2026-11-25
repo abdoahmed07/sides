@@ -42,6 +42,25 @@ describe("finding where you are", () => {
     expect(step.live!.statuses[0]).toMatchObject({ index: 0, status: "correct" });
   });
 
+  it("starts at Al-Baqarah's first ayah when the phone writes its letters oddly", () => {
+    for (const alm of ["الف لا ميم", "علم", "اللهم", "ألف لام"]) {
+      for (const mode of ["live", "pause"] as const) {
+        const step = follow(baqarah, said(`بسم الله الرحمن الرحيم ${alm} ${PLAIN[2]}`), 0, { known, mode, begun: false, searchEnd: at(17) });
+        expect(step.start, alm).toBeUndefined();
+        const st = mode === "live" ? step.live!.statuses : step.settled;
+        expect(st.map((s) => s.status), `${alm} (${mode})`).toEqual(baqarah.slice(0, 8).map(() => "correct"));
+      }
+    }
+  });
+
+  it("doesn't take a stray word for the opening letters: it waits for more", () => {
+    // Paused on just a word (the phone's guess, or something said before starting): nothing is decided.
+    for (const w of ["اللهم", "لا", "طيب"]) expect(follow(baqarah, [w], 0, { known, mode: "pause", begun: false })).toMatchObject({ settled: [], used: 0 });
+    // Said before starting a few ayahs on: you start there.
+    const step = follow(baqarah, said(`لا ${PLAIN[3]}`), 0, { known, mode: "pause", begun: false, searchEnd: at(17) });
+    expect(step.start).toBe(at(3));
+  });
+
   it("looks for where you started only up to where it's told (reciting page by page)", () => {
     const kursi = said(PLAIN[255]).slice(0, 7);
     expect(follow(baqarah, kursi, 0, { ...live, begun: false, searchEnd: at(250) }).start).toBeUndefined();

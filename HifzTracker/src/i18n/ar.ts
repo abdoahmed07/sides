@@ -1018,6 +1018,8 @@ const ar: Dict = {
   "Listen to {ayah}": "استمع إلى {ayah}",
   "Listening… recite at your normal pace.":
     "جارٍ الاستماع… سمّع بسرعتك المعتادة.",
+  "Starting the microphone…": "جارٍ تشغيل الميكروفون…",
+  "The microphone didn't start. Tap it to try again.": "لم يعمل الميكروفون. اضغط عليه للمحاولة مرة أخرى.",
   "Paused. Tap the microphone to continue.":
     "متوقف مؤقتاً. اضغط على الميكروفون للمتابعة.",
   "Tap the microphone and start reciting. Use the bulb if you get stuck.":

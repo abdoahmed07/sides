@@ -26,8 +26,13 @@ interface Recognition {
   onresult: ((e: ResultEvent) => void) | null;
   onerror: ((e: ErrorEvent) => void) | null;
   onend: (() => void) | null;
+  onstart: (() => void) | null;
+  onaudiostart: (() => void) | null;
   onsoundstart: (() => void) | null;
   onspeechstart: (() => void) | null;
+  onspeechend: (() => void) | null;
+  onaudioend: (() => void) | null;
+  onnomatch: (() => void) | null;
   start(): void;
   stop(): void;
   abort(): void;
@@ -80,6 +85,8 @@ export type SpeechHandlers = {
   onText: (text: string, final: boolean) => void;
   /** The browser hears sound, speech or words (for the "can't hear you" warning and the mic ring). */
   onActivity?: () => void;
+  /** The browser says it has started listening (the microphone is on). */
+  onStart?: () => void;
   /** A session ended; anything not settled yet should be settled now. Listening goes on in a new one. */
   onSessionEnd?: () => void;
   /** Recognition stopped and won't come back by itself. */
@@ -97,6 +104,7 @@ const PROBLEMS: Record<string, SpeechProblem> = {
 };
 
 export class WebSpeech {
+  /** The current session's recognition; null once it has ended (or been let go), so nothing more from it counts. */
   private rec: Recognition | null = null;
   private stopped = true;
   private worked = false;
@@ -105,6 +113,11 @@ export class WebSpeech {
   private onStopped: (() => void) | null = null;
 
   constructor(private h: SpeechHandlers) {}
+
+  /** Whether a session is still going (or still ending after `stop`). */
+  get running() {
+    return this.rec !== null;
+  }
 
   /** Call straight from the tap on the microphone: browsers only start recognition from a tap. */
   start() {
@@ -136,14 +149,19 @@ export class WebSpeech {
       this.h.onActivity?.();
       this.h.onText(assemble(parts), final);
     };
-    rec.onsoundstart = () => {
-      this.h.onTrace?.("sound");
-      this.h.onActivity?.();
+    /** The browser's own events, for a recording (only while this is the current session). */
+    const on = (kind: string, then?: () => void) => () => {
+      if (this.rec !== rec) return;
+      this.h.onTrace?.(kind);
+      then?.();
     };
-    rec.onspeechstart = () => {
-      this.h.onTrace?.("speech");
-      this.h.onActivity?.();
-    };
+    rec.onstart = on("started", () => this.h.onStart?.());
+    rec.onaudiostart = on("audiostart", () => this.h.onStart?.());
+    rec.onsoundstart = on("sound", () => this.h.onActivity?.());
+    rec.onspeechstart = on("speech", () => this.h.onActivity?.());
+    rec.onspeechend = on("speechend");
+    rec.onaudioend = on("audioend");
+    rec.onnomatch = on("nomatch");
     rec.onerror = (e) => {
       if (this.rec !== rec) return;
       this.h.onTrace?.("error", e.error);
@@ -192,6 +210,23 @@ export class WebSpeech {
         resolve();
       }
     });
+  }
+
+  /**
+   * Lets this recognition go at once (a new one is starting): it's stopped, and nothing more from it
+   * counts, not even the last words a stopping session may still send.
+   */
+  detach() {
+    this.stopped = true;
+    const rec = this.rec;
+    this.rec = null;
+    try {
+      rec?.abort();
+    } catch {
+      /* already stopped */
+    }
+    this.onStopped?.();
+    this.onStopped = null;
   }
 
   private fail(problem: SpeechProblem) {
