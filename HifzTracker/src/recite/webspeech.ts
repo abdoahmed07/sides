@@ -84,6 +84,8 @@ export type SpeechHandlers = {
   onSessionEnd?: () => void;
   /** Recognition stopped and won't come back by itself. */
   onError: (problem: SpeechProblem) => void;
+  /** Everything the browser says, as it says it (for a recording): its results, sessions starting and ending, errors. */
+  onTrace?: (kind: string, data?: unknown) => void;
 };
 
 const PROBLEMS: Record<string, SpeechProblem> = {
@@ -128,14 +130,23 @@ export class WebSpeech {
         parts.push(r[0]?.transcript ?? "");
         if (!r.isFinal) final = false;
       }
+      this.h.onTrace?.("result", Array.from({ length: e.results.length }, (_, i) => [parts[i], e.results[i].isFinal]));
       this.worked = true;
       this.quickEnds = 0;
       this.h.onActivity?.();
       this.h.onText(assemble(parts), final);
     };
-    rec.onsoundstart = rec.onspeechstart = () => this.h.onActivity?.();
+    rec.onsoundstart = () => {
+      this.h.onTrace?.("sound");
+      this.h.onActivity?.();
+    };
+    rec.onspeechstart = () => {
+      this.h.onTrace?.("speech");
+      this.h.onActivity?.();
+    };
     rec.onerror = (e) => {
       if (this.rec !== rec) return;
+      this.h.onTrace?.("error", e.error);
       const problem = PROBLEMS[e.error];
       // "no-speech" and "aborted" just end the session; listening goes on in a new one.
       if (!problem) return;
@@ -144,6 +155,7 @@ export class WebSpeech {
     };
     rec.onend = () => {
       if (this.rec !== rec) return;
+      this.h.onTrace?.("end");
       this.rec = null;
       this.h.onSessionEnd?.();
       if (this.stopped) {
@@ -158,6 +170,7 @@ export class WebSpeech {
     };
     this.rec = rec;
     this.startedAt = Date.now();
+    this.h.onTrace?.("start");
     try {
       rec.start();
     } catch {

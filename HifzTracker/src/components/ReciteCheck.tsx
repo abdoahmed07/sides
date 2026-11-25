@@ -2,7 +2,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { q } from "@/lib/app";
-import { t, tp, tx } from "@/i18n";
+import { getLang, t, tp, tx } from "@/i18n";
 import { useLang } from "@/i18n/react";
 import { audioUrl, newAudio, reciterById } from "@/audio/recitation";
 import {
@@ -16,10 +16,13 @@ import {
   type Alignment,
   type Rating,
   type WordStatus,
+  wordFits,
 } from "@/recite/match";
 import { concat, Mic, RATE } from "@/recite/mic";
 import { loadModel, modelIsDownloaded, transcribe, type Engine } from "@/recite/recognizer";
 import { follow, type Step } from "@/recite/follow";
+import { LevelMeter, meterOff, turnMeterOff } from "@/recite/level";
+import { keepWhileDeveloping, Recorder, saveRecording, type Recording } from "@/recite/record";
 import { LAST_WORD_SURE, reveal, type Live } from "@/recite/reveal";
 import { heardWords, WebSpeech, webSpeechAvailable, type SpeechProblem } from "@/recite/webspeech";
 import { loadText } from "./AyahText";
@@ -67,9 +70,22 @@ const RATING_LABEL: Record<Rating, string> = {
 
 /**
  * Phone recognition: once the text hasn't changed for this long you've paused, and what you said is
- * settled, a wrong word you stopped on included (iPhone never says "final").
+ * settled, a wrong word you stopped on included (iPhone never says "final"). Long enough for a word
+ * drawn out in recitation (a madd of four to six counts), which the phone often only writes once it
+ * has heard all of it.
  */
-const SETTLE_MS = 1200;
+const SETTLE_MS = 1800;
+/** Problems this soon after the level meter started may be the meter's doing (see level.ts). */
+const METER_TRIAL_MS = 8000;
+
+/** A step in a recording: where matching started, heard words used, what was settled (index + s/c/w), where it goes on. */
+const stepTrace = (from: number, s: Step) => ({
+  from,
+  used: s.used,
+  next: s.next,
+  ...(s.start !== undefined && { start: s.start }),
+  settled: s.settled.map((x) => `${x.index}${x.status[0]}`).join(" "),
+});
 
 /** Every word of the Quran, for checking phone recognition strictly: worked out once, when first needed. */
 let knownWords: { text: string[]; words: Set<string> } | null = null;
@@ -144,8 +160,17 @@ export function ReciteCheck({
   const pointer = useRef(0);
   const seen = useRef<Set<number>>(new Set());
   const lastSound = useRef(0);
-  /** The ring around the microphone button: moved straight from the mic, without redrawing the page. */
+  /** The rings around the microphone button: moved straight from the mic, without redrawing the page. */
   const ring = useRef<HTMLSpanElement>(null);
+  const halo = useRef<HTMLSpanElement>(null);
+  /** Phone recognition gives no sound level: this listens alongside it for the rings. */
+  const meter = useRef<LevelMeter | null>(null);
+  const meterSince = useRef(0);
+  /** A recording of this recitation (no sound), to save if something went wrong. */
+  const recorder = useRef<Recorder | null>(null);
+  const [recording, setRecording] = useState<Recording | null>(null);
+  /** A wrong word you stopped on: if the phone then corrects itself to the right word, it's no mistake. */
+  const lastFlag = useRef<number | null>(null);
 
   // Phone recognition.
   const speech = useRef<WebSpeech | null>(null);
@@ -180,6 +205,7 @@ export function ReciteCheck({
     loadText().then(setText, () => setPhase("error"));
     return () => {
       mic.current?.stop();
+      meter.current?.stop();
       void speech.current?.stop();
       clearTimeout(settleTimer.current);
     };
@@ -216,6 +242,30 @@ export function ReciteCheck({
     });
   }, [text, ayahs]);
   const expected = useMemo(() => words.map((w) => w.text), [words]);
+  /** The portion's mushaf pages ([first word, end) of each): reciting shows one at a time. */
+  const pages = useMemo(() => {
+    const out: [number, number][] = [];
+    words.forEach((w, i) => {
+      const last = out[out.length - 1];
+      if (last && q.pageOf[words[last[0]].ayah] === q.pageOf[w.ayah]) last[1] = i + 1;
+      else out.push([i, i + 1]);
+    });
+    return out;
+  }, [words]);
+  const pageOf = useCallback(
+    (i: number) => {
+      const k = pages.findIndex(([a, b]) => i >= a && i < b);
+      return k === -1 ? Math.max(0, pages.length - 1) : k;
+    },
+    [pages],
+  );
+  const [page, setPageRaw] = useState(0);
+  const setPage = (k: number) => {
+    setPageRaw(k);
+    recorder.current?.add("page", k);
+  };
+  /** Where to look for you when you aren't where you were: no further than the end of the next page. */
+  const searchEnd = () => pages[Math.min(pages.length - 1, pageOf(pointer.current) + 1)]?.[1] ?? words.length;
 
   // Per-word state, sized to the words (fresh when the text arrives or after a reset).
   // (Memoized, so the word list below is only redrawn when a word really changes.)
@@ -241,6 +291,9 @@ export function ReciteCheck({
     lastRest.current = [];
     startAt.current = null;
     begun.current = false;
+    lastFlag.current = null;
+    recorder.current = null;
+    setRecording(null);
     setStart(null);
     setStatus(words.map(() => "pending"));
     setLive(null);
@@ -312,13 +365,28 @@ export function ReciteCheck({
 
   // ---- Phone recognition ----
 
+  /** The microphone level (0–1) on the rings around the button, straight to the page (no redraw). */
+  const showLevel = (l: number) => {
+    if (ring.current) ring.current.style.transform = `scale(${1 + l * 0.32})`;
+    if (halo.current) {
+      halo.current.style.transform = `scale(${1 + l * 0.75})`;
+      halo.current.style.opacity = String(0.25 + l * 0.75);
+    }
+    if (l > 0.3) lastSound.current = Date.now();
+    recorder.current?.level(l);
+  };
+
+  /** Without a level to show, the rings pulse with each word heard. */
   const pulse = () => {
-    const el = ring.current;
-    if (!el) return;
-    el.style.transform = "scale(1.35)";
-    setTimeout(() => {
-      el.style.transform = "scale(1)";
-    }, 160);
+    if (meter.current) return;
+    showLevel(0.7);
+    setTimeout(() => showLevel(0), 180);
+  };
+
+  const stopMeter = () => {
+    meter.current?.stop();
+    meter.current = null;
+    showLevel(0);
   };
 
   /**
@@ -364,8 +432,12 @@ export function ReciteCheck({
     pending.current = null;
     if (!p || !text) return lastRest.current;
     const from = pointer.current;
-    const step = follow(expected, p.fresh, from, { known: known(text), mode: end ? "end" : "pause", begun: begun.current });
+    const step = follow(expected, p.fresh, from, { known: known(text), mode: end ? "end" : "pause", begun: begun.current, searchEnd: searchEnd() });
     debug(end ? "phone: end" : "phone: settled", p.fresh, { statuses: step.settled, next: step.next });
+    recorder.current?.add(end ? "end-settle" : "settle", stepTrace(from, step));
+    // A wrong word you stopped on (last of what was settled): remembered in case the phone corrects itself.
+    const last = step.settled.reduce<Step["settled"][number] | null>((m, x) => (!m || x.index > m.index ? x : m), null);
+    if (last) lastFlag.current = last.status === "wrong" ? last.index : null;
     const said = p.fresh.slice(0, step.used);
     p = apply(p, step);
     if (said.length) setHeardLog((l) => [...l.slice(-30), said.join(" ")]);
@@ -382,8 +454,18 @@ export function ReciteCheck({
     const done = settledWords.current;
     let base = 0;
     while (base < done.length && base < heard.length && fold(heard[base]) === fold(done[base])) base++;
+    // The phone changed its mind about the word you'd stopped on (a drawn-out word it caught late):
+    // if it's the right word now, it's no mistake.
+    const flagged = lastFlag.current;
+    if (flagged !== null && base < done.length && heard.slice(base, base + 2).some((w) => wordFits(expected[flagged], w, known(text)))) {
+      lastFlag.current = null;
+      setStatus((prev) => prev.map((v, k) => (k === flagged && v === "wrong" ? "correct" : v)));
+      recorder.current?.add("unflag", flagged);
+    }
     let p: Hearing = { words: heard, base, fresh: [...waiting.current, ...heard.slice(base)] };
-    const step = follow(expected, p.fresh, pointer.current, { known: known(text), mode: "live", begun: begun.current });
+    const from = pointer.current;
+    const step = follow(expected, p.fresh, from, { known: known(text), mode: "live", begun: begun.current, searchEnd: searchEnd() });
+    if (step.settled.length || step.start !== undefined) recorder.current?.add("step", stepTrace(from, step));
     p = apply(p, step);
     pending.current = p;
     setLive(step.live && { statuses: step.live.statuses, heard: p.fresh.length });
@@ -395,6 +477,16 @@ export function ReciteCheck({
 
   const onProblem = (p: SpeechProblem) => {
     speech.current = null;
+    recorder.current?.add("problem", p);
+    const hadMeter = meter.current !== null && Date.now() - meterSince.current < METER_TRIAL_MS;
+    stopMeter();
+    // Right after the level meter started, it may be what got in the way (some phones let only one thing
+    // use the microphone): no meter on this device from now on, and a tap carries on.
+    if (hadMeter && p !== "blocked") {
+      turnMeterOff();
+      recorder.current?.add("meter-off");
+      return setPhase("paused");
+    }
     if (p === "interrupted") return setPhase("paused");
     setErrorMsg(t(PROBLEM[p]));
     setPhase(begun.current || pointer.current > 0 ? "paused" : "ready");
@@ -415,6 +507,7 @@ export function ReciteCheck({
     try {
       // A copy goes to the model: the original is still needed for a second listen.
       const heard = (await transcribe(audio.slice())).trim();
+      recorder.current?.add("heard", heard);
       if (heard) setHeardLog((l) => [...l.slice(-30), heard]);
       return heard.split(/\s+/).filter(Boolean);
     } finally {
@@ -531,6 +624,26 @@ export function ReciteCheck({
     setErrorMsg(null);
     setQuiet(false);
     lastSound.current = Date.now();
+    // Not started yet, on a later page: reciting starts on the page shown.
+    if (!begun.current && startAt.current === null && pages[page] && pages[page][0] > pointer.current) {
+      pointer.current = pages[page][0];
+      startAt.current = pages[page][0];
+      setStart(pages[page][0]);
+    }
+    recorder.current ??= new Recorder({
+      ua: navigator.userAgent,
+      lang: getLang(),
+      mode,
+      standalone: matchMedia("(display-mode: standalone)").matches,
+      href: location.pathname + location.search,
+      ayahs: [ayahs[0], ayahs[ayahs.length - 1]],
+      words: expected.length,
+      page: q.pageOf[words[pages[page]?.[0] ?? 0]?.ayah ?? ayahs[0]],
+      build: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? process.env.NODE_ENV,
+      date: new Date().toISOString(),
+      meter: mode === "phone" && !meterOff(),
+    });
+    recorder.current.add("listen", { from: pointer.current });
     if (mode === "phone") {
       settledWords.current = [];
       pending.current = null;
@@ -545,19 +658,29 @@ export function ReciteCheck({
           settledWords.current = [];
         },
         onError: onProblem,
+        onTrace: (kind, data) => recorder.current?.add(kind, data),
       });
       speech.current = s;
       // Straight from the tap: browsers only start recognition from one.
       s.start();
       setPhase("listening");
+      // The level, from the microphone alongside the recognition (unless that got in the way before).
+      if (!meterOff()) {
+        const m = new LevelMeter(showLevel);
+        meter.current = m;
+        meterSince.current = Date.now();
+        m.start().catch(() => {
+          if (meter.current === m) meter.current = null;
+          recorder.current?.add("meter-failed");
+        });
+      }
       return;
     }
     const m = new Mic({
       onPart,
       onPartial,
       onLevel: (l) => {
-        if (ring.current) ring.current.style.transform = `scale(${1 + Math.min(0.6, l * 1.2)})`;
-        if (l > 0.02) lastSound.current = Date.now();
+        showLevel(l);
         setQuiet(Date.now() - lastSound.current > 4000);
       },
     });
@@ -575,6 +698,9 @@ export function ReciteCheck({
   };
 
   const pause = () => {
+    recorder.current?.add("pause");
+    stopMeter();
+    setPageRaw(pageOf(Math.min(view.next, words.length - 1)));
     if (mode === "phone") {
       const s = speech.current;
       speech.current = null;
@@ -588,6 +714,9 @@ export function ReciteCheck({
 
   const finish = async () => {
     setPhase("finishing");
+    recorder.current?.add("finish");
+    stopMeter();
+    setPageRaw(pageOf(Math.min(view.next, words.length - 1)));
     if (mode === "phone") {
       const s = speech.current;
       speech.current = null;
@@ -605,6 +734,9 @@ export function ReciteCheck({
         s === "pending" && seen.current.has(i) ? "correct" : s,
       ),
     );
+    const rec = recorder.current?.finish(undefined);
+    recorder.current = null;
+    if (rec) setRecording(rec);
     setPhase("done");
   };
 
@@ -614,6 +746,7 @@ export function ReciteCheck({
 
   const hint = () => {
     if (nextHidden >= words.length) return;
+    recorder.current?.add("hint", nextHidden);
     setHints(hints.map((v, k) => (k === nextHidden ? v + 1 : v)));
   };
 
@@ -621,6 +754,18 @@ export function ReciteCheck({
     (i: number) => setStatus((prev) => prev.map((v, k) => (k === i ? "correct" : v))),
     [],
   );
+
+  /** The page shown: while reciting, the one you're on; otherwise the one picked (where you paused or finished). */
+  const shownPage = phase === "listening" || phase === "finishing" ? pageOf(Math.min(nextHidden, words.length - 1)) : Math.min(page, pages.length - 1);
+  /** A recording with how it ended (what each word came to), to save. */
+  const finished = (rec: Recording): Recording => ({ ...rec, result: { start, statuses: status.map((x) => CODE[x]).join("") } });
+  // While developing, finished recordings are kept in the project too (once each).
+  const kept = useRef<Recording | null>(null);
+  useEffect(() => {
+    if (phase !== "done" || !recording || kept.current === recording) return;
+    kept.current = recording;
+    keepWhileDeveloping(finished(recording));
+  });
 
   // Keep your place in view: when it nears the bottom of the screen (or is under the pinned controls), scroll.
   useEffect(() => {
@@ -743,6 +888,7 @@ export function ReciteCheck({
           onChoose={setRating}
           saved={saved}
           heardLog={heardLog}
+          onSaveRecording={recording ? () => void saveRecording(finished(recording)) : undefined}
           speed={
             mode === "phone"
               ? t("Recognized by your phone's speech recognition.")
@@ -815,11 +961,14 @@ export function ReciteCheck({
                 className="relative flex h-16 w-16 items-center justify-center rounded-full bg-accent text-accent-text shadow-lg transition active:scale-95 disabled:opacity-50"
               >
                 {listening && (
-                  <span
-                    ref={ring}
-                    aria-hidden
-                    className="absolute inset-0 rounded-full bg-accent/30 transition-transform duration-150"
-                  />
+                  <>
+                    <span
+                      ref={halo}
+                      aria-hidden
+                      className="absolute -inset-1 rounded-full bg-accent/20 opacity-25 transition-[transform,opacity] duration-100 ease-out"
+                    />
+                    <span ref={ring} aria-hidden className="absolute inset-0 rounded-full bg-accent/35 transition-transform duration-75 ease-out" />
+                  </>
                 )}
                 <svg
                   viewBox="0 0 24 24"
@@ -882,8 +1031,17 @@ export function ReciteCheck({
         )
       )}
 
+      <PageBar
+        pages={pages}
+        words={words}
+        page={shownPage}
+        onPage={setPage}
+        locked={phase === "listening" || phase === "finishing"}
+        startHere={!started && !done}
+      />
       <RecitedText
         words={words}
+        range={pages[shownPage] ?? [0, words.length]}
         status={done ? status : view.status}
         hints={hints}
         done={done}
@@ -900,12 +1058,12 @@ const CODE: Record<WordStatus, string> = { pending: "p", correct: "c", wrong: "w
 const STATUS: Record<string, WordStatus> = { p: "pending", c: "correct", w: "wrong", s: "skipped" };
 
 /**
- * The portion's words: hidden bars, revealed words, hints and mistakes. One block per mushaf page,
- * redrawn only when a word on it changes, and pages off screen aren't laid out at all: even a whole
- * Al-Baqarah (over 6,000 words) stays quick on a phone while you recite.
+ * The words of the page being recited: hidden bars, revealed words, hints and mistakes. One mushaf page
+ * at a time (about as long as Al-Fatiha's whole page), redrawn only when a word on it changes.
  */
 const RecitedText = memo(function RecitedText({
   words,
+  range: [a, b],
   status,
   hints,
   done,
@@ -914,6 +1072,8 @@ const RecitedText = memo(function RecitedText({
   onFix,
 }: {
   words: Word[];
+  /** The page shown: [first word, end). */
+  range: [number, number];
   status: WordStatus[];
   hints: number[];
   done: boolean;
@@ -922,35 +1082,74 @@ const RecitedText = memo(function RecitedText({
   onFix: (i: number) => void;
 }) {
   const lang = useLang();
-  const pages = useMemo(() => {
-    const out: [number, number][] = [];
-    words.forEach((w, i) => {
-      const last = out[out.length - 1];
-      if (last && q.pageOf[words[last[0]].ayah] === q.pageOf[w.ayah]) last[1] = i + 1;
-      else out.push([i, i + 1]);
-    });
-    return out;
-  }, [words]);
   return (
-    <div className="space-y-2">
-      {pages.map(([a, b]) => (
-        <TextPage
-          key={a}
-          words={words}
-          from={a}
-          to={b}
-          states={status.slice(a, b).map((s) => CODE[s]).join("")}
-          hints={hints.slice(a, b).join(",")}
-          done={done}
-          next={next >= a && next < b ? next : -1}
-          started={started}
-          onFix={onFix}
-          lang={lang}
-        />
-      ))}
-    </div>
+    <TextPage
+      key={a}
+      words={words}
+      from={a}
+      to={b}
+      states={status.slice(a, b).map((s) => CODE[s]).join("")}
+      hints={hints.slice(a, b).join(",")}
+      done={done}
+      next={next >= a && next < b ? next : -1}
+      started={started}
+      onFix={onFix}
+      lang={lang}
+    />
   );
 });
+
+/**
+ * Which mushaf page of the portion is shown, with buttons to turn the page. Before you start, the page
+ * shown is where reciting starts; while you recite, it turns by itself.
+ */
+function PageBar({
+  pages,
+  words,
+  page,
+  onPage,
+  locked,
+  startHere,
+}: {
+  pages: [number, number][];
+  words: Word[];
+  page: number;
+  onPage: (k: number) => void;
+  locked: boolean;
+  startHere: boolean;
+}) {
+  useLang();
+  if (pages.length < 2) return null;
+  const [a, b] = pages[page];
+  const ayahsHere = [...new Set(words.slice(a, b).map((w) => w.ayah))];
+  const button = (k: number, label: string, path: string) => (
+    <button
+      onClick={() => onPage(k)}
+      disabled={locked || k < 0 || k >= pages.length}
+      aria-label={label}
+      title={label}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-text disabled:opacity-30"
+    >
+      <svg viewBox="0 0 24 24" className="h-5 w-5 rtl:rotate-180" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d={path} />
+      </svg>
+    </button>
+  );
+  return (
+    <div className="flex items-center gap-1 rounded-xl bg-surface-2 p-1">
+      {button(page - 1, t("Previous page"), "M15 6l-6 6 6 6")}
+      <div className="min-w-0 flex-1 text-center leading-tight">
+        <p className="truncate text-sm font-medium">
+          {t("Page {n}", { n: q.pageOf[ayahsHere[0]] })} · {q.rangeLabel(ayahsHere)}
+        </p>
+        <p className="text-xs text-muted">
+          {startHere && page > 0 ? t("You'll start on this page") : t("{n} of {total}", { n: page + 1, total: pages.length })}
+        </p>
+      </div>
+      {button(page + 1, t("Next page"), "M9 6l6 6-6 6")}
+    </div>
+  );
+}
 
 /** One mushaf page of the portion's words. */
 const TextPage = memo(function TextPage({
@@ -1097,6 +1296,8 @@ function Summary(p: {
   saved: boolean;
   heardLog: string[];
   speed?: string;
+  /** Saves a recording of this recitation (no sound), to report a problem. */
+  onSaveRecording?: () => void;
   onAgain: () => void;
 }) {
   const counted = p.status.slice(p.scope[0], p.scope[1]);
@@ -1243,15 +1444,25 @@ function Summary(p: {
         )}
         <Button onClick={p.onAgain}>↺ {t("Try again")}</Button>
       </div>
-      {p.heardLog.length > 0 && (
+      {(p.heardLog.length > 0 || p.onSaveRecording) && (
         <details className="text-xs text-muted">
           <summary className="cursor-pointer">
             {t("What the app heard")}
           </summary>
-          <p className="mt-1 leading-relaxed" lang="ar" dir="rtl">
-            {p.heardLog.join(" · ")}
-          </p>
+          {p.heardLog.length > 0 ? (
+            <p className="mt-1 leading-relaxed" lang="ar" dir="rtl">
+              {p.heardLog.join(" · ")}
+            </p>
+          ) : (
+            <p className="mt-1">{t("Nothing was heard.")}</p>
+          )}
           {p.speed && <p className="mt-1">{p.speed}</p>}
+          {p.onSaveRecording && (
+            <div className="mt-2 space-y-1">
+              <Button onClick={p.onSaveRecording}>{t("Save a recording of this recitation")}</Button>
+              <p>{t("Something not right? The recording has what your phone heard and when (no sound). Send it along when you report a problem.")}</p>
+            </div>
+          )}
         </details>
       )}
     </div>

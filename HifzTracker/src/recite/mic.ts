@@ -4,6 +4,8 @@
  * `onPart`; while a part is still going, `onPartial` gets it every couple of
  * seconds so words can appear before you pause.
  */
+import { levelOf } from "./level";
+
 export const RATE = 16000;
 
 /**
@@ -168,7 +170,7 @@ export class Mic {
     // Learn the background noise level only in the quiet moments, so a quiet room and a
     // noisy one both work, and a long stretch of reciting never starts to count as "silence".
     if (!voice) this.floor = rms < this.floor ? rms : this.floor * 0.98 + rms * 0.02;
-    this.h.onLevel?.(Math.min(1, rms * 8));
+    this.h.onLevel?.(levelOf(rms));
 
     if (!this.speaking && !voice) {
       this.preRoll.push(frame);

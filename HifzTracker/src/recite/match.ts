@@ -158,14 +158,19 @@ const LETTER_NAMES: [name: string, letter: string][] = [
   ["نون", "ن"],
 ];
 
-/** The letters some letter names spell (written together, without hamza), or "" if they aren't all names. */
+/** The letters of the opening letters, which recognition may also write one by one ("ا ل م"). */
+const OPENING_LETTERS = new Set("المصركهيعطسحقن");
+
+/** The letters some letter names (or the letters themselves) spell, written together without hamza; "" if they aren't. */
 function spelled(names: string): string {
   let out = "";
   for (let k = 0; k < names.length; ) {
     const hit = LETTER_NAMES.find(([name]) => names.startsWith(name, k));
-    if (!hit) return "";
-    out += hit[1];
-    k += hit[0].length;
+    if (hit) {
+      out += hit[1];
+      k += hit[0].length;
+    } else if (OPENING_LETTERS.has(names[k])) out += names[k++];
+    else return "";
   }
   return out;
 }
@@ -262,6 +267,12 @@ const CLOSE = 0.75;
 const WRONG = 0.4;
 /** A word you stopped on that nothing explains: dearer than any pairing, so it's called a mistake. */
 const UNEXPLAINED = 2;
+/**
+ * The opening letters of a surah (الٓمٓ, حمٓ…) are recited as long, drawn-out letter names, which phones
+ * hear badly or not at all. Not hearing them costs almost nothing, and once the words after them are
+ * heard they count as said.
+ */
+const LETTERS_SKIP = 0.1;
 /** How far back a word you stopped on still counts as repeating yourself. */
 const RECENT = 12;
 /** Said around a recitation, not part of it: the isti'adha, the basmala, "sadaqa Allahu l-'azim", amin. */
@@ -423,7 +434,7 @@ export function align(expected: string[], heard: string[], from: number, opts: A
       let mv = 1;
       // On a tie, a heard word goes with the earlier of two same words ("الناس" is in every ayah of
       // An-Nas): what you said comes first and the skipped stretch after it, not the other way round.
-      const skip = cost[i - 1][j] + 1;
+      const skip = cost[i - 1][j] + (ex[off + i - 1].letters ? LETTERS_SKIP : 1);
       if (skip <= best) [best, mv] = [skip, 2];
       const two = twoExpected[i] && joinFit(twoExpected[i]!, h[j - 1]);
       if (two && cost[i - 2][j - 1] + two.cost < best) [best, mv] = [cost[i - 2][j - 1] + two.cost, 4];
@@ -486,7 +497,8 @@ export function align(expected: string[], heard: string[], from: number, opts: A
       i--;
       j--;
     } else if (mv === 2) {
-      statuses.push({ index: from + i - 1, status: "skipped", score: 0, heard: -1 });
+      // Opening letters not heard: said (see LETTERS_SKIP).
+      statuses.push({ index: from + i - 1, status: ex[off + i - 1].letters ? "correct" : "skipped", score: 0, heard: -1 });
       i--;
     } else if (mv === 4) {
       const score = joinFit(twoExpected[i]!, h[j - 1])!.score;
@@ -504,7 +516,8 @@ export function align(expected: string[], heard: string[], from: number, opts: A
   }
   statuses.reverse();
   // Trailing skips aren't mistakes yet: the person may simply not have got there.
-  while (statuses.length && statuses[statuses.length - 1].status === "skipped") statuses.pop();
+  // (Nor are opening letters not heard yet: they count once what follows them is heard.)
+  while (statuses.length && statuses[statuses.length - 1].heard === -1) statuses.pop();
   const last = statuses[statuses.length - 1];
   return { statuses, next: last ? last.index + 1 : from, ...(rest && { rest }) };
 }

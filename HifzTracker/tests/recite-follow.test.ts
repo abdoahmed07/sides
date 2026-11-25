@@ -36,6 +36,18 @@ describe("finding where you are", () => {
     );
   });
 
+  it("starts at Al-Baqarah's first ayah even when the phone misses its letters", () => {
+    const step = follow(baqarah, said(PLAIN[2]), 0, { ...live, begun: false });
+    expect(step.start).toBeUndefined();
+    expect(step.live!.statuses[0]).toMatchObject({ index: 0, status: "correct" });
+  });
+
+  it("looks for where you started only up to where it's told (reciting page by page)", () => {
+    const kursi = said(PLAIN[255]).slice(0, 7);
+    expect(follow(baqarah, kursi, 0, { ...live, begun: false, searchEnd: at(250) }).start).toBeUndefined();
+    expect(follow(baqarah, kursi, at(254), { ...live, begun: false, searchEnd: at(257) }).start).toBe(at(255));
+  });
+
   it("starts at the beginning as usual, the isti'adha and basmala before it", () => {
     const step = follow(baqarah, said(`أعوذ بالله من الشيطان الرجيم بسم الله الرحمن الرحيم ${PLAIN[1]} ${PLAIN[2]}`), 0, { ...live, begun: false });
     expect(step.start).toBeUndefined();

@@ -869,8 +869,6 @@ const sv: Dict = {
   "Listening and reciting": "Lyssna och recitera",
   "Recitation audio streams from EveryAyah (everyayah.com) when you press play.":
     "Reciteringsljudet strömmas från EveryAyah (everyayah.com) när du trycker på spela.",
-  "**Recite and check** listens through your microphone only while you recite. By default it uses your phone's own speech recognition (Google on Android and in Chrome, Apple on iPhone and in Safari): like voice typing, your recitation is sent to them to be turned into text. In private mode, the recognition runs on your device instead and your voice is never sent anywhere; the first time, its speech model (about 45–70 MB) downloads from Hugging Face. The app itself never records or keeps your voice.":
-    "**Recitera och kontrollera** lyssnar genom mikrofonen bara medan du reciterar. Som standard används telefonens egen taligenkänning (Google på Android och i Chrome, Apple på iPhone och i Safari): som vid röstinmatning skickas din recitation till dem för att bli text. I privat läge körs taligenkänningen i stället på din enhet och din röst skickas aldrig någonstans; första gången laddas talmodellen (ungefär 45–70 MB) ner från Hugging Face. Appen själv spelar aldrig in eller sparar din röst.",
   "Speech recognition is blocked. Allow the microphone (and speech recognition) for this site in your settings, then try again.":
     "Taligenkänningen är blockerad. Tillåt mikrofonen (och taligenkänning) för den här webbplatsen i inställningarna och försök igen.",
   "Your phone's speech recognition isn't available here. On iPhone, turn on Dictation (Settings › General › Keyboard) and open the app in Safari, or use private mode.":
@@ -1007,6 +1005,16 @@ const sv: Dict = {
     "Detta är Boken som det inte råder något tvivel om, en vägledning för dem som fruktar Allah.",
   "You've reached {n} whole pages!": { one: "Du har nått {n} hel sida!", other: "Du har nått {n} hela sidor!" },
   "You've reached {n} ayahs!": { one: "Du har nått {n} vers!", other: "Du har nått {n} verser!" },
+  "**Recite and check** listens through your microphone only while you recite. By default it uses your phone's own speech recognition (Google on Android and in Chrome, Apple on iPhone and in Safari): like voice typing, your recitation is sent to them to be turned into text. In private mode, the recognition runs on your device instead and your voice is never sent anywhere; the first time, its speech model (about 45–70 MB) downloads from Hugging Face. The app itself never records or keeps your voice. To help fix problems you can save a recording of a recitation: it holds only the text your phone heard and when, never sound, and it stays on your device unless you send it yourself.":
+    "**Recitera och kontrollera** lyssnar genom mikrofonen bara medan du reciterar. Som standard används telefonens egen taligenkänning (Google på Android och i Chrome, Apple på iPhone och i Safari): som vid röstinmatning skickas din recitation till dem för att bli text. I privat läge körs taligenkänningen i stället på din enhet och din röst skickas aldrig någonstans; första gången laddas talmodellen (ungefär 45–70 MB) ner från Hugging Face. Appen själv spelar aldrig in eller sparar din röst. För att hjälpa till att rätta problem kan du spara en inspelning av en recitation: den innehåller bara texten din telefon hörde och när, aldrig ljud, och den stannar på din enhet om du inte skickar den själv.",
+  "Previous page": "Föregående sida",
+  "Next page": "Nästa sida",
+  "You'll start on this page": "Du börjar på den här sidan",
+  "{n} of {total}": "{n} av {total}",
+  "Nothing was heard.": "Inget hördes.",
+  "Save a recording of this recitation": "Spara en inspelning av den här recitationen",
+  "Something not right? The recording has what your phone heard and when (no sound). Send it along when you report a problem.":
+    "Något som inte stämmer? Inspelningen innehåller vad din telefon hörde och när (inget ljud). Skicka med den när du rapporterar ett problem.",
 };
 
 export default sv;

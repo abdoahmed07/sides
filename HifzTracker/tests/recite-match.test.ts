@@ -156,6 +156,19 @@ describe("checking the phone's recognition strictly", () => {
     const r = align(baqarah, "ألف لام ميم ذلك الكتاب لا ريب فيه هدى للمتقين".split(" "), 0, strict);
     expect(r.statuses.map((s) => s.status)).toEqual(baqarah.map(() => "correct"));
     expect(align(words(36, 1, 2), "ياسين والقرآن الحكيم".split(" "), 0, strict).statuses.every((s) => s.status === "correct")).toBe(true);
+    // …or as the letters themselves.
+    expect(align(baqarah, "ا ل م ذلك الكتاب".split(" "), 0, strict).statuses.every((s) => s.status === "correct")).toBe(true);
+  });
+
+  it("counts the opening letters as said when the phone doesn't catch them (drawn out, they're often missed)", () => {
+    const baqarah = words(2, 1, 2);
+    for (const heard of ["ذلك الكتاب لا ريب فيه", "اللهم ذلك الكتاب لا ريب فيه"]) {
+      const r = align(baqarah, heard.split(" "), 0, strict);
+      expect(r.statuses[0]).toMatchObject({ index: 0, status: "correct" });
+      expect(r.statuses.every((s) => s.status === "correct"), heard).toBe(true);
+    }
+    // Not before what comes after them is heard.
+    expect(align(baqarah, ["اللهم"], 0, { ...strict, stopped: "pause" }).statuses.filter((s) => s.index === 0 && s.status === "correct")).toEqual([]);
   });
 });
 

@@ -58,7 +58,7 @@ export function Privacy() {
         <P text={t("Recitation audio streams from EveryAyah (everyayah.com) when you press play.")} />
         <P
           text={t(
-            "**Recite and check** listens through your microphone only while you recite. By default it uses your phone's own speech recognition (Google on Android and in Chrome, Apple on iPhone and in Safari): like voice typing, your recitation is sent to them to be turned into text. In private mode, the recognition runs on your device instead and your voice is never sent anywhere; the first time, its speech model (about 45–70 MB) downloads from Hugging Face. The app itself never records or keeps your voice.",
+            "**Recite and check** listens through your microphone only while you recite. By default it uses your phone's own speech recognition (Google on Android and in Chrome, Apple on iPhone and in Safari): like voice typing, your recitation is sent to them to be turned into text. In private mode, the recognition runs on your device instead and your voice is never sent anywhere; the first time, its speech model (about 45–70 MB) downloads from Hugging Face. The app itself never records or keeps your voice. To help fix problems you can save a recording of a recitation: it holds only the text your phone heard and when, never sound, and it stays on your device unless you send it yourself.",
           )}
         />
       </Section>

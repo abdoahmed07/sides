@@ -24,6 +24,8 @@ const RUN_MAX = 30;
 const LIVE_MAX = 30;
 /** …all but this many. */
 const LIVE_KEEP = 10;
+/** Where you started has to fit at least this share of the words heard. */
+const FIT_MOST = 0.7;
 /** How far back going back to repeat yourself is recognized. */
 const REPEAT_BACK = 250;
 /** A few words you stopped on that are said a little further on (this many words at most): you skipped to them. */
@@ -51,10 +53,15 @@ export type FollowOptions = {
   mode: "live" | "pause" | "end";
   /** Whether you've started reciting (any word settled yet). */
   begun: boolean;
+  /**
+   * Where to look for you when you aren't where you were: only before this word (the end of the next
+   * page, reciting page by page), so a phrase that comes again much later can't pull you there.
+   */
+  searchEnd?: number;
 };
 
 /** Follows the heard words from `from`. */
-export function follow(expected: string[], heard: string[], from: number, { known, mode, begun }: FollowOptions): Step {
+export function follow(expected: string[], heard: string[], from: number, { known, mode, begun, searchEnd = expected.length }: FollowOptions): Step {
   const settled: Statuses = [];
   let at = from;
   let used = 0;
@@ -63,7 +70,7 @@ export function follow(expected: string[], heard: string[], from: number, { know
   /** Heard words before where you started, kept while that may still change. */
   let kept = 0;
 
-  const found = findJump(expected, words, at, known, begun, mode);
+  const found = findJump(expected, words, at, known, begun, mode, searchEnd);
   // Paused before it's clear where you started (the words so far are in more than one place): wait for more.
   if (found === "wait" && mode === "pause") return { settled, next: at, used, live: null };
   // Paused on a few words from further on: settle what came before, and wait for more of them.
@@ -155,6 +162,7 @@ function findJump(
   known: Set<string>,
   begun: boolean,
   mode: FollowOptions["mode"],
+  searchEnd: number,
 ): { heard: number; to: number } | { hold: number } | "wait" | null {
   if (words.length < 2) return null;
   const local = align(expected, words, from, { known });
@@ -193,7 +201,7 @@ function findJump(
           all = true;
           break;
         }
-        const found = findRun(expected, words.slice(b, b + len), known).filter((c) => c >= from);
+        const found = findRun(expected, words.slice(b, b + len), known).filter((c) => c >= from && c < searchEnd);
         if (!found.length) break;
         places = found;
         if (found.length === 1 || len >= RUN_MAX) break;
@@ -202,14 +210,16 @@ function findJump(
       // Still in more than one place with all that was heard: paused, wait to hear which; reciting on,
       // follow the first for now (nothing is settled until it's clear).
       if (places.length > 1 && all && mode === "pause") return "wait";
-      // Otherwise the one all the words heard fit best (the words after may come after a skip).
+      // Otherwise the one all the words heard fit best (the words after may come after a skip), as long
+      // as most of them do: a few words alike in another ayah (لا إله إلا هو is in 2:163 and 2:255) don't
+      // make it the place.
       let to = places[0];
       let best = -1;
-      if (places.length > 1)
-        for (const c of places.slice(0, 12)) {
-          const right = align(expected, words.slice(b), c, { known }).statuses.filter((s) => s.status === "correct").length;
-          if (right > best) [best, to] = [right, c];
-        }
+      for (const c of places.slice(0, 12)) {
+        const right = align(expected, words.slice(b), c, { known }).statuses.filter((s) => s.status === "correct").length;
+        if (right > best) [best, to] = [right, c];
+      }
+      if (best < FIT_MOST * (words.length - b)) continue;
       const j = back(b, to, from);
       return j.to > from ? j : null;
     }
@@ -227,7 +237,7 @@ function findJump(
   const bad = words.slice(firstBad);
   if (bad.length >= (mode === "live" ? JUMP_RUN : 2)) {
     const places = findRun(expected, bad, known);
-    const ahead = places.filter((c) => c > floor);
+    const ahead = places.filter((c) => c > floor && c < searchEnd);
     if (ahead.length) {
       const before = places.some((c) => c < floor && c >= floor - REPEAT_BACK);
       if (before) {
@@ -243,7 +253,7 @@ function findJump(
   const places = findRun(expected, words.slice(b), known);
   // Said before: going back to repeat yourself.
   if (places.some((c) => c < local.next && c >= local.next - REPEAT_BACK)) return null;
-  const ahead = places.filter((c) => c > local.next);
+  const ahead = places.filter((c) => c > local.next && c < searchEnd);
   return ahead.length ? back(b, ahead[0], local.next) : null;
 }
 
