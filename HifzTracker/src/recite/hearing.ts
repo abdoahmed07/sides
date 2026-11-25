@@ -60,6 +60,8 @@ export class Hearing {
   private mistakes = new Set<number>();
   /** Words the phone wrote right at some point: you said them, whatever it writes later. */
   private right = new Set<number>();
+  /** The last word settled as right: mistakes after it are where you stopped (and may say again). */
+  private lastRight = -1;
 
   constructor(
     private readonly expected: string[],
@@ -95,6 +97,7 @@ export class Hearing {
       this.turnRight([flagged], "unflag");
     }
     if (base < done.length) this.recheck(heard, base);
+    this.saidAgain(heard.slice(base));
     let p: Pending = { words: heard, base, fresh: [...this.waiting, ...heard.slice(base)] };
     const from = this.pointer;
     const step = follow(this.expected, p.fresh, from, { known: this.known, mode: "live", begun: this.begun, searchEnd: this.searchEnd(from) });
@@ -164,8 +167,10 @@ export class Hearing {
       if (heardRight.length) this.on.trace?.("heard-right", heardRight);
       const updates = step.settled.map((s): [number, Settled] => [s.index, this.right.has(s.index) ? "correct" : s.status]);
       for (const [i, status] of updates) {
-        if (status === "correct") this.mistakes.delete(i);
-        else this.mistakes.add(i);
+        if (status === "correct") {
+          this.mistakes.delete(i);
+          this.lastRight = Math.max(this.lastRight, i);
+        } else this.mistakes.add(i);
       }
       this.on.statuses(updates);
     }
@@ -200,11 +205,25 @@ export class Hearing {
     this.turnRight(right, "rewritten-right");
   }
 
+  /**
+   * A word you stopped on that wasn't heard right (no word after it was), said again: it's right. Only
+   * those, and close by, so the same word further on doesn't count for it.
+   */
+  private saidAgain(fresh: string[]) {
+    const stoppedOn = [...this.mistakes].filter((i) => i > this.lastRight && i >= this.pointer - 12);
+    if (!stoppedOn.length || !fresh.length) return;
+    const fixed = stoppedOn.filter((i) => fresh.some((w) => wordFits(this.expected[i], w, this.known)));
+    if (fixed.length) this.turnRight(fixed, "said-again");
+  }
+
   /** Words settled as mistakes that turn out right. */
   private turnRight(indices: number[], why: string) {
     const fixed = indices.filter((i) => this.mistakes.has(i));
     if (!fixed.length) return;
-    for (const i of fixed) this.mistakes.delete(i);
+    for (const i of fixed) {
+      this.mistakes.delete(i);
+      this.lastRight = Math.max(this.lastRight, i);
+    }
     this.on.trace?.(why, fixed.length === 1 ? fixed[0] : fixed);
     this.on.statuses(fixed.map((i): [number, Settled] => [i, "correct"]));
   }

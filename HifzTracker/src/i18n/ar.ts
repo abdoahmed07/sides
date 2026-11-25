@@ -980,6 +980,19 @@ const ar: Dict = {
     many: "{n} كلمة لم تصل إليها",
     other: "{n} كلمة لم تصل إليها",
   },
+  "{n} words not heard": {
+    zero: "{n} كلمة لم تُسمع",
+    one: "كلمة واحدة لم تُسمع",
+    two: "كلمتان لم تُسمعا",
+    few: "{n} كلمات لم تُسمع",
+    many: "{n} كلمة لم تُسمع",
+    other: "{n} كلمة لم تُسمع",
+  },
+  "Marks mistakes as you recite.": "يُعلِّم الأخطاء أثناء التسميع.",
+  "Waits on each word until it hears it right; say it again if it doesn't show.":
+    "ينتظر عند كل كلمة حتى يسمعها صحيحة؛ أعِدها إن لم تظهر.",
+  "Just wait for each word instead": "انتظر كل كلمة بدلاً من ذلك",
+  "Mark mistakes instead": "علِّم الأخطاء بدلاً من ذلك",
   "{n} wrong words": {
     zero: "{n} كلمة خاطئة",
     one: "كلمة خاطئة واحدة",

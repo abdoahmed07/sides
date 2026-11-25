@@ -69,6 +69,18 @@ describe("following what the phone writes", () => {
     expect(status).toEqual(Array(12).fill("correct"));
   });
 
+  it("turns a word you stopped on right when you say it again", () => {
+    const { h, status } = hearing(words(114, 1, 2));
+    h.hear("قل أعوذ برب الفلق");
+    h.settle(false);
+    expect(status[3]).toBe("wrong");
+    // A new session (you tapped to go on), saying it again and going on.
+    h.newSession();
+    h.hear("الناس ملك الناس");
+    h.settle(true);
+    expect(status).toEqual(Array(6).fill("correct"));
+  });
+
   it("still calls a wrong word a mistake", () => {
     const { h, status } = hearing(words(114, 1, 2));
     h.hear("قل أعوذ برب الفلق ملك الناس");

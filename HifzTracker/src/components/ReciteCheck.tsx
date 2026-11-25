@@ -56,6 +56,18 @@ type Phase =
  */
 type Mode = "phone" | "device";
 const MODE_KEY = "hifz:reciteMode";
+/**
+ * Marking mistakes, or (the default) waiting on each word until it's heard right: phones mishear, and a
+ * word marked wrong that you said right is worse than one you have to say again.
+ */
+const MARK_KEY = "hifz:markMistakes";
+function initialMark(): boolean {
+  try {
+    return localStorage.getItem(MARK_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 function initialMode(): Mode {
   if (!webSpeechAvailable()) return "device";
@@ -155,6 +167,15 @@ export function ReciteCheck({
 }) {
   useLang();
   const [mode, setMode] = useState<Mode>(initialMode);
+  const [mark, setMarkRaw] = useState(initialMark);
+  const setMark = (m: boolean) => {
+    setMarkRaw(m);
+    try {
+      localStorage.setItem(MARK_KEY, m ? "1" : "0");
+    } catch {
+      /* not kept; fine for now */
+    }
+  };
   const [text, setText] = useState<string[] | null>(null);
   const [phase, setPhase] = useState<Phase>(mode === "phone" ? "ready" : "check");
   const [progress, setProgress] = useState(0);
@@ -330,7 +351,7 @@ export function ReciteCheck({
     [hintsRaw, words],
   );
   /** What shows while reciting: settled words, then live ones, strictly in order (from where you started). */
-  const view = useMemo(() => reveal(status, live, confirmed, start ?? 0), [status, live, confirmed, start]);
+  const view = useMemo(() => reveal(status, live, confirmed, start ?? 0, !mark), [status, live, confirmed, start, mark]);
 
   const reset = () => {
     pointer.current = 0;
@@ -903,7 +924,9 @@ export function ReciteCheck({
   const notReached = done ? status.slice(scope[0], scope[1]).filter((s) => s === "pending").length : 0;
   const hinted = hints.filter((h) => h > 0).length;
   const mistakes = wrong + skipped;
-  const suggestion = suggestRating(scope[1] - scope[0], mistakes + notReached, hinted);
+  const suggestion = mark
+    ? suggestRating(scope[1] - scope[0], mistakes + notReached, hinted)
+    : suggestRating(scope[1] - scope[0], notReached, hinted + mistakes);
   const chosen = rating ?? suggestion;
   const currentAyah = words[Math.min(nextHidden, words.length - 1)]?.ayah;
   const ayahNo = currentAyah === undefined ? 0 : ayahs.indexOf(currentAyah) + 1;
@@ -993,6 +1016,7 @@ export function ReciteCheck({
           saved={saved}
           heardLog={heardLog}
           onSaveRecording={recording ? () => void saveRecording(finished(recording)) : undefined}
+          soft={!mark}
           speed={
             mode === "phone"
               ? t("Recognized by your phone's speech recognition.")
@@ -1034,7 +1058,7 @@ export function ReciteCheck({
               </span>
               <span className="flex items-center gap-2">
                 {checking && <Spinner />}
-                {started && (
+                {started && mark && (
                   <span className={mistakes ? "font-medium text-danger" : ""}>
                     {tp(
                       { one: "{n} mistake", other: "{n} mistakes" },
@@ -1134,6 +1158,16 @@ export function ReciteCheck({
                 </button>
               </p>
             )}
+            {!started && (
+              <p className="text-center text-[11px] leading-snug text-muted">
+                {mark
+                  ? t("Marks mistakes as you recite.")
+                  : t("Waits on each word until it hears it right; say it again if it doesn't show.")}{" "}
+                <button className="underline underline-offset-2 hover:text-text" onClick={() => setMark(!mark)}>
+                  {mark ? t("Just wait for each word instead") : t("Mark mistakes instead")}
+                </button>
+              </p>
+            )}
             {!started && (mode === "phone" || phoneAvailable) && (
               <p className="text-center text-[11px] leading-snug text-muted">
                 {mode === "phone"
@@ -1165,6 +1199,7 @@ export function ReciteCheck({
         range={pages[shownPage] ?? [0, words.length]}
         status={done ? status : view.status}
         hints={hints}
+        soft={!mark}
         done={done}
         next={nextHidden}
         started={started}
@@ -1187,6 +1222,7 @@ const RecitedText = memo(function RecitedText({
   range: [a, b],
   status,
   hints,
+  soft,
   done,
   next,
   started,
@@ -1197,6 +1233,8 @@ const RecitedText = memo(function RecitedText({
   range: [number, number];
   status: WordStatus[];
   hints: number[];
+  /** Not marking mistakes: words not heard show softly, not as mistakes. */
+  soft: boolean;
   done: boolean;
   next: number;
   started: boolean;
@@ -1211,6 +1249,7 @@ const RecitedText = memo(function RecitedText({
       to={b}
       states={status.slice(a, b).map((s) => CODE[s]).join("")}
       hints={hints.slice(a, b).join(",")}
+      soft={soft}
       done={done}
       next={next >= a && next < b ? next : -1}
       started={started}
@@ -1279,6 +1318,7 @@ const TextPage = memo(function TextPage({
   to,
   states,
   hints,
+  soft,
   done,
   next,
   started,
@@ -1287,6 +1327,7 @@ const TextPage = memo(function TextPage({
   words: Word[];
   from: number;
   to: number;
+  soft: boolean;
   /** Each word's state, one letter per word (`CODE`). */
   states: string;
   /** Hint presses per word, comma-separated. */
@@ -1316,7 +1357,9 @@ const TextPage = memo(function TextPage({
         const hintShown = !isShown && hint[k] > 0;
         const cls = hintShown
           ? "text-muted"
-          : st === "wrong"
+          : soft && (st === "wrong" || st === "skipped")
+            ? "rounded-md text-muted underline decoration-dotted decoration-1 underline-offset-8"
+            : st === "wrong"
             ? "rounded-md bg-danger-soft text-danger"
             : st === "skipped"
               ? "rounded-md text-warn underline decoration-dotted decoration-2 underline-offset-8"
@@ -1419,6 +1462,8 @@ function Summary(p: {
   speed?: string;
   /** Saves a recording of this recitation (no sound), to report a problem. */
   onSaveRecording?: () => void;
+  /** Not marking mistakes: words not heard right are "not heard", not wrong or skipped. */
+  soft: boolean;
   onAgain: () => void;
 }) {
   const counted = p.status.slice(p.scope[0], p.scope[1]);
@@ -1429,8 +1474,9 @@ function Summary(p: {
   const skipped = p.status.filter((s) => s === "skipped").length;
   const perfect = wrong + skipped + p.notReached + p.hinted === 0;
   const parts = [
-    wrong && tp({ one: "{n} wrong word", other: "{n} wrong words" }, wrong),
-    skipped &&
+    p.soft && wrong + skipped && tp({ one: "{n} word not heard", other: "{n} words not heard" }, wrong + skipped),
+    !p.soft && wrong && tp({ one: "{n} wrong word", other: "{n} wrong words" }, wrong),
+    !p.soft && skipped &&
       tp({ one: "{n} skipped word", other: "{n} skipped words" }, skipped),
     p.notReached &&
       tp(
@@ -1511,9 +1557,7 @@ function Summary(p: {
                 {words.map(({ w, i }) => (
                   <span
                     key={i}
-                    className={
-                      p.status[i] === "wrong" ? "text-danger" : "text-warn"
-                    }
+                    className={p.soft ? "text-muted" : p.status[i] === "wrong" ? "text-danger" : "text-warn"}
                   >
                     {w.text}{" "}
                   </span>

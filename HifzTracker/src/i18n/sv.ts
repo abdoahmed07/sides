@@ -862,6 +862,12 @@ const sv: Dict = {
     one: "{n} ord som inte nåddes",
     other: "{n} ord som inte nåddes",
   },
+  "{n} words not heard": { one: "{n} ord hördes inte", other: "{n} ord hördes inte" },
+  "Marks mistakes as you recite.": "Markerar fel medan du reciterar.",
+  "Waits on each word until it hears it right; say it again if it doesn't show.":
+    "Väntar på varje ord tills det hörs rätt; säg det igen om det inte visas.",
+  "Just wait for each word instead": "Vänta bara på varje ord i stället",
+  "Mark mistakes instead": "Markera fel i stället",
   "{n} wrong words": { one: "{n} fel ord", other: "{n} fel ord" },
   "Tap if you said it right": "Tryck om du sa det rätt",
   "Marked wrong but you said it right? Tap the word to correct it.":

@@ -31,6 +31,17 @@ describe("putting the phone's recognition results together", () => {
 });
 
 describe("revealing words while reciting", () => {
+  it("waits on a word not heard right (not marking mistakes) until you go on, then shows it as not heard", () => {
+    const settled: WordStatus[] = ["correct", "correct", "wrong", "pending", "pending"];
+    // Stopped on it: it stays hidden, waiting for you to say it again.
+    expect(reveal(settled, null, undefined, 0, true)).toEqual({ status: ["correct", "correct", "pending", "pending", "pending"], next: 2 });
+    // You went on and the next word was heard right: it shows (as not heard), and so does the next one.
+    const after: WordStatus[] = ["correct", "correct", "wrong", "correct", "pending"];
+    expect(reveal(after, null, undefined, 0, true)).toEqual({ status: after, next: 4 });
+    // Marking mistakes: it shows straight away.
+    expect(reveal(settled, null, undefined, 0, false).status[2]).toBe("wrong");
+  });
+
   it("reveals words in order: a later word waits for the one before it", () => {
     // Word 2 isn't heard clearly yet, word 3 is: only 0–1 show.
     const live = { statuses: [0, 1, 3].map((index, k) => ({ index, status: "correct" as const, score: 1, heard: k })), heard: 4 };

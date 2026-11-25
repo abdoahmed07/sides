@@ -26,6 +26,8 @@ export type Live = { statuses: Alignment["statuses"]; heard: number };
  * @param live the current live result (aligned from the first unsettled word), if any
  * @param confirmed words already heard right by an earlier check (on-device mode)
  * @param start where you started reciting (the words before it aren't part of it)
+ * @param wait not marking mistakes: a word not heard right stays hidden (waiting for you to say it
+ *   again) until you've gone on and a word after it is heard right; then it shows as not heard
  * @returns what to show per word, and the first word still hidden
  */
 export function reveal(
@@ -33,6 +35,7 @@ export function reveal(
   live: Live | null,
   confirmed?: Set<number>,
   start = 0,
+  wait = false,
 ): { status: WordStatus[]; next: number } {
   const status = settled.map((s, i): WordStatus => (s === "pending" && confirmed?.has(i) ? "correct" : s));
   if (live) {
@@ -48,6 +51,11 @@ export function reveal(
       }
       if (ok[k]) rightAfter++;
     }
+  }
+  if (wait) {
+    let lastRight = status.length - 1;
+    while (lastRight >= 0 && status[lastRight] !== "correct") lastRight--;
+    for (let i = lastRight + 1; i < status.length; i++) if (status[i] === "wrong" || status[i] === "skipped") status[i] = "pending";
   }
   let next = Math.min(start, status.length);
   while (next < status.length && status[next] !== "pending") next++;
