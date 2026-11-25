@@ -209,6 +209,24 @@ describe("checking the phone's recognition strictly", () => {
     expect(end(false)).toBe("wrong");
   });
 
+  it("forgives how an iPhone wrote right words in a real recitation (Al-Baqarah 2:3–16)", () => {
+    const check = (ayah: number, phone: string, stopped?: "end") =>
+      align(words(2, ayah, ayah), phone.split(" "), 0, { ...strict, stopped }).statuses.map((s) => s.status);
+    const allRight = (ayah: number) => words(2, ayah, ayah).map(() => "correct");
+    // A word split in two, its pieces no word of the Quran (وَمِمَّا, تُنذِرْهُمْ, أَنُؤْمِنُ)…
+    expect(check(3, "الذين يؤمنون بالغيب ويقيمون الصلاة ومن ما رزقناهم ينفقون")).toEqual(allRight(3));
+    expect(check(6, "إن الذين كفروا سواء عليهم أندرتهم أم لم تنظر هم لا يؤمنون")).toEqual(allRight(6));
+    expect(check(13, "وإذا قيل لهم آمنوا كما آمن الناس قالوا أن أؤمن كما آمن السفهاء ألا إنهم هم السفهاء ولكن لا يعلمون")).toEqual(allRight(13));
+    // …letters that sound alike (خطم for خَتَمَ), "ال" after tanween (عَذَابٌ أَلِيمٌ), the ending cut off on
+    // the word you stop on (مُصْلِحُونَ), the ة left out (ٱلضَّلَـٰلَةَ).
+    expect(check(7, "خطم الله على قلوبهم وعلى سمعهم").slice(0, 6)).toEqual(Array(6).fill("correct"));
+    expect(check(10, "في قلوبهم مرض فزادهم الله مرضا ولهم عذاب الأليم بما كانوا يكذبون")).toEqual(allRight(10));
+    expect(check(11, "وإذا قيل لهم لا تفسدوا في الأرض قالوا إنما نحن مصلح", "end")).toEqual(allRight(11));
+    expect(check(16, "أولئك الذين اشتروا الضلال بالهدى فما ربحت تجارتهم وما كانوا مهتدين")).toEqual(allRight(16));
+    // A different word of the Quran is still a mistake (أخوة for غِشَـٰوَةٌ).
+    expect(check(7, "ختم الله على قلوبهم وعلى سمعهم وعلى أبصارهم أخوة", "end")[8]).toBe("wrong");
+  });
+
   it("doesn't call the letter names said again a mistake (the phone writing them once more)", () => {
     const baqarah = words(2, 1, 2);
     const r = align(baqarah, ["لام", "ميم"], 1, { ...strict, stopped: "pause" });

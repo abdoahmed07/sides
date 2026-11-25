@@ -40,12 +40,50 @@ export class Recorder {
     return this.events.length;
   }
 
+  /** When the recording started (it names the recitation). */
+  get date() {
+    return this.meta.date;
+  }
+
   finish(result: unknown): Recording {
     return { app: "hifz-recite-recording", version: 1, meta: this.meta, events: [...this.events], result };
   }
 
   private now() {
     return Math.round(performance.now() - this.t0);
+  }
+}
+
+const UNFINISHED = "hifz:unfinishedRecording";
+
+/**
+ * A recitation left without finishing it (you left the screen, or closed the app, because something
+ * went wrong): its recording is kept on this device, to save afterwards.
+ */
+export function keepUnfinished(rec: Recording) {
+  try {
+    localStorage.setItem(UNFINISHED, JSON.stringify(rec));
+  } catch {
+    /* too big, or storage is off: nothing kept */
+  }
+}
+
+/** The recording of a recitation left without finishing it, if there's one from the last day. */
+export function unfinished(): Recording | null {
+  try {
+    const rec = JSON.parse(localStorage.getItem(UNFINISHED) ?? "null") as Recording | null;
+    return rec && Date.now() - Date.parse(String(rec.meta.date)) < 24 * 3600_000 ? rec : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Lets go of the kept recording (saved, or that recitation was finished after all). */
+export function forgetUnfinished(date?: unknown) {
+  try {
+    if (date === undefined || unfinished()?.meta.date === date) localStorage.removeItem(UNFINISHED);
+  } catch {
+    /* nothing kept */
   }
 }
 

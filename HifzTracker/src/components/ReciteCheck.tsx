@@ -10,6 +10,7 @@ import {
   ayahWords,
   fold,
   hintText,
+  LOOSE_SCORE,
   quranWords,
   SURE,
   suggestRating,
@@ -22,7 +23,15 @@ import { concat, Mic, RATE } from "@/recite/mic";
 import { loadModel, modelIsDownloaded, transcribe, type Engine } from "@/recite/recognizer";
 import { follow, type Step } from "@/recite/follow";
 import { LevelMeter, meterFits, meterOff, turnMeterOff } from "@/recite/level";
-import { keepWhileDeveloping, Recorder, saveRecording, type Recording } from "@/recite/record";
+import {
+  forgetUnfinished,
+  keepUnfinished,
+  keepWhileDeveloping,
+  Recorder,
+  saveRecording,
+  unfinished,
+  type Recording,
+} from "@/recite/record";
 import { LAST_WORD_SURE, reveal, type Live } from "@/recite/reveal";
 import { heardWords, WebSpeech, webSpeechAvailable, type SpeechProblem } from "@/recite/webspeech";
 import { loadText } from "./AyahText";
@@ -79,13 +88,21 @@ const SETTLE_MS = 1800;
 const METER_TRIAL_MS = 8000;
 /**
  * The phone's recognition hasn't said it started this long after a tap: it's stuck. (Only once it has
- * said so on this page before: then it's allowed, and isn't waiting for you to allow it.)
+ * said so on this page before: then it's allowed, and isn't waiting for you to allow it. An iPhone
+ * takes over a second at the best of times.)
  */
-const STUCK_MS = 6000;
+const STUCK_MS = 12000;
 /** Whether the phone's recognition has worked on this page (it's allowed: a start that fails is something else). */
 let workedBefore = false;
 /** Whether it has said it started on this page (some browsers may not say; a start that doesn't come only counts where they do). */
 let saysStarted = false;
+/** The phone's recognition has worked (words came), or has said it started. */
+const noteWorked = () => {
+  workedBefore = true;
+};
+const noteStarted = () => {
+  workedBefore = saysStarted = true;
+};
 
 /** A step in a recording: where matching started, heard words used, what was settled (index + s/c/w), where it goes on. */
 const stepTrace = (from: number, s: Step) => ({
@@ -178,6 +195,8 @@ export function ReciteCheck({
   /** A recording of this recitation (no sound), to save if something went wrong. */
   const recorder = useRef<Recorder | null>(null);
   const [recording, setRecording] = useState<Recording | null>(null);
+  /** The recording of a recitation left without finishing it (something went wrong), to save now. */
+  const [leftover, setLeftover] = useState<Recording | null>(unfinished);
   /** A wrong word you stopped on: if the phone then corrects itself to the right word, it's no mistake. */
   const lastFlag = useRef<number | null>(null);
   /** Without a meter (phones), the rings follow the words coming in: their level as it eases down. */
@@ -196,6 +215,13 @@ export function ReciteCheck({
   const listenAt = useRef(0);
   /** Words of the current recognition session already settled (what comes after them is new). */
   const settledWords = useRef<string[]>([]);
+  /** For each of those: the word of the text it was taken for (-1: none), to check again if the phone rewrites it. */
+  const settledAt = useRef<number[]>([]);
+  /**
+   * Words the phone wrote right at some point. Its text changes as it goes (a guess, then its final
+   * version), and you said a word it once wrote right: it counts as right.
+   */
+  const heardRight = useRef<Set<number>>(new Set());
   /** What's being heard and isn't settled yet. */
   const pending = useRef<Hearing | null>(null);
   /** Where you started reciting, when it isn't where the portion starts (found from your first words). */
@@ -223,7 +249,17 @@ export function ReciteCheck({
 
   useEffect(() => {
     loadText().then(setText, () => setPhase("error"));
+    // A recitation left before you finished it (something went wrong?): its recording is kept, to save.
+    const keep = () => {
+      if (document.visibilityState === "hidden" && recorder.current) keepUnfinished(recorder.current.finish("unfinished"));
+    };
+    document.addEventListener("visibilitychange", keep);
     return () => {
+      document.removeEventListener("visibilitychange", keep);
+      if (recorder.current) {
+        recorder.current.add("left");
+        keepUnfinished(recorder.current.finish("unfinished"));
+      }
       mic.current?.stop();
       meter.current?.stop();
       cancelAnimationFrame(activity.current.raf);
@@ -232,6 +268,21 @@ export function ReciteCheck({
       clearTimeout(settleTimer.current);
     };
   }, []);
+
+  // While reciting, anything that goes wrong in the app goes into the recording too.
+  const reciting = phase === "listening" || phase === "paused" || phase === "finishing";
+  useEffect(() => {
+    if (!reciting) return;
+    const onError = (e: ErrorEvent) => recorder.current?.add("js-error", String(e.message).slice(0, 300));
+    const onRejection = (e: PromiseRejectionEvent) =>
+      recorder.current?.add("js-error", String((e.reason as Error | undefined)?.stack ?? e.reason).slice(0, 300));
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, [reciting]);
 
   // Phone recognition is checked against every word of the Quran: work that out ahead (a moment's work).
   useEffect(() => {
@@ -308,6 +359,8 @@ export function ReciteCheck({
     prev.current = null;
     seen.current = new Set();
     settledWords.current = [];
+    settledAt.current = [];
+    heardRight.current = new Set();
     pending.current = null;
     waiting.current = [];
     lastRest.current = [];
@@ -428,6 +481,8 @@ export function ReciteCheck({
     waiting.current = waiting.current.slice(fromWaiting);
     const base = p.base + used - fromWaiting;
     settledWords.current = p.words.slice(0, base);
+    settledAt.current = settledAt.current.slice(0, base);
+    while (settledAt.current.length < base) settledAt.current.push(-1);
     return { words: p.words, base, fresh: p.fresh.slice(used) };
   };
 
@@ -439,9 +494,14 @@ export function ReciteCheck({
     }
     if (step.settled.length) {
       begun.current = true;
+      // Which word of the session's text each one was (the words waiting from an earlier session come first).
+      const waited = p.fresh.length - (p.words.length - p.base);
+      for (const s of step.settled) if (s.heard >= waited) settledAt.current[p.base + s.heard - waited] = s.index;
+      const right = step.settled.filter((s) => s.status !== "correct" && heardRight.current.has(s.index)).map((s) => s.index);
+      if (right.length) recorder.current?.add("heard-right", right);
       setStatus((prev) => {
         const next = prev.length === expected.length ? [...prev] : expected.map((): WordStatus => "pending");
-        for (const s of step.settled) next[s.index] = s.status;
+        for (const s of step.settled) next[s.index] = heardRight.current.has(s.index) ? "correct" : s.status;
         return next;
       });
     }
@@ -479,7 +539,7 @@ export function ReciteCheck({
   const onText = (transcript: string, final: boolean) => {
     if (!text) return;
     // Words coming in: it's listening (whether or not the browser said it started).
-    workedBefore = true;
+    noteWorked();
     if (!micOnNow.current) {
       micOnNow.current = true;
       setMicOn(true);
@@ -498,17 +558,43 @@ export function ReciteCheck({
       setStatus((prev) => prev.map((v, k) => (k === flagged && v === "wrong" ? "correct" : v)));
       recorder.current?.add("unflag", flagged);
     }
+    if (base < done.length) recheck(heard, base);
     let p: Hearing = { words: heard, base, fresh: [...waiting.current, ...heard.slice(base)] };
     const from = pointer.current;
     const step = follow(expected, p.fresh, from, { known: known(text), mode: "live", begun: begun.current, searchEnd: searchEnd() });
     if (step.settled.length || step.start !== undefined) recorder.current?.add("step", stepTrace(from, step));
     p = apply(p, step);
     pending.current = p;
+    // Words written right (not the last, which may be cut off): they stay right whatever the phone writes later.
+    for (const s of step.live?.statuses ?? [])
+      if (s.status === "correct" && s.score > LOOSE_SCORE && s.heard >= 0 && s.heard < p.fresh.length - 1) heardRight.current.add(s.index);
     setLive(step.live && { statuses: step.live.statuses, heard: p.fresh.length });
     pulse(0.75);
     clearTimeout(settleTimer.current);
     if (final) settle(false);
     else settleTimer.current = setTimeout(() => settle(false), SETTLE_MS);
+  };
+
+  /**
+   * The phone rewrote words already settled (its final version of what you said, after a guess): those
+   * that are the right word now count as right (never the other way round).
+   */
+  const recheck = (heard: string[], base: number) => {
+    if (!text) return;
+    const at = settledAt.current;
+    let from = -1;
+    for (let k = base - 1; k >= 0 && from < 0; k--) if (at[k] >= 0) from = at[k] + 1;
+    for (let k = base; k < at.length && from < 0; k++) if (at[k] >= 0) from = at[k];
+    if (from < 0) return;
+    const r = align(expected, heard.slice(base), from, { known: known(text) });
+    const right = r.statuses.filter((s) => s.index < pointer.current && s.status === "correct" && s.score > LOOSE_SCORE).map((s) => s.index);
+    if (!right.length) return;
+    for (const i of right) heardRight.current.add(i);
+    setStatus((prev) => {
+      const fixed = right.filter((i) => prev[i] === "wrong" || prev[i] === "skipped");
+      if (fixed.length) recorder.current?.add("rewritten-right", fixed);
+      return fixed.length ? prev.map((v, k) => (fixed.includes(k) ? "correct" : v)) : prev;
+    });
   };
 
   const onProblem = (p: SpeechProblem) => {
@@ -696,7 +782,7 @@ export function ReciteCheck({
       date: new Date().toISOString(),
       meter: mode === "phone" && meterFits() && !meterOff(),
     });
-    recorder.current.add("listen", { from: pointer.current });
+    recorder.current.add("listen", { from: pointer.current, ...(stopping.current && { again: true }) });
     if (mode === "phone") {
       // The session stopped when you paused may still be ending (an iPhone can take a while): let it go,
       // so its last words don't mix with the new session's, and settle what it heard.
@@ -708,6 +794,7 @@ export function ReciteCheck({
         if (pending.current) waiting.current = settle(false);
       }
       settledWords.current = [];
+      settledAt.current = [];
       pending.current = null;
       micOnNow.current = false;
       setMicOn(false);
@@ -718,7 +805,7 @@ export function ReciteCheck({
           lastSound.current = Date.now();
         },
         onStart: () => {
-          workedBefore = saysStarted = true;
+          noteStarted();
           micOnNow.current = true;
           setMicOn(true);
         },
@@ -726,6 +813,7 @@ export function ReciteCheck({
           // The session's text is gone: words still waiting for what comes next go on to the next one.
           waiting.current = pending.current ? settle(false) : lastRest.current;
           settledWords.current = [];
+          settledAt.current = [];
         },
         onError: onProblem,
         onTrace: (kind, data) => recorder.current?.add(kind, data),
@@ -820,6 +908,7 @@ export function ReciteCheck({
       ),
     );
     const rec = recorder.current?.finish(undefined);
+    if (recorder.current) forgetUnfinished(recorder.current.date);
     recorder.current = null;
     if (rec) setRecording(rec);
     setPhase("done");
@@ -1099,6 +1188,21 @@ export function ReciteCheck({
             </p>
             {errorMsg && (
               <p className="text-center text-xs text-danger">{errorMsg}</p>
+            )}
+            {!started && leftover && (
+              <p className="text-center text-[11px] leading-snug text-muted">
+                {t("Your last recitation stopped before you finished it.")}{" "}
+                <button
+                  className="underline underline-offset-2 hover:text-text"
+                  onClick={() => {
+                    void saveRecording(leftover);
+                    forgetUnfinished();
+                    setLeftover(null);
+                  }}
+                >
+                  {t("Save its recording")}
+                </button>
+              </p>
             )}
             {!started && (mode === "phone" || phoneAvailable) && (
               <p className="text-center text-[11px] leading-snug text-muted">

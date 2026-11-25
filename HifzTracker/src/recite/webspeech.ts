@@ -149,7 +149,13 @@ export class WebSpeech {
   private session() {
     const Rec = recognitionClass();
     if (!Rec) return this.fail("unavailable");
-    const rec = new Rec();
+    let rec: Recognition;
+    try {
+      rec = new Rec();
+    } catch (e) {
+      this.h.onTrace?.("start-failed", String(e));
+      return this.fail(this.worked ? "interrupted" : "unavailable");
+    }
     rec.lang = "ar-SA";
     rec.continuous = true;
     rec.interimResults = true;
@@ -211,7 +217,8 @@ export class WebSpeech {
     this.h.onTrace?.("start");
     try {
       rec.start();
-    } catch {
+    } catch (e) {
+      this.h.onTrace?.("start-failed", String(e));
       this.fail(this.worked ? "interrupted" : "unavailable");
     }
   }

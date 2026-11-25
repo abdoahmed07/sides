@@ -60,8 +60,11 @@ function bare(word: string): string {
     .replace(/وا$/, "و"); // the alef after a final waw
 }
 
-/** The spellings an expected word is compared in: folded, plain, and the ones without hamza. */
-type Forms = { f: string; p: string; b: string; bp: string; alts: string[]; letters: boolean };
+/**
+ * The spellings an expected word is compared in: folded, plain, and the ones without hamza. `soft`: how the
+ * phone may write it without it being the word's own spelling (not counted as a word of the Quran).
+ */
+type Forms = { f: string; p: string; b: string; bp: string; alts: string[]; soft: string[]; letters: boolean };
 
 function forms(word: string): Forms {
   const p = plain(word);
@@ -92,12 +95,15 @@ function forms(word: string): Forms {
   also(/^([وف]َ)?ٱلَّ?ـٰ/, (a) => a.replace(/^([وف]?)ال/, "$1الل"));
   // بَصْۜطَةً = بسطة: ص with a small س over it, which may be read (and written) س.
   also(/ۜ/, (a) => a.replace(/ص/g, "س"));
+  // ٱلضَّلَـٰلَةَ = الضلال: the phone may leave out the ة (said joined to the next word, it's barely heard).
+  const soft = /ة[ً-ْ]*$/.test(word) ? [...alts].filter((a) => a.length > 3 && a.endsWith("ه")).map((a) => a.slice(0, -1)) : [];
   return {
     f: fold(word),
     p: fold(p),
     b,
     bp,
     alts: [...alts],
+    soft,
     // الٓمٓ, حمٓ, طه…: the opening letters of a surah, the only words written without vowel marks.
     letters: !/[ً-ْ]/.test(word),
   };
@@ -110,6 +116,7 @@ const joined = (x: Forms, y: Forms): Forms => ({
   b: x.b + y.b,
   bp: x.bp + y.bp,
   alts: [x.b + y.b, x.bp + y.bp],
+  soft: [],
   letters: false,
 });
 
@@ -133,8 +140,30 @@ function hear(w: string): Heard {
 
 /** Whether a heard word is the expected word, in any of its spellings. */
 function sameWord(w: Forms, x: Heard): boolean {
-  if (x.f === w.f || x.f === w.p || w.alts.includes(x.b)) return true;
+  if (x.f === w.f || x.f === w.p || w.alts.includes(x.b) || w.soft.includes(x.b)) return true;
   return !!x.cut && (x.cut[0] === w.f || x.cut[0] === w.p || w.alts.includes(x.cut[1]));
+}
+
+/**
+ * Letters phones mix up, each written as one, for comparing words the Quran doesn't have (a misspelling
+ * of what was said): ت ط, د ذ ض ظ ز, س ص ث, ه ح, ك ق, خ غ, ا ع, ل ن.
+ */
+const SOUND_ALIKE: Record<string, string> = { ط: "ت", ذ: "د", ض: "د", ظ: "د", ز: "د", ص: "س", ث: "س", ح: "ه", ق: "ك", غ: "خ", ع: "ا", ء: "ا", ن: "ل" };
+const sounds = (s: string) => s.replace(/[طذضظزصثحقغعءن]/g, (c) => SOUND_ALIKE[c]);
+
+/**
+ * How alike a heard word that isn't a word of the Quran is to the expected one, by how they sound: the
+ * phone's misspelling of what you said (خطم for خَتَمَ, قانون for قَالُوٓا۟). And a word whose ending (ون, ين)
+ * the phone cut off, as it may on the word you stop on (مصلح for مُصْلِحُونَ), counts as alike.
+ */
+function soundsAlike(w: Forms, x: Heard): number {
+  let best = 0;
+  for (const e of [w.f, w.p, ...w.alts])
+    for (const h of [x.f, x.b]) {
+      if (h.length >= 3 && e.length - h.length === 2 && e.startsWith(h) && /(ون|ين)$/.test(e)) return 1;
+      best = Math.max(best, similarity(sounds(e), sounds(h)));
+    }
+  return best;
 }
 
 /** An expected word without the و ("and") it starts with, when there's a word left (وَأُو۟لَـٰٓئِكَ = أولئك). */
@@ -402,9 +431,12 @@ function fitOf(w: Forms, x: Heard, known: Set<string> | undefined): { cost: numb
   }
   const s = w.p === w.f ? similarity(w.f, x.f) : Math.max(similarity(w.f, x.f), similarity(w.p, x.f));
   if (!known) return { cost: 1.3 * (1 - s), score: s, ok: s >= SAME };
-  // Strict: another word of the Quran is a mistake; a spelling the Quran doesn't have counts when close.
-  const ok = s >= CLOSE && !known.has(x.f) && !known.has(x.b);
-  return { cost: 1.3 * (1 - s) + (ok ? 0 : WRONG), score: s, ok };
+  // Strict: another word of the Quran is a mistake; a spelling the Quran doesn't have (the phone's
+  // misspelling of what you said) counts when it sounds close.
+  if (known.has(x.f) || known.has(x.b)) return { cost: 1.3 * (1 - s) + WRONG, score: s, ok: false };
+  const alike = Math.max(s, soundsAlike(w, x));
+  const ok = alike >= CLOSE;
+  return { cost: 1.3 * (1 - alike) + (ok ? 0 : WRONG), score: alike, ok };
 }
 
 /** Whether a heard word is the expected word (strictly, with `known`, as phone recognition is checked). */
@@ -495,15 +527,28 @@ export function align(expected: string[], heard: string[], from: number, opts: A
   const lo = Math.max(0, from - RECENT);
   const ex = expected.slice(lo, from + n).map(forms);
   const off = from - lo;
+  // عَذَابٌ أَلِيمٌ = "عذاب الأليم": after tanween, the next word's alef can sound like the article.
+  for (let k = 1; k < ex.length; k++)
+    if (ex[k].f[0] === "ا" && /[ً-ٍ][ۭۢ]?ا?[ۭۢ]?$/.test(expected[lo + k - 1]))
+      ex[k] = { ...ex[k], soft: [...ex[k].soft, "ال" + ex[k].b, "ال" + ex[k].bp] };
   // (Opening letters just before `from` too: their names said again are you repeating yourself.)
   [h, at] = joinLetters(h, at, new Set(ex.filter((w) => w.letters).map((w) => w.f)));
   const m = h.length;
 
   const fit = (w: Forms, x: Heard) => fitOf(w, x, known);
-  /** Words joined or split differently: they must match as written (strict) or nearly. */
-  const joinFit = (w: Forms, x: Heard) => {
+  /**
+   * Words joined or split differently: they must match as written or nearly; strictly, nearly only when
+   * put together they're no word of the Quran (تنظر هم for تُنذِرْهُمْ, ومن ما for وَمِمَّا), and only pieces
+   * (`pieces`: each shorter than the whole and no match by itself, so a wrong word next to a right one
+   * isn't taken in).
+   */
+  const joinFit = (w: Forms, x: Heard, pieces: boolean) => {
     if (sameWord(w, x)) return { cost: JOIN, score: 1 };
-    if (known) return null;
+    if (known) {
+      if (!pieces || known.has(x.f) || known.has(x.b)) return null;
+      const s = soundsAlike(w, x);
+      return s >= CLOSE ? { cost: 1.3 * (1 - s) + JOIN, score: s } : null;
+    }
     const s = Math.max(similarity(w.f, x.f), similarity(w.p, x.f));
     return s >= JOIN_SAME ? { cost: 1.3 * (1 - s) + JOIN, score: s } : null;
   };
@@ -513,6 +558,16 @@ export function align(expected: string[], heard: string[], from: number, opts: A
   const twoHeard = Array.from({ length: m + 1 }, (_, j): Heard | null =>
     j >= 2 ? { f: h[j - 2].f + h[j - 1].f, b: h[j - 2].b + h[j - 1].b } : null,
   );
+  /** Whether heard words j-2 and j-1 are pieces of expected word i-1 (see joinFit). */
+  const splitPieces = (i: number, j: number) => {
+    const w = ex[off + i - 1];
+    return [h[j - 2], h[j - 1]].every((x) => x.f.length < w.f.length && !sameWord(w, x));
+  };
+  /** Whether expected words i-2 and i-1 are pieces of heard word j-1. */
+  const twoPieces = (i: number, j: number) => {
+    const x = h[j - 1];
+    return [ex[off + i - 2], ex[off + i - 1]].every((w) => w.f.length < x.f.length && !sameWord(w, x));
+  };
 
   // cost[i][j]: aligning expected[0..i) with heard[0..j). Skipping an expected word costs 1, an extra heard
   // word EXTRA, pairing two words 1.3 × (1 − similarity): a near-match is cheap, a wrong word ~1.3.
@@ -541,9 +596,9 @@ export function align(expected: string[], heard: string[], from: number, opts: A
       // An-Nas): what you said comes first and the skipped stretch after it, not the other way round.
       const skip = cost[i - 1][j] + (ex[off + i - 1].letters ? LETTERS_SKIP : 1);
       if (skip <= best) [best, mv] = [skip, 2];
-      const two = twoExpected[i] && joinFit(twoExpected[i]!, h[j - 1]);
+      const two = twoExpected[i] && joinFit(twoExpected[i]!, h[j - 1], twoPieces(i, j));
       if (two && cost[i - 2][j - 1] + two.cost < best) [best, mv] = [cost[i - 2][j - 1] + two.cost, 4];
-      const split = twoHeard[j] && joinFit(ex[off + i - 1], twoHeard[j]!);
+      const split = twoHeard[j] && joinFit(ex[off + i - 1], twoHeard[j]!, splitPieces(i, j));
       if (split && cost[i - 1][j - 2] + split.cost < best) [best, mv] = [cost[i - 1][j - 2] + split.cost, 5];
       closed[i][j] = best;
       closedMove[i][j] = mv;
@@ -611,13 +666,13 @@ export function align(expected: string[], heard: string[], from: number, opts: A
       statuses.push({ index: from + i - 1, status: ex[off + i - 1].letters ? "correct" : "skipped", score: 0, heard: -1 });
       i--;
     } else if (mv === 4) {
-      const score = joinFit(twoExpected[i]!, h[j - 1])!.score;
+      const score = joinFit(twoExpected[i]!, h[j - 1], twoPieces(i, j))!.score;
       statuses.push({ index: from + i - 1, status: "correct", score, heard: at[j - 1] });
       statuses.push({ index: from + i - 2, status: "correct", score, heard: at[j - 1] });
       i -= 2;
       j--;
     } else if (mv === 5) {
-      const score = joinFit(ex[off + i - 1], twoHeard[j]!)!.score;
+      const score = joinFit(ex[off + i - 1], twoHeard[j]!, splitPieces(i, j))!.score;
       statuses.push({ index: from + i - 1, status: "correct", score, heard: at[j - 1] });
       i--;
       j -= 2;

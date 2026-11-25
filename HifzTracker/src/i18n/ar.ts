@@ -1241,6 +1241,8 @@ const ar: Dict = {
   "You'll start on this page": "ستبدأ من هذه الصفحة",
   "{n} of {total}": "{n} من {total}",
   "Nothing was heard.": "لم يُسمع شيء.",
+  "Your last recitation stopped before you finished it.": "توقف تسميعك الأخير قبل أن تُنهيه.",
+  "Save its recording": "احفظ تسجيله",
   "Save a recording of this recitation": "احفظ تسجيلاً لهذا التسميع",
   "Something not right? The recording has what your phone heard and when (no sound). Send it along when you report a problem.":
     "هل هناك خلل؟ يحتوي التسجيل على ما سمعه هاتفك ومتى (دون صوت). أرسله مع بلاغك عن المشكلة.",

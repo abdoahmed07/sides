@@ -74,6 +74,9 @@ export function follow(expected: string[], heard: string[], from: number, { know
    * the phone may have missed (see align's `clipped`).
    */
   let clipped = true;
+  /** How many heard words `words` no longer starts with: settled words say which heard word they were (of all of them). */
+  let shift = 0;
+  const ofAll = (st: Statuses): Statuses => (shift ? st.map((x) => (x.heard >= 0 ? { ...x, heard: x.heard + shift } : x)) : st);
 
   const found = findJump(expected, words, at, known, begun, mode, searchEnd);
   // Paused before it's clear where you started (the words so far are in more than one place): wait for more.
@@ -97,6 +100,7 @@ export function follow(expected: string[], heard: string[], from: number, { know
     if (!begun && mode === "live") kept = jump.heard;
     else used = jump.heard;
     words = words.slice(jump.heard);
+    shift = jump.heard;
     clipped = clipped && !jump.heard;
   } else if (
     !begun &&
@@ -130,11 +134,12 @@ export function follow(expected: string[], heard: string[], from: number, { know
       const last = live.statuses.filter((s) => s.heard >= 0 && s.heard < cut).pop();
       if (last) {
         const part = live.statuses.filter((s) => s.index <= last.index);
-        settled.push(...part);
+        settled.push(...ofAll(part));
         const u = Math.max(...part.map((s) => s.heard)) + 1;
         used += kept + u;
         kept = 0;
         words = words.slice(u);
+        shift += u;
         at = last.index + 1;
         live = align(expected, words, at, { known });
       }
@@ -157,7 +162,7 @@ export function follow(expected: string[], heard: string[], from: number, { know
         ? words.slice(0, paired)
         : words;
   const r = align(expected, said, at, { known, stopped: mode, clipped: clipped && said.length > 0 });
-  settled.push(...fromStart(r.statuses));
+  settled.push(...ofAll(fromStart(r.statuses)));
   const rest = said === words ? (r.rest ?? 0) : 0;
   return { settled, next: Math.max(at, r.next), used: used + words.length - rest, live: null, start };
 }

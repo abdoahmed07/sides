@@ -1014,6 +1014,8 @@ const sv: Dict = {
   "You'll start on this page": "Du börjar på den här sidan",
   "{n} of {total}": "{n} av {total}",
   "Nothing was heard.": "Inget hördes.",
+  "Your last recitation stopped before you finished it.": "Din senaste recitation avbröts innan du avslutade den.",
+  "Save its recording": "Spara inspelningen",
   "Save a recording of this recitation": "Spara en inspelning av den här recitationen",
   "Something not right? The recording has what your phone heard and when (no sound). Send it along when you report a problem.":
     "Något som inte stämmer? Inspelningen innehåller vad din telefon hörde och när (inget ljud). Skicka med den när du rapporterar ett problem.",
