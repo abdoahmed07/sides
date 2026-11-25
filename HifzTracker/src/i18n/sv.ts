@@ -862,6 +862,8 @@ const sv: Dict = {
     one: "{n} ord som inte nåddes",
     other: "{n} ord som inte nåddes",
   },
+  "Said a grey word right? Tap it: next time the app accepts what your phone wrote there.":
+    "Sa du ett grått ord rätt? Tryck på det: nästa gång godtar appen det din telefon skrev där.",
   "{n} words not heard": { one: "{n} ord hördes inte", other: "{n} ord hördes inte" },
   "Marks mistakes as you recite.": "Markerar fel medan du reciterar.",
   "Waits on each word until it hears it right; say it again if it doesn't show.":

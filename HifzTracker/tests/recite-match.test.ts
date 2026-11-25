@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import text from "../data/quran-text.json";
-import { align, ayahWords, fold, hintText, LOOSE_SCORE, quranWords, similarity, suggestRating } from "../src/recite/match";
+import { acceptAt, align, ayahWords, fold, heardKey, hintText, LOOSE_SCORE, quranWords, similarity, suggestRating } from "../src/recite/match";
 import { q } from "./helpers";
 
 const quran = text as unknown as string[];
@@ -225,6 +225,20 @@ describe("checking the phone's recognition strictly", () => {
     expect(check(16, "أولئك الذين اشتروا الضلال بالهدى فما ربحت تجارتهم وما كانوا مهتدين")).toEqual(allRight(16));
     // A different word of the Quran is still a mistake (أخوة for غِشَـٰوَةٌ).
     expect(check(7, "ختم الله على قلوبهم وعلى سمعهم وعلى أبصارهم أخوة", "end")[8]).toBe("wrong");
+  });
+
+  it("accepts how your phone writes a word you said right, at that place only", () => {
+    // Al-Baqarah 2:8–9 (its own copy of the words, so what's accepted stays with it).
+    const text = [...words(2, 8, 9)];
+    const at = text.indexOf("يُخَـٰدِعُونَ");
+    const phone = "ومن الناس من يقول آمنا بالله وباليوم الآخر وما هم بمؤمنين يقعون الله".split(" ");
+    expect(align(text, phone, 0, strict).statuses.find((s) => s.index === at)?.status).toBe("wrong");
+    acceptAt(text, (i) => (i === at ? [heardKey("يقعون")] : undefined));
+    expect(align(text, phone, 0, strict).statuses.find((s) => s.index === at)?.status).toBe("correct");
+    // Elsewhere it doesn't count: in place of وَمَا يَخْدَعُونَ, later in 2:9, it's still a mistake.
+    const later = text.indexOf("يَخْدَعُونَ");
+    const rest = "يخادعون الله والذين آمنوا وما يقعون إلا أنفسهم وما يشعرون".split(" ");
+    expect(align(text, rest, at, strict).statuses.find((s) => s.index === later)?.status).toBe("wrong");
   });
 
   it("doesn't call the letter names said again a mistake (the phone writing them once more)", () => {

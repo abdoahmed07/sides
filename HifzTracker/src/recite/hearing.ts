@@ -24,6 +24,8 @@ export type HearingEvents = {
   live?(live: Live | null): void;
   /** Heard words just settled (for "what the app heard"). */
   said?(words: string[]): void;
+  /** What was heard for a word settled as not right (to remember if you said it right after all). */
+  heard?(index: number, word: string): void;
   /** For a recording. */
   trace?(kind: string, data?: unknown): void;
 };
@@ -162,7 +164,10 @@ export class Hearing {
       this.begun = true;
       // Which word of the session's text each one was (the words waiting from an earlier session come first).
       const waited = p.fresh.length - (p.words.length - p.base);
-      for (const s of step.settled) if (s.heard >= waited) this.settledAt[p.base + s.heard - waited] = s.index;
+      for (const s of step.settled) {
+        if (s.heard >= waited) this.settledAt[p.base + s.heard - waited] = s.index;
+        if (s.status !== "correct" && s.heard >= 0 && p.fresh[s.heard]) this.on.heard?.(s.index, p.fresh[s.heard]);
+      }
       const heardRight = step.settled.filter((s) => s.status !== "correct" && this.right.has(s.index)).map((s) => s.index);
       if (heardRight.length) this.on.trace?.("heard-right", heardRight);
       const updates = step.settled.map((s): [number, Settled] => [s.index, this.right.has(s.index) ? "correct" : s.status]);

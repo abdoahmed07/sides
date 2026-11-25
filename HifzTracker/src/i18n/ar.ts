@@ -980,6 +980,8 @@ const ar: Dict = {
     many: "{n} كلمة لم تصل إليها",
     other: "{n} كلمة لم تصل إليها",
   },
+  "Said a grey word right? Tap it: next time the app accepts what your phone wrote there.":
+    "قلت كلمة رمادية صحيحة؟ اضغط عليها: في المرة القادمة يقبل التطبيق ما كتبه هاتفك هناك.",
   "{n} words not heard": {
     zero: "{n} كلمة لم تُسمع",
     one: "كلمة واحدة لم تُسمع",

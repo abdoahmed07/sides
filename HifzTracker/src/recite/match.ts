@@ -138,6 +138,17 @@ function hear(w: string): Heard {
   return /ة[\u064B-\u0652]*$/.test(w) && f.length > 3 ? { f, b, cut: [f.slice(0, -1), b.slice(0, -1)] } : { f, b };
 }
 
+/**
+ * Spellings to accept for words of a text at their place (how your phone writes words you said right
+ * there: heard-as.ts), by the word's index in the text.
+ */
+const accepted = new WeakMap<string[], (index: number) => readonly string[] | undefined>();
+export function acceptAt(expected: string[], at: (index: number) => readonly string[] | undefined) {
+  accepted.set(expected, at);
+}
+/** A heard word in the form those spellings are kept in. */
+export const heardKey = (word: string) => bare(word);
+
 /** Whether a heard word is the expected word, in any of its spellings. */
 function sameWord(w: Forms, x: Heard): boolean {
   if (x.f === w.f || x.f === w.p || w.alts.includes(x.b) || w.soft.includes(x.b)) return true;
@@ -532,6 +543,13 @@ export function align(expected: string[], heard: string[], from: number, opts: A
   const lo = Math.max(0, from - RECENT);
   const ex = expected.slice(lo, from + n).map(forms);
   const off = from - lo;
+  // How your phone writes a word you said right, at its place (heard-as.ts).
+  const also = accepted.get(expected);
+  if (also)
+    for (let k = 0; k < ex.length; k++) {
+      const more = also(lo + k);
+      if (more?.length) ex[k] = { ...ex[k], soft: [...ex[k].soft, ...more] };
+    }
   // عَذَابٌ أَلِيمٌ = "عذاب الأليم": after tanween, the next word's alef can sound like the article.
   for (let k = 1; k < ex.length; k++)
     if (ex[k].f[0] === "ا" && /[ً-ٍ][ۭۢ]?ا?[ۭۢ]?$/.test(expected[lo + k - 1]))

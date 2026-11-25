@@ -7,7 +7,9 @@ import { useLang } from "@/i18n/react";
 import { audioUrl, newAudio, reciterById } from "@/audio/recitation";
 import {
   align,
+  acceptAt,
   ayahWords,
+  heardKey,
   hintText,
   quranWords,
   SURE,
@@ -19,6 +21,7 @@ import {
 import { concat, Mic, PAUSE_S, RATE } from "@/recite/mic";
 import { loadModel, modelIsDownloaded, transcribe, type Engine } from "@/recite/recognizer";
 import { Hearing } from "@/recite/hearing";
+import { heardAs, placeOf, rememberHeardAs } from "@/recite/heard-as";
 import { LevelMeter, meterFits, meterOff, turnMeterOff } from "@/recite/level";
 import {
   forgetUnfinished,
@@ -226,6 +229,8 @@ export function ReciteCheck({
   const listenAt = useRef(0);
   /** Following what the phone writes (see hearing.ts): one per recitation. */
   const hearing = useRef<Hearing | null>(null);
+  /** What the phone wrote for words not heard right, to remember if you tap them as said right. */
+  const heardFor = useRef(new Map<number, string>());
   /** Where you started reciting, when it isn't where the portion starts (found from your first words). */
   const [start, setStart] = useState<number | null>(null);
   const startAt = useRef<number | null>(null);
@@ -315,6 +320,19 @@ export function ReciteCheck({
     });
   }, [text, ayahs]);
   const expected = useMemo(() => words.map((w) => w.text), [words]);
+  /** Each word's place in the Quran (its ayah and position), for how your phone writes it (heard-as.ts). */
+  const places = useRef<string[]>([]);
+  useEffect(() => {
+    let k = 0;
+    places.current = words.map((w, i) => {
+      k = i > 0 && words[i - 1].ayah === w.ayah ? k + 1 : 0;
+      return placeOf(w.ayah, k);
+    });
+    acceptAt(expected, (i) => {
+      const place = places.current[i];
+      return place ? heardAs(place) : undefined;
+    });
+  }, [words, expected]);
   /** The portion's mushaf pages ([first word, end) of each): reciting shows one at a time. */
   const pages = useMemo(() => {
     const out: [number, number][] = [];
@@ -360,6 +378,7 @@ export function ReciteCheck({
     preview.current = null;
     seen.current = new Set();
     hearing.current = null;
+    heardFor.current = new Map();
     startAt.current = null;
     begun.current = false;
     recorder.current = null;
@@ -485,6 +504,7 @@ export function ReciteCheck({
           setStart(i);
         },
         live: setLive,
+        heard: (i, w) => heardFor.current.set(i, w),
         said: (said) => setHeardLog((l) => [...l.slice(-30), said.join(" ")]),
         trace: (kind, data) => recorder.current?.add(kind, data),
       },
@@ -876,7 +896,16 @@ export function ReciteCheck({
   };
 
   const fix = useCallback(
-    (i: number) => setStatus((prev) => prev.map((v, k) => (k === i ? "correct" : v))),
+    (i: number) => {
+      setStatus((prev) => prev.map((v, k) => (k === i ? "correct" : v)));
+      // Said right: what the phone wrote there counts there next time.
+      const w = heardFor.current.get(i);
+      const place = places.current[i];
+      if (w && place) {
+        rememberHeardAs(place, heardKey(w));
+        recorder.current?.add("remembered", { index: i, heard: w });
+      }
+    },
     [],
   );
 
@@ -1569,7 +1598,9 @@ function Summary(p: {
       )}
       {!perfect && (
         <p className="text-xs text-muted">
-          {t("Marked wrong but you said it right? Tap the word to correct it.")}
+          {p.soft
+            ? t("Said a grey word right? Tap it: next time the app accepts what your phone wrote there.")
+            : t("Marked wrong but you said it right? Tap the word to correct it.")}
         </p>
       )}
 
